@@ -12,12 +12,15 @@ import (
 
 func (a *Module) photoForWrite(w http.ResponseWriter, r *http.Request) (Asset, bool) {
 	p, e := a.asset(idParam(r, "pid"))
-	if e != nil {
-		fail(w, 404, "照片不存在")
+	if e != nil || !a.CanProduct(currentUser(r), p.ProductID) {
+		fail(w, 404, "素材不存在")
 		return p, false
 	}
-	ok := a.RequireProduct(w, r, p.ProductID, true)
-	return p, ok
+	if a.ActiveProduct(p.ProductID) {
+		fail(w, 409, "此商品正在排队或处理中，请等待任务完成")
+		return p, false
+	}
+	return p, true
 }
 func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 	a.Mu.Lock()
@@ -155,7 +158,7 @@ func (a *Module) deletePhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	a.Audit(r, "asset.delete", "asset", p.ID, Object{"product_id": p.ProductID})
 	for _, file := range []string{p.File, p.EnhancedFile} {
-		if file == "" {
+		if !validAssetFile(file) {
 			continue
 		}
 		var n int

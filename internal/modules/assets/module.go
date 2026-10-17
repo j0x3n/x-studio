@@ -9,17 +9,22 @@ import (
 
 type Module struct {
 	*core.Core
-	aiUsers      sync.Map
-	backfillOnce sync.Once
+	aiUsers         sync.Map
+	backfillOnce    sync.Once
+	cleanupOnce     sync.Once
+	workbenchFiles  sync.Map
+	workbenchFileMu sync.Mutex
 }
 
 func New(c *core.Core) *Module { return &Module{Core: c} }
 func (*Module) Name() string   { return "assets" }
 func (a *Module) Jobs() map[string]core.JobHandler {
-	return map[string]core.JobHandler{"assets.tag": a.executeTag, "assets.process": a.executeProcess}
+	return map[string]core.JobHandler{"assets.workbench": a.executeWorkbench, "assets.tag": a.executeTag, "assets.process": a.executeProcess}
 }
 func (a *Module) Routes(r *core.Router) {
 	a.startHashBackfill()
+	a.startWorkbenchCleanup()
+	a.workbenchRoutes(r)
 	r.Handle("GET /api/presets", core.AssetUpload, a.presets)
 	r.Handle("POST /api/presets", core.AssetUpload, a.createPreset)
 	r.Handle("PATCH /api/presets/{id}", core.Scoped, a.patchPreset)

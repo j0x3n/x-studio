@@ -1,7 +1,6 @@
 package assets
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -21,6 +20,10 @@ func sharedPipelineBusy(db interface{ QueryRow(string, ...any) *sql.Row }, pid i
 	return err != nil || n > 0
 }
 func (a *Module) process(w http.ResponseWriter, r *http.Request) {
+	if !currentUser(r).Has(core.AssetUpload) {
+		fail(w, 403, "没有此图片处理的权限")
+		return
+	}
 	var raw Object
 	if !decode(w, r, &raw) {
 		return
@@ -61,6 +64,10 @@ func (a *Module) process(w http.ResponseWriter, r *http.Request) {
 		ref, e := a.asset(in.Ops.Color.MatchTo)
 		if e != nil || !a.CanProduct(currentUser(r), ref.ProductID) {
 			fail(w, 404, "校色参考图不存在")
+			return
+		}
+		if ref.ProductID != pid {
+			fail(w, 400, "校色参考图必须是本批同一款的图")
 			return
 		}
 	}
@@ -181,6 +188,9 @@ func (a *Module) executeProcess(ctx context.Context, j core.Job) error {
 	if err != nil {
 		return err
 	}
+	if !u.Has(core.AssetUpload) {
+		return fmt.Errorf("任务发起人没有上传权限")
+	}
 	prompts, err := a.preparePrompts(in.Ops)
 	if err != nil {
 		return err
@@ -203,6 +213,9 @@ func (a *Module) executeProcess(ctx context.Context, j core.Job) error {
 		p, e := a.asset(in.Ops.Color.MatchTo)
 		if e != nil || !a.CanProduct(u, p.ProductID) {
 			return fmt.Errorf("校色参考图不存在")
+		}
+		if p.ProductID != j.TargetID {
+			return fmt.Errorf("校色参考图必须是本批同一款的图")
 		}
 		im, ex, e := a.load(p)
 		if e != nil {
@@ -254,109 +267,32 @@ func (a *Module) processOne(ctx context.Context, p Asset, in ProcessRequest, pro
 	if err != nil {
 		return nil, err
 	}
-	original := imaging.Geometry(raw, ex.Orientation, 0, nil)
-	im := original
-	o := in.Ops
-	op := Object{"ops": o, "preset_id": in.PresetID, "set_current": in.SetCurrent, "prompts": prompts.names, "models": Object{}}
-	warnings := []string{}
-	models := op["models"].(Object)
-	source := p.EffectiveSource()
-	if o.Geometry != nil {
-		im = imaging.Geometry(raw, ex.Orientation, o.Geometry.Rotate, o.Geometry.Crop)
-	}
-	if ratio, ok := map[string]float64{"1:1": 1, "3:4": .75, "4:3": 4.0 / 3, "16:9": 16.0 / 9}[o.Aspect]; ok {
-		im = imaging.Aspect(im, ratio)
-	}
-	if o.Color != nil {
-		var params Object
-		im, params = imaging.Color(im, p.Code, o.Color.AutoWB, ref)
-		op["color"] = params
-	}
-	if o.Cutout != nil {
-		mask, mode := imaging.Mask(ctx, im, a.Cfg.RembgURL, a.Client)
-		op["cutout"] = mode
-		im = imaging.ReplaceBackground(im, mask, o.Cutout.Background == "transparent")
-		if mode == "fallback" {
-			warnings = append(warnings, "抠图服务不可用，已使用边缘连通算法")
+	v, err := a.processImage(ctx, raw, ex, p.EffectiveSource(), p.Code, in, prompts, ref, func(im image.Image, format string) (string, error) {
+		if err := os.MkdirAll(filepath.Join(a.Dir(p.ProductID), "原图"), 0700); err != nil {
+			return "", fmt.Errorf("创建处理图片目录失败")
 		}
-	}
-	edit := func(feature, prompt string) error {
-		models[feature] = a.Model(feature, a.Cfg.ImageModel)
-		data, e := a.EditImage(core.WithFeature(ctx, feature), prompt, []image.Image{im})
-		if e != nil {
-			return e
-		}
-		if _, _, e = imageConfig(data); e != nil {
-			return fmt.Errorf("AI 图片格式或像素数量不符合要求")
-		}
-		decoded, _, e := image.Decode(bytes.NewReader(data))
-		if e != nil {
-			return fmt.Errorf("AI 图片无法解码")
-		}
-		im = imaging.Geometry(decoded, 1, 0, nil)
-		return nil
-	}
-	if o.Upscale != nil {
-		if err = edit("upscale", prompts.upscale); err != nil {
-			return nil, err
-		}
-		im, err = imaging.Resample(im, o.Upscale.TargetLongSide)
+		f, err := os.CreateTemp(filepath.Join(a.Dir(p.ProductID), "原图"), ".process-*.")
 		if err != nil {
-			return nil, err
+			return "", fmt.Errorf("创建处理图片临时文件失败")
 		}
-		warnings = append(warnings, "高清化采用 AI 重绘后重采样，并非真正的无损放大")
-		source = composeSource(source, "ai_enhanced")
-	}
-	if o.AI != nil {
-		if err = edit("process", prompts.ai); err != nil {
-			return nil, err
+		name := f.Name()
+		f.Close()
+		if format == "png" {
+			err = imaging.SavePNG(name, im)
+		} else {
+			err = imaging.SaveJPEG(name, im)
 		}
-		kind := "ai_enhanced"
-		if prompts.edited {
-			kind = "ai_edited"
-		}
-		source = composeSource(source, kind)
-	}
-	if o.Upscale != nil || o.AI != nil {
-		diff := imaging.Diff(original, im)
-		op["diff"] = diff
-		if diff["phash_distance"].(int) > 16 {
-			warnings = append(warnings, "商品外观可能被改动，请对照原图")
-		}
-	}
-	if o.Resize != nil {
-		im, err = imaging.Resample(im, o.Resize.LongSide)
 		if err != nil {
-			return nil, err
+			os.Remove(name)
+			return "", fmt.Errorf("保存处理图片失败")
 		}
+		return name, nil
+	})
+	if v != nil {
+		v.input = p
+		v.op["elapsed_ms"] = time.Since(started).Milliseconds()
 	}
-	if o.Format == "jpg" {
-		im = imaging.Flatten(im)
-		if o.Cutout != nil && o.Cutout.Background == "transparent" {
-			warnings = append(warnings, "JPG 不支持透明，已合成白底")
-		}
-	}
-	if err = os.MkdirAll(filepath.Join(a.Dir(p.ProductID), "原图"), 0700); err != nil {
-		return nil, fmt.Errorf("创建处理图片目录失败")
-	}
-	f, err := os.CreateTemp(filepath.Join(a.Dir(p.ProductID), "原图"), ".process-*.")
-	if err != nil {
-		return nil, fmt.Errorf("创建处理图片临时文件失败")
-	}
-	name := f.Name()
-	f.Close()
-	if o.Format == "png" {
-		err = imaging.SavePNG(name, im)
-	} else {
-		err = imaging.SaveJPEG(name, im)
-	}
-	if err != nil {
-		os.Remove(name)
-		return nil, fmt.Errorf("保存处理图片失败")
-	}
-	op["warnings"] = warnings
-	op["elapsed_ms"] = time.Since(started).Milliseconds()
-	return &stagedProcess{input: p, width: im.Rect.Dx(), height: im.Rect.Dy(), phash: fmt.Sprintf("%016x", imaging.Hash(im)), file: name, source: source, op: op}, nil
+	return v, err
 }
 func (a *Module) publishProcess(j core.Job, in ProcessRequest, v stagedProcess) (int64, error) {
 	a.Mu.Lock()

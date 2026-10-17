@@ -128,20 +128,27 @@ func mergeParams(base, override Object) Object {
 	}
 	return out
 }
-func (a *Module) processRequest(raw Object, u core.User) (ProcessRequest, error) {
+func (a *Module) resolveProcessPreset(raw Object, u core.User) (Object, error) {
 	var probe struct {
 		PresetID *int64 `json:"preset_id"`
 	}
 	if err := decodeObject(raw, &probe); err != nil {
-		return ProcessRequest{}, fmt.Errorf("预设编号不正确")
+		return nil, fmt.Errorf("预设编号不正确")
 	}
 	merged := raw
 	if probe.PresetID != nil {
 		var params string
-		if a.DB.QueryRow("SELECT params FROM asset_presets WHERE id=? AND (owner_id=? OR shared=1)", *probe.PresetID, u.ID).Scan(&params) != nil {
-			return ProcessRequest{}, fmt.Errorf("预设不存在")
+		if a.DB.QueryRow("SELECT params FROM asset_presets WHERE id=? AND (owner_id=? OR (shared=1 AND ?<>'shares'))", *probe.PresetID, u.ID, u.Role.Scope).Scan(&params) != nil {
+			return nil, fmt.Errorf("预设不存在")
 		}
 		merged = mergeParams(core.JSONObj(params), raw)
+	}
+	return merged, nil
+}
+func (a *Module) processRequest(raw Object, u core.User) (ProcessRequest, error) {
+	merged, err := a.resolveProcessPreset(raw, u)
+	if err != nil {
+		return ProcessRequest{}, err
 	}
 	var in ProcessRequest
 	if err := strictDecode(merged, &in); err != nil {

@@ -46,7 +46,10 @@ func (a *Module) load(p Asset) (*image.NRGBA, imaging.Exif, error) {
 	return imaging.Geometry(im, 1, 0, nil), imaging.ReadExif(b), nil
 }
 func (a *Module) download(w http.ResponseWriter, r *http.Request) {
-	var in selection
+	var in struct {
+		selection
+		AILabel *int `json:"ai_label"`
+	}
 	if !decode(w, r, &in) {
 		return
 	}
@@ -57,6 +60,10 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 	items, err := a.selected(currentUser(r), in.AssetIDs)
 	if err != nil {
 		fail(w, 404, err.Error())
+		return
+	}
+	label, ok := downloadLabel(w, r, in.AILabel)
+	if !ok {
 		return
 	}
 	f, err := os.CreateTemp(a.Cfg.DataDir, ".assets-*.zip")
@@ -93,7 +100,15 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 		names[name] = true
 		entry, e := z.Create(name)
 		if e == nil {
-			e = jpeg.Encode(entry, imaging.Geometry(im, ex.Orientation, 0, nil), &jpeg.Options{Quality: 92})
+			var buf bytes.Buffer
+			e = jpeg.Encode(&buf, imaging.Geometry(im, ex.Orientation, 0, nil), &jpeg.Options{Quality: 92})
+			if e == nil {
+				var data []byte
+				data, e = labelDownload(buf.Bytes(), p.EffectiveSource(), label)
+				if e == nil {
+					_, e = entry.Write(data)
+				}
+			}
 		}
 		if e != nil {
 			z.Close()
@@ -113,6 +128,9 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail(w, 500, "读取下载包失败")
 		return
+	}
+	if !label {
+		a.Audit(r, "export.no_ai_label", "assets", 0, Object{"asset_ids": in.AssetIDs})
 	}
 	a.Audit(r, "assets.download", "assets", 0, Object{"asset_ids": in.AssetIDs})
 	w.Header().Set("Content-Type", "application/zip")

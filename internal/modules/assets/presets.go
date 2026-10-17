@@ -46,7 +46,8 @@ func validatePresetParams(raw Object) (Object, error) {
 	return Object{"ops": v.Ops, "set_current": v.SetCurrent}, nil
 }
 func (a *Module) presets(w http.ResponseWriter, r *http.Request) {
-	rows, err := a.DB.Query("SELECT id,name,owner_id,shared,params,created_at,updated_at FROM asset_presets WHERE owner_id=? OR shared=1 ORDER BY updated_at DESC,id DESC", currentUser(r).ID)
+	u := currentUser(r)
+	rows, err := a.DB.Query("SELECT id,name,owner_id,shared,params,created_at,updated_at FROM asset_presets WHERE owner_id=? OR (shared=1 AND ?<>'shares') ORDER BY updated_at DESC,id DESC", u.ID, u.Role.Scope)
 	if err != nil {
 		fail(w, 500, "读取预设失败")
 		return
@@ -111,12 +112,8 @@ func (a *Module) createPreset(w http.ResponseWriter, r *http.Request) {
 func (a *Module) presetForWrite(w http.ResponseWriter, r *http.Request) (Preset, bool) {
 	p, err := scanPreset(a.DB.QueryRow("SELECT id,name,owner_id,shared,params,created_at,updated_at FROM asset_presets WHERE id=?", idParam(r, "id")))
 	u := currentUser(r)
-	if err != nil || (p.OwnerID != u.ID && !p.Shared && u.Role.Key != "admin") {
+	if err != nil || p.OwnerID != u.ID {
 		fail(w, 404, "预设不存在")
-		return p, false
-	}
-	if p.OwnerID != u.ID && u.Role.Key != "admin" {
-		fail(w, 403, "只能修改自己创建的预设")
 		return p, false
 	}
 	return p, true

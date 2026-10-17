@@ -34,5 +34,15 @@ CREATE INDEX IF NOT EXISTS assets_parent_id ON assets(parent_id);
 CREATE TABLE IF NOT EXISTS asset_presets(id INTEGER PRIMARY KEY,name TEXT NOT NULL,owner_id INTEGER NOT NULL REFERENCES users(id),shared INTEGER NOT NULL DEFAULT 0,params TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS assets_updated_at_insert AFTER INSERT ON assets WHEN NEW.updated_at='' BEGIN UPDATE assets SET updated_at=NEW.created_at WHERE id=NEW.id; END;`)
 		return err
+	}}, {Version: 3, Up: func(tx *sql.Tx) error {
+		_, err := tx.Exec(`CREATE TABLE workbench_items(
+ id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+ kind TEXT NOT NULL CHECK(kind IN ('input','result')), file TEXT NOT NULL,
+ orig_name TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL,
+ phash TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'original',
+ asset_id INTEGER, input_id INTEGER, op TEXT NOT NULL DEFAULT '{}',
+ saved_asset_id INTEGER, created_at TEXT NOT NULL);
+ CREATE INDEX workbench_user_created ON workbench_items(user_id,created_at);`)
+		return err
 	}}}
 }
