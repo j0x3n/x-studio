@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+	"xstudio/internal/imaging"
 )
 
 const maxPhotoBytes int64 = 25 << 20
@@ -62,7 +63,7 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type pending struct {
-		p   Photo
+		p   Asset
 		tmp string
 	}
 	files := []pending{}
@@ -104,7 +105,8 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Decode as well as sniffing the header: reject truncated or corrupt images.
-		if _, _, e = image.Decode(bytes.NewReader(b)); e != nil {
+		decoded, _, decodeErr := image.Decode(bytes.NewReader(b))
+		if decodeErr != nil {
 			fail(w, 400, "图片损坏，无法解码")
 			return
 		}
@@ -114,7 +116,7 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		e1 := func() error { defer tmp.Close(); _, e := tmp.Write(b); return e }()
-		files = append(files, pending{p: Photo{ProductID: id, OrigName: safeName(part.FileName()), Width: c.Width, Height: c.Height, Metrics: Object{}, RetouchLog: Object{}, Source: "original"}, tmp: tmp.Name()})
+		files = append(files, pending{p: Asset{Photo: Photo{ProductID: id, OrigName: safeName(part.FileName()), Width: c.Width, Height: c.Height, Metrics: Object{}, RetouchLog: Object{}, Source: "original"}}, tmp: tmp.Name()})
 		if e1 != nil {
 			fail(w, 500, "保存上传照片失败")
 			return
@@ -124,6 +126,7 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			ext = "jpg"
 		}
 		files[len(files)-1].p.File = ext
+		files[len(files)-1].p.PHash = fmt.Sprintf("%016x", imaging.Hash(imaging.Geometry(decoded, imaging.ReadExif(b).Orientation, 0, nil)))
 	}
 	if len(files) == 0 {
 		fail(w, 400, "没有收到 files 照片")
@@ -144,11 +147,12 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
-	photos := []Photo{}
+	photos := []Asset{}
 	for _, v := range files {
 		p := v.p
 		p.CreatedBy = currentUser(r).ID
 		p.CreatedAt = now()
+		p.UpdatedAt = p.CreatedAt
 		p.Kind = "photo"
 		p.Tags = []string{}
 		p.Op = Object{}
@@ -166,21 +170,23 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		renamed = append(renamed, dst)
-		if _, e = tx.Exec("UPDATE assets SET file=? WHERE id=?", p.File, p.ID); e != nil {
+		if _, e = tx.Exec("UPDATE assets SET file=?,phash=?,updated_at=? WHERE id=?", p.File, p.PHash, p.UpdatedAt, p.ID); e != nil {
 			fail(w, 500, "保存照片失败")
 			return
 		}
 		p.URL = fmt.Sprintf("/files/products/%d/%s", id, p.File)
 		photos = append(photos, p)
 	}
-	if _, e = tx.Exec("UPDATE products SET updated_at=? WHERE id=?", now(), id); e != nil {
-		fail(w, 500, "更新款式失败")
-		return
-	}
 	if e = tx.Commit(); e != nil {
 		fail(w, 500, "保存照片失败")
 		return
 	}
 	committed = true
+	ids := []int64{}
+	for i := range photos {
+		ids = append(ids, photos[i].ID)
+		photos[i] = a.decorate(photos[i], currentUser(r), photos)
+	}
+	a.Audit(r, "assets.upload", "product", id, Object{"asset_ids": ids})
 	writeJSON(w, 201, Object{"items": photos, "total": len(photos)})
 }

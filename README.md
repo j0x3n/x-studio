@@ -236,3 +236,58 @@ docker build -t xstudio .
 - 新增测试涵盖默认配置与空推理强度、多 image 字段的 multipart、请求重试与超时、PNG/base64、阈值和裁剪、旧数据库及部分迁移、每款开关、禁止补图的编号、4 张限制、失败继续、AI 标识纠正、实拍优先和增强输入不重复裁剪。
 - 假 AI 服务器与真实 Chrome 跑通完整六步：3 张实拍高清化、补 3 张图、保守修图、生成文案、导出 ZIP，并检查主图与详情页 DOM 实际显示“AI 生成”和“AI 增强”。测试未访问真实 SubAPI。
 - `web/`、`prompts/`、实际 `.env` 未修改；旧版模板的字符串标识兼容只处理本站副本。
+
+## 图片库与图片处理后端（phase1/assets，2026-10-18）
+
+按第 1–5 步实现图片库、批量操作、AI 打标签、图片处理、预设和操作日志。修改范围只有 `internal/modules/assets/`、新建的 `internal/imaging/` 和本小节；没有新增依赖，没有修改共用模块、流水线、前端、提示词、模板或约定文档。
+
+- `imaging/{image,config,cutout}.go` 从流水线复制几何、EXIF、保守校色、蒙版、合成与文件编码算法；`hash.go`、`process.go` 增加 DCT 感知哈希、参考图校色、比例裁剪、重采样、透明合成和 AI 前后比对。
+- `assets/migrations.go` 保留 v1 并增加 v2：新字段、索引和 `asset_presets`。旧素材不重写文件，phash 选择后台补算；列表和详情不解码补算。上传和处理生成时直接计算。旧流水线仍可插入素材，由触发器补齐初始 `updated_at`。
+- `assets/{model,library,assets,upload}.go` 实现全库筛选、版本树、引用、标题/备注/标签/归档及上传兼容；`module.go` 注册接口和任务。
+- `assets/{batch,files,tag,jobs}.go` 实现批量动作、ZIP 下载、相似搜索和 AI 打标签；`{params,process,presets}.go` 实现处理参数、任务与预设。测试位于两包的 `*_test.go`。
+
+### 接口与任务结果
+
+新增 `GET /api/assets`、`GET /api/assets/{id}`，以及 `POST /api/assets/batch`、`/download`、`/{id}/similar`、`/tag`、`/process`；预设为 `GET/POST /api/presets` 和 `PATCH/DELETE /api/presets/{id}`。沿用原有商品上传和素材 PATCH/DELETE 接口。新列表支持约定中的全部筛选，`archived` 默认 0；数据范围、总数和分页全部在 SQL 中执行，列表与相似搜索复用 `scope.go` 中与 `core.CanProduct` 一致的条件。版本链保留归档素材，包含同一根下的分支。
+
+后台任务 `assets.tag`、`assets.process` 都以商品为目标；返回 `{job}`，通过现有任务接口查询。**结果是对象**：`{"items":[{"asset_id":12,"new_asset_id":34},{"asset_id":13,"error":"读取素材文件失败"}]}`。打标签成功项包含合并后的 `tags`。单张失败时整批仍为 done；缺提示词、额度不足等整批前置失败时为 failed。批量动作同步返回 `{items,total}`，逐张报告跳过原因。
+
+处理严格按 EXIF 转正 → 本次 geometry → aspect → color → cutout → upscale → ai → resize → format 顺序执行，不重复应用素材保存的 crop/rotate。新版本原图文件保持不变，`parent_id` 指向输入素材，记录操作者、参数、模型、提示词文件名、比对、警告与耗时。来源按有效来源与本次操作取更高等级；E5 跳过校色，参考图不允许出现在本批输入。透明背景保存 JPG 时合成白底并记录警告。
+
+`set_current` 在请求和发布新版本时都检查商品共用流水线。请求冲突返回 409；执行中才发生冲突时保留新版本，跳过编号转移并写警告。编号转移与素材记录使用事务，成功后清理该编号的旧修图输出；新版本用于后续一键出图。
+
+### 验证方式
+
+每一步均先通过 `go build ./...` 和图片模块测试再继续：第 1–4 步分别为 3、5、10、11 项测试。第 5 步新增算法检查后，两包共 13 项顶层测试（assets 10 项、imaging 3 项），覆盖数据范围、权限、迁移、标签计量、来源、版本/原文件、批次额度、部分失败、执行期间编号冲突、预设覆盖与日志。
+
+所有 Go 验证均使用以下离线环境，新增 AI 和 rembg 测试只访问 `httptest` 假服务及临时目录，不读取 `.env`：
+
+```powershell
+$env:GOMODCACHE = Join-Path $PWD '.cache/go-mod'
+$env:GOCACHE = Join-Path $PWD '.cache/go-build'
+$env:GOFLAGS = '-mod=mod'
+$env:GOPROXY = 'off'
+go build ./...
+go vet ./...
+go test ./... -count=1 -v
+```
+
+分步日志为 `.cache/assets-step1.log` 至 `assets-step4.log`，最终全量日志为 `.cache/assets-final-tests.log`。最终 build、vet 和全量测试全部通过：56 项顶层测试（含新增 13 项），0 跳过，既有真实 Chrome 渲染测试也通过。
+
+### 约定解释、共用接口需求与风险
+
+- 依本次任务补充约定，`jobs.result` 使用 `{items:[...]}`，不使用原接口文档里的裸数组。几何、参考图限幅、逐张失败、运行中 `set_current` 冲突均按补充约定处理。
+- 打标签一次也限制同一商品，因为任务必须有唯一的商品目标与数据范围；跨商品打标签需要前端拆请求。共享预设按现有表结构对全体账号可见，个人预设只对本人可见；创建人和管理员可改删。
+- 移动素材会复制原文件和增强文件到目标商品，解除跨商品的 parent 关联，避免版本详情泄露其他商品的数据。占用编号的素材不能移动。普通 PATCH、上传、删除保留原有流水线冲突规则；批量修改额外检查商品目标任务。
+- **建议 Claude 扩展 `internal/core/quota.go`**：提供含在途用量的整批原子预留接口，并让 AI 调用消耗该预留。目前本模块整批预估额度、同用户本模块任务串行，并暂存处理结果直到全部 AI 调用结束；跨模块仍可能并发消耗额度。后续调用额度不足时不发布本批新版本/标签，但此前成功的 AI 调用仍会计量，不能保证跨模块并发下整批零调用。
+- **若要按功能配置模型，请 Claude 扩展 `internal/core/settings.go`** 的 `ai_models` 白名单，允许 `tag`、`upscale`、`process`。当前已按这些功能名计量，使用既有 VisionModel/ImageModel 回退配置即可运行。未修改这两个冻结文件。
+- 提示词只读取约定的四个文件；本工作区缺文件时按中文错误失败，由 Claude 在 main 提供。未验证真实模型效果或真实 rembg 服务。
+- 后台补算由 `assets/backfill.go` 在模块注册路由时启动 goroutine；core 没有模块启动钩子，使用其 `Context()` 退出、`OnClose()` 等待后再关闭数据库。每批最多 50 张，满批间让出 25ms，空闲轮询间隔 1 秒。读文件失败时记录中文日志并写 `phash='-'`，后续不自动重试；需要修复后重算时可由维护人员清空该标记。相似搜索只读取 SQL 范围内已有有效哈希的候选（保留归档素材），仅目标图允许同步补算一张。
+- 处理台抠图使用 `imaging.ReplaceBackground`，保持输入尺寸、比例和像素位置，按蒙版混合白底或输出透明 alpha，并保留软边；原 `CompositeWhite` 不变。AI 比对将图片缩到宽 256，极端长图另限制高 4096，避免无上限内存分配。
+
+### 图片库与处理返工第 1 轮
+
+- 抠图：修改 `imaging/cutout.go`、`assets/process.go`；`imaging_test.go` 新增软边及不移动像素测试，`process_test.go` 新增 900×1200、3:4 白底与透明抠图测试。
+- SQL 范围及分页：新增 `assets/scope.go`，修改 `library.go`、`files.go`；`assets_test.go` 新增 3 个商品共 25 张素材的分页测试（运营可见 21 张，三页为 10/10/1，协作者可见 10 张），`backfill_test.go` 比较 28 组用户/商品的 SQL 范围和 `core.CanProduct`。
+- 后台哈希：新增 `assets/backfill.go`，修改 `module.go`、`model.go`；迁移测试改为等待真实后台补算，确认列表和详情不主动解码、原图字节不变。新增批次 50/2/0、失败标记不重试、context 取消测试；`batch_test.go` 新增相似搜索范围、距离、排序、最多 50 张、保留归档以及只补算目标图测试。
+- 新增 6 项顶层测试，图片两包共 19 项。按上面的离线环境执行 `gofmt -l internal/`（无输出）、`go build ./...`、`go vet ./...`、`go test ./... -count=1 -v`，全部通过；全库 62 项顶层测试，含子测试 90 项，0 跳过。日志：`.cache/assets-rework1-focused.log`、`.cache/assets-rework1-tests.log`。本轮无要求差异，未修改冻结文件，未提交。

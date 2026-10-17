@@ -2,16 +2,35 @@ package assets
 
 import (
 	"net/http"
+	"sync"
 	"xstudio/internal/core"
 	"xstudio/internal/media"
 )
 
-type Module struct{ *core.Core }
+type Module struct {
+	*core.Core
+	aiUsers      sync.Map
+	backfillOnce sync.Once
+}
 
-func New(c *core.Core) *Module                   { return &Module{c} }
-func (*Module) Name() string                     { return "assets" }
-func (*Module) Jobs() map[string]core.JobHandler { return nil }
+func New(c *core.Core) *Module { return &Module{Core: c} }
+func (*Module) Name() string   { return "assets" }
+func (a *Module) Jobs() map[string]core.JobHandler {
+	return map[string]core.JobHandler{"assets.tag": a.executeTag, "assets.process": a.executeProcess}
+}
 func (a *Module) Routes(r *core.Router) {
+	a.startHashBackfill()
+	r.Handle("GET /api/presets", core.AssetUpload, a.presets)
+	r.Handle("POST /api/presets", core.AssetUpload, a.createPreset)
+	r.Handle("PATCH /api/presets/{id}", core.Scoped, a.patchPreset)
+	r.Handle("DELETE /api/presets/{id}", core.Scoped, a.deletePreset)
+	r.Handle("POST /api/assets/process", core.Scoped, a.process)
+	r.Handle("POST /api/assets/batch", core.Scoped, a.batch)
+	r.Handle("POST /api/assets/download", core.ExportRun, a.download)
+	r.Handle("POST /api/assets/{pid}/similar", core.ProductView, a.similar)
+	r.Handle("POST /api/assets/tag", core.AssetUpload, a.tag)
+	r.Handle("GET /api/assets", core.ProductView, a.library)
+	r.Handle("GET /api/assets/{pid}", core.ProductView, a.detail)
 	r.Handle("GET /api/products/{id}/assets", core.ProductView, a.list)
 	r.Handle("POST /api/products/{id}/assets", core.AssetUpload, a.upload)
 	r.Handle("PATCH /api/assets/{pid}", core.AssetUpload, a.patchPhoto)

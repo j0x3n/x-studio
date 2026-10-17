@@ -10,8 +10,8 @@ import (
 	"xstudio/internal/media"
 )
 
-func (a *Module) photoForWrite(w http.ResponseWriter, r *http.Request) (Photo, bool) {
-	p, e := scanPhoto(a.DB.QueryRow("SELECT "+photoColumns+" FROM assets WHERE id=?", idParam(r, "pid")))
+func (a *Module) photoForWrite(w http.ResponseWriter, r *http.Request) (Asset, bool) {
+	p, e := a.asset(idParam(r, "pid"))
 	if e != nil {
 		fail(w, 404, "照片不存在")
 		return p, false
@@ -40,6 +40,18 @@ func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 	for k, v := range in {
 		var e error
 		switch k {
+		case "title":
+			e = json.Unmarshal(v, &p.Title)
+			if len([]rune(p.Title)) > 200 {
+				e = errors.New("显示名过长")
+			}
+		case "note":
+			e = json.Unmarshal(v, &p.Note)
+			if len([]rune(p.Note)) > 4000 {
+				e = errors.New("备注过长")
+			}
+		case "archived":
+			e = json.Unmarshal(v, &p.Archived)
 		case "code":
 			if string(v) == "null" {
 				p.Code = ""
@@ -72,10 +84,12 @@ func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if e := validatePhoto(p); e != nil {
+	if e := validatePhoto(p.Photo); e != nil {
 		fail(w, 400, e.Error())
 		return
 	}
+	p.Tags = normalizeTags(p.Tags)
+	p.UpdatedAt = now()
 	if oldCrop != js(p.Crop) || oldRotate != p.Rotate {
 		p.EnhancedFile = ""
 		p.AIEnhanced = false
@@ -93,7 +107,7 @@ func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if _, e := tx.Exec("UPDATE assets SET code=?,crop=?,rotate=?,white_bg=?,manual=?,enhanced_file=?,ai_enhanced=?,retouch_log=?,tags=?,source_override=? WHERE id=?", p.Code, js(p.Crop), p.Rotate, p.WhiteBG, p.Manual, p.EnhancedFile, p.AIEnhanced, js(p.RetouchLog), js(p.Tags), p.SourceOverride, p.ID); e != nil {
+	if _, e := tx.Exec("UPDATE assets SET code=?,crop=?,rotate=?,white_bg=?,manual=?,enhanced_file=?,ai_enhanced=?,retouch_log=?,tags=?,source_override=?,title=?,note=?,archived=?,updated_at=? WHERE id=?", p.Code, js(p.Crop), p.Rotate, p.WhiteBG, p.Manual, p.EnhancedFile, p.AIEnhanced, js(p.RetouchLog), js(p.Tags), p.SourceOverride, p.Title, p.Note, p.Archived, p.UpdatedAt, p.ID); e != nil {
 		fail(w, 409, "该编号已被另一张照片使用")
 		return
 	}
@@ -111,7 +125,8 @@ func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 		a.removePhotoOutputs(p.ProductID, old)
 		a.removePhotoOutputs(p.ProductID, p.Code)
 	}
-	_, _ = a.DB.Exec("UPDATE products SET updated_at=? WHERE id=?", now(), p.ProductID)
+
+	a.Audit(r, "assets.update", "asset", p.ID, Object{"fields": rawFields(in)})
 	writeJSON(w, 200, Object{"asset": p})
 }
 func (a *Module) removePhotoOutputs(id int64, code string) {
@@ -149,6 +164,6 @@ func (a *Module) deletePhoto(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.removePhotoOutputs(p.ProductID, p.Code)
-	_, _ = a.DB.Exec("UPDATE products SET updated_at=? WHERE id=?", now(), p.ProductID)
+
 	writeJSON(w, 200, Object{})
 }
