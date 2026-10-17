@@ -55,7 +55,12 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "上架版本不存在")
 		return
 	}
-	if _, e := os.Stat(filepath.Join(a.ListingDir(id), "导出.zip")); e != nil {
+	_, statErr := os.Stat(filepath.Join(a.ListingDir(id), "导出.zip"))
+	if a.requireReviewForDownload(id, statErr == nil) {
+		fail(w, 409, "出图结果还没审核通过")
+		return
+	}
+	if statErr != nil {
 		fail(w, 404, "导出文件不存在")
 		return
 	}
@@ -71,6 +76,30 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 	a.Audit(r, action, "listing", id, Object{"ai_label": label, "stage": "download"})
 	w.Header().Set("Content-Disposition", `attachment; filename="export.zip"; filename*=UTF-8''%E5%AF%BC%E5%87%BA.zip`)
 	serveRoot(w, r, a.ListingDir(id), "导出.zip")
+}
+func (a *Module) requireReviewForDownload(listingID int64, hasZip bool) bool {
+	var raw string
+	if err := a.DB.QueryRow("SELECT value FROM studio_settings WHERE key='require_review'").Scan(&raw); err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return false
+		}
+		raw = "true"
+	}
+	if raw == "false" || raw == "0" {
+		return false
+	}
+	var status string
+	var renderedJobID int64
+	if err := a.DB.QueryRow("SELECT review_status, coalesce(rendered_job_id, 0) FROM listing_render WHERE listing_id=?", listingID).Scan(&status, &renderedJobID); err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return false
+		}
+		return hasZip
+	}
+	if !hasZip && renderedJobID == 0 && (status == "" || status == "none") {
+		return false
+	}
+	return status != "approved"
 }
 func (a *Module) renderRoute(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'")
@@ -115,6 +144,11 @@ func (a *Module) renderRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		fail(w, 404, "渲染文件不存在")
+		return
+	}
+	if len(parts) == 3 && parts[0] == "详情页模板" && parts[1] == "缩略图" && validFilePath(parts[2]) && !strings.Contains(parts[2], "..") && strings.HasSuffix(strings.ToLower(parts[2]), ".jpg") {
+		w.Header().Set("Content-Type", "image/jpeg")
+		serveRoot(w, r, a.Cfg.TemplateDir, name)
 		return
 	}
 	if len(parts) == 2 && (parts[0] == "主图模板" || parts[0] == "详情页模板") && validFilePath(parts[1]) && !strings.Contains(parts[1], "..") {

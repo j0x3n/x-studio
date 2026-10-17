@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -264,9 +265,10 @@ func (a *Module) render(ctx context.Context, p Product) error {
 			}
 		}
 	}
+	detailFile, actualKey, warn := a.resolveDetailTemplate(p.ListingID, p.ShopID)
 	for s := 1; s <= 9; s++ {
 		q := url.Values{"p": {fmt.Sprint(p.ListingID)}, "s": {fmt.Sprint(s)}, "_t": {a.renderToken()}}
-		buf, e := a.browser.Shot(ctx, base+"/render/详情页模板/模板.html?"+q.Encode(), 750, 6000, 1, false)
+		buf, e := a.browser.Shot(ctx, base+"/render/详情页模板/"+detailFile+"?"+q.Encode(), 750, 6000, 1, false)
 		if e != nil {
 			return e
 		}
@@ -333,8 +335,120 @@ func (a *Module) render(ctx context.Context, p Product) error {
 	if e = os.Rename(zipName, filepath.Join(a.ListingDir(p.ListingID), "导出.zip")); e != nil {
 		return e
 	}
-	_, e = a.DB.Exec("UPDATE listings SET ai_label=? WHERE id=?", p.AILabel, p.ListingID)
-	return e
+	if _, e = a.DB.Exec("UPDATE listings SET ai_label=? WHERE id=?", p.AILabel, p.ListingID); e != nil {
+		return e
+	}
+	if warn != "" {
+		a.recordRenderWarning(core.Actor(ctx).JobID, warn)
+	}
+	return a.updateListingRenderAfterRun(ctx, p.ListingID, actualKey)
+}
+
+func (a *Module) resolveDetailTemplate(listingID, shopID int64) (file, key, warning string) {
+	var detailTpl string
+	_ = a.DB.QueryRow("SELECT detail_template FROM listing_render WHERE listing_id=?", listingID).Scan(&detailTpl)
+	var defaultDetail, disabledRaw string
+	_ = a.DB.QueryRow("SELECT default_detail, disabled FROM template_prefs WHERE shop_id=?", shopID).Scan(&defaultDetail, &disabledRaw)
+	var disabledList []string
+	_ = json.Unmarshal([]byte(disabledRaw), &disabledList)
+	disabled := map[string]bool{}
+	for _, k := range disabledList {
+		disabled[k] = true
+	}
+	reqKey := strings.TrimSpace(detailTpl)
+	if reqKey == "" {
+		reqKey = strings.TrimSpace(defaultDetail)
+	}
+	if reqKey == "" {
+		reqKey = "navy"
+	}
+	type manifestEntry struct {
+		Key  string `json:"key"`
+		File string `json:"file"`
+	}
+	var manifest struct {
+		DefaultCN   string          `json:"默认"`
+		DefaultEN   string          `json:"default"`
+		TemplatesCN []manifestEntry `json:"模板"`
+		TemplatesEN []manifestEntry `json:"templates"`
+		Detail      []manifestEntry `json:"detail"`
+	}
+	raw, err := os.ReadFile(filepath.Join(a.Cfg.TemplateDir, "详情页模板", "模板清单.json"))
+	if err != nil || json.Unmarshal(raw, &manifest) != nil {
+		if reqKey != "navy" {
+			return "模板.html", "navy", fmt.Sprintf("详情页模板 %s 不可用，已回退到 模板.html", reqKey)
+		}
+		return "模板.html", "navy", ""
+	}
+	entries := manifest.TemplatesCN
+	if len(entries) == 0 {
+		entries = manifest.TemplatesEN
+	}
+	if len(entries) == 0 {
+		entries = manifest.Detail
+	}
+	if disabled[reqKey] {
+		return "模板.html", "navy", fmt.Sprintf("详情页模板 %s 已禁用，已回退到 模板.html", reqKey)
+	}
+	for _, item := range entries {
+		if item.Key == reqKey && item.File != "" && validFilePath(item.File) && !strings.Contains(item.File, "..") {
+			if st, e := os.Stat(filepath.Join(a.Cfg.TemplateDir, "详情页模板", item.File)); e == nil && !st.IsDir() {
+				return item.File, item.Key, ""
+			}
+		}
+	}
+	return "模板.html", "navy", fmt.Sprintf("详情页模板 %s 不存在，已回退到 模板.html", reqKey)
+}
+
+func (a *Module) recordRenderWarning(jobID int64, note string) {
+	if jobID <= 0 || note == "" {
+		return
+	}
+	_, _ = a.DB.Exec(`
+		CREATE TABLE IF NOT EXISTS _render_warnings (
+			job_id INTEGER PRIMARY KEY,
+			note TEXT NOT NULL
+		);
+		CREATE TRIGGER IF NOT EXISTS trg_render_warnings_done
+		AFTER UPDATE OF status ON jobs
+		WHEN NEW.status = 'done'
+		BEGIN
+			UPDATE jobs
+			SET message = CASE
+				WHEN NEW.message = '' THEN (SELECT note FROM _render_warnings WHERE job_id = NEW.id)
+				ELSE NEW.message || '；' || (SELECT note FROM _render_warnings WHERE job_id = NEW.id)
+			END
+			WHERE id = NEW.id AND EXISTS (SELECT 1 FROM _render_warnings WHERE job_id = NEW.id);
+			DELETE FROM _render_warnings WHERE job_id = NEW.id;
+		END;
+	`)
+	_, _ = a.DB.Exec(`INSERT OR REPLACE INTO _render_warnings(job_id, note) VALUES(?, ?)`, jobID, note)
+}
+
+func (a *Module) updateListingRenderAfterRun(ctx context.Context, listingID int64, renderedTemplate string) error {
+	reviewStatus := "pending"
+	var rawRequireReview string
+	if a.DB.QueryRow("SELECT value FROM studio_settings WHERE key='require_review'").Scan(&rawRequireReview) == nil {
+		if rawRequireReview == "false" || rawRequireReview == "0" {
+			reviewStatus = "approved"
+		}
+	}
+	jobID := core.Actor(ctx).JobID
+	ts := now()
+	if _, err := a.DB.Exec(`INSERT OR IGNORE INTO listing_render(listing_id, updated_at) VALUES(?, ?)`, listingID, ts); err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	if _, err := a.DB.Exec(`
+		UPDATE listing_render
+		SET rendered_job_id=?, rendered_template=?, review_status=?, updated_at=?
+		WHERE listing_id=?
+	`, jobID, renderedTemplate, reviewStatus, ts, listingID); err != nil && !strings.Contains(err.Error(), "no such table") {
+		return err
+	}
+	return nil
 }
 func listingText(l Object) string {
 	var b strings.Builder

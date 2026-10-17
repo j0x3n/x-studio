@@ -236,3 +236,16 @@ docker build -t xstudio .
 - 新增测试涵盖默认配置与空推理强度、多 image 字段的 multipart、请求重试与超时、PNG/base64、阈值和裁剪、旧数据库及部分迁移、每款开关、禁止补图的编号、4 张限制、失败继续、AI 标识纠正、实拍优先和增强输入不重复裁剪。
 - 假 AI 服务器与真实 Chrome 跑通完整六步：3 张实拍高清化、补 3 张图、保守修图、生成文案、导出 ZIP，并检查主图与详情页 DOM 实际显示“AI 生成”和“AI 增强”。测试未访问真实 SubAPI。
 - `web/`、`prompts/`、实际 `.env` 未修改；旧版模板的字符串标识兼容只处理本站副本。
+
+## 文案中心、模板中心与出图审核导出（2026-10-18）
+
+- 新增 `internal/modules/copywriting`（文案中心）：
+  - 管理上架版本的多版本文案（`copy_versions`）、店铺关键词库（`keywords`）和品牌口吻（`voice_profiles`）。
+  - 支持手动保存版本、应用版本到上架版本、AI 整套生成（`copy.generate`，融合 `文案.md` + `文案-附加.md`、店铺口吻与权重前 50 关键词）、AI 按范围改写（`copy.rewrite`，严格按 `title` / `selling` / `all` 隔离字段）以及本地违禁词 + 店铺禁用词 + AI 合规检查（`POST /api/copies/{id}/check`，支持 `?ai=0` 与 AI 失败降级）。
+  - 自动衔接流水线：当 `pipeline` 任务的 `copy` 步骤完成后，自动为上架版本补存一条 `source='pipeline'` 的文案版本（幂等不重复）。
+- 新增 `internal/modules/studio`（模板中心、出图任务、审核与设置）：
+  - 动态读取 `templates/详情页模板/模板清单.json` 并校验顶层 `.html` 模板文件及缩略图 `/render/详情页模板/缩略图/<key>.jpg`，支持按店铺配置默认模板和停用模板（`template_prefs`）。
+  - 支持按上架版本配置详情页模板与 AI 标识（`listing_render`），提供单品出图（`POST /api/listings/{id}/render/run`）与批量出图（`POST /api/render/batch`，自动跳过无权限或运行中的上架版本）。
+  - `pipeline/render.go` 按 `listing_render.detail_template` → 店铺 `default_detail` → `navy` 选择详情页模板渲染截图；模板不存在或停用时自动回退到 `模板.html` 并在任务 `message` 中记录提示；出图完成后自动更新 `rendered_job_id`、`rendered_template` 及审核状态（`require_review=true` 时置 `pending`，`false` 时直接 `approved`）。
+  - `pipeline/files.go` 在 `require_review=true` 时拦截未通过审核（`review_status != 'approved'`）的 `GET /api/listings/{id}/download` 下载请求（返回 409）；数据库升级迁移时对已有成品的上架版本自动回填 `review_status='approved'`，保持向后兼容。
+
