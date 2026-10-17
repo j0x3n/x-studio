@@ -18,8 +18,8 @@ func TestPresetVisibilityOwnershipValidationAndOverrides(t *testing.T) {
 	if o["total"] != float64(1) {
 		t.Fatal("泄漏私有预设", o)
 	}
-	f.req(t, "PATCH", fmt.Sprintf("/api/presets/%d", shared), obj{"name": "篡改"}, 403)
-	f.req(t, "DELETE", fmt.Sprintf("/api/presets/%d", shared), nil, 403)
+	f.req(t, "PATCH", fmt.Sprintf("/api/presets/%d", shared), obj{"name": "篡改"}, 404)
+	f.req(t, "DELETE", fmt.Sprintf("/api/presets/%d", shared), nil, 404)
 	f.req(t, "PATCH", fmt.Sprintf("/api/presets/%d", private), obj{"name": "窥探"}, 404)
 	f.req(t, "POST", "/api/presets", obj{"name": "无权限共享", "shared": true, "params": obj{}}, 403)
 	f.req(t, "POST", "/api/assets/process", obj{"asset_ids": []int64{aid}, "preset_id": private}, 404)

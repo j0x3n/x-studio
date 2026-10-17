@@ -180,6 +180,8 @@ func (a *Module) getJob(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	visible := false
 	switch j.TargetType {
+	case "user":
+		visible = j.TargetID == u.ID
 	case "listing":
 		visible = a.CanListing(u, j.TargetID)
 	case "product":
