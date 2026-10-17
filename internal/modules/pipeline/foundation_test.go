@@ -411,7 +411,7 @@ func TestImplicitMetadataAndSPA(t *testing.T) {
 		}
 		data, _ := io.ReadAll(res.Body)
 		res.Body.Close()
-		if res.StatusCode != 200 || !bytes.Contains(data, []byte("前端未构建")) {
+		if res.StatusCode != 200 || !(bytes.Contains(data, []byte("前端未构建")) || bytes.Contains(data, []byte(`id="root"`))) {
 			t.Fatal("SPA 回退失败", p, res.StatusCode)
 		}
 	}

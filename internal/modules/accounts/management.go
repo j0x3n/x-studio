@@ -235,7 +235,7 @@ func (a *Module) settings(w http.ResponseWriter, r *http.Request) {
 		}
 		value := core.JSONObj(v["value"].(string))
 		if key == "ai_models" {
-			for feature, model := range map[string]string{"classify": a.Cfg.VisionModel, "copy": a.Cfg.TextModel, "enhance": a.Cfg.ImageModel, "fill": a.Cfg.ImageModel} {
+			for feature, model := range map[string]string{"classify": a.Cfg.VisionModel, "tag": a.Cfg.VisionModel, "copy": a.Cfg.TextModel, "copy_rewrite": a.Cfg.TextModel, "copy_check": a.Cfg.TextModel, "enhance": a.Cfg.ImageModel, "fill": a.Cfg.ImageModel, "upscale": a.Cfg.ImageModel, "process": a.Cfg.ImageModel} {
 				if s, _ := value[feature].(string); s == "" {
 					value[feature] = model
 				}
