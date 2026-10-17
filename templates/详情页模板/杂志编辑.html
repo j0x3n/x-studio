@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>详情页 · 杂志编辑</title>
+<!-- 风格 3「杂志编辑」：超大标题、黑白加一个强调色、用数字做视觉。适合主推款、大珠、上新首发。
+     可选字段：PRODUCT.issueNo（首屏竖排的期号，如 "03"）；首屏的大数字取参数里的"珠径" -->
+<link rel="stylesheet" href="公共.css">
+<style>
+:root{ --ink:#111; --paper:#fff; --acc:#8C2F1B; --mute:#6B6B6B; --line:#DDD; }
+body{color:var(--ink);background:#fff}
+.pad{padding:96px 56px}
+.dark{background:#111;color:#F2EEE8} .alt{background:#F4F1EC} .base,.base2{background:#fff}
+.ph{background:#E8E5E0} .dark .ph{background:#222}
+.stamp,.mm{background:#111;font-family:var(--latin)}
+.dark .stamp{background:var(--acc)}
+
+.eyebrow{font-family:var(--sans);font-size:18px;font-weight:700;letter-spacing:.32em;color:var(--acc);text-transform:uppercase}
+.h2{font-family:var(--serif);font-weight:700;font-size:60px;line-height:1.2;margin-top:12px;padding-bottom:18px;border-bottom:4px solid currentColor}
+.lead{font-family:var(--serif);font-size:26px;line-height:1.8;margin-top:22px;color:var(--mute)}
+.dark .lead{color:#B9B4AC}
+.rule{display:none}
+
+/* 1 首屏 */
+.s-hero{padding-bottom:88px}
+.s-hero .ph{height:900px}
+.s-hero .issue{position:absolute;top:36px;right:30px;z-index:2;writing-mode:vertical-rl;color:#fff;font-size:18px;letter-spacing:.4em;font-weight:700;text-shadow:0 0 12px rgba(0,0,0,.35)}
+.s-hero .name{position:relative;display:inline-block;font-family:var(--serif);font-weight:700;font-size:150px;line-height:1;margin:-82px 0 0 40px;padding:0 20px 0 0;background:linear-gradient(transparent 52%,#fff 52%)}
+.s-hero .kicker{font-size:20px;font-weight:700;letter-spacing:.3em;color:var(--acc);margin:26px 56px 0;text-transform:uppercase}
+.s-hero .one{font-family:var(--serif);font-size:30px;line-height:1.8;margin:18px 56px 0}
+.s-hero .big{display:flex;align-items:baseline;gap:20px;margin:40px 56px 0;padding-top:20px;border-top:6px solid var(--ink)}
+.s-hero .big b{font-family:var(--serif);font-size:110px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.s-hero .big span{font-size:22px;color:var(--mute);line-height:1.6}
+.s-hero .tags{display:flex;gap:28px;margin:30px 56px 0;font-size:20px;font-weight:700;letter-spacing:.12em}
+.s-hero .tags span::before{content:"/ ";color:var(--acc)}
+
+/* 2 真假对比：编号要点 */
+.s-real .tray .ph{height:560px;margin-top:48px}
+.s-real .cap{font-family:var(--serif);font-style:italic;font-size:22px;color:#B9B4AC;margin-top:14px}
+.pt{display:grid;grid-template-columns:104px 1fr;gap:20px;padding:30px 0;border-bottom:1px solid #333}
+.pt i{font-style:normal;font-family:var(--serif);font-size:72px;font-weight:700;color:var(--acc);line-height:.9}
+.pt b{display:block;font-family:var(--serif);font-size:32px;margin-bottom:10px}
+.pt p{font-size:23px;line-height:1.7;color:#CFC9C0}
+.pt p em{font-style:normal;color:#fff}
+.s-real .note{margin-top:36px;font-family:var(--serif);font-size:23px;line-height:1.8;color:#B9B4AC}
+
+/* 3 细节：大编号 */
+.detail{margin-top:72px}
+.detail .ph{height:520px}
+.detail .txt{display:grid;grid-template-columns:120px 1fr;gap:16px;margin-top:22px;border-top:2px solid var(--ink);padding-top:18px}
+.detail .no{font-family:var(--serif);font-size:84px;font-weight:700;color:var(--acc);line-height:.9}
+.detail .t{font-family:var(--serif);font-weight:700;font-size:34px}
+.detail .d{font-size:23px;line-height:1.75;color:var(--mute);margin-top:8px}
+
+/* 4 上耳 */
+.s-wear .big{margin-top:56px} .s-wear .big .ph{height:900px}
+.s-wear .grid2{margin-top:16px} .s-wear .grid2 .ph{height:460px}
+.fig-cap{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--mute);margin-top:10px}
+
+/* 5 尺寸 */
+.s-size .ruler{margin-top:56px} .s-size .ruler .ph{height:500px}
+.s-size .grid2{margin-top:56px;gap:24px 16px} .s-size .grid2 .ph{height:400px}
+.params{margin-top:48px;border-top:6px solid var(--ink)}
+.params .row{display:grid;grid-template-columns:180px 1fr;border-bottom:1px solid var(--line);font-size:25px}
+.params .row>div{padding:22px 0;line-height:1.5}
+.params .k{font-family:var(--serif);font-weight:700;color:var(--acc)}
+.s-size .tip{margin-top:28px;font-size:21px;color:var(--mute);line-height:1.7}
+
+/* 6 同系列 */
+.series-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px 20px;margin-top:56px}
+.card .ph{height:380px}
+.card .n{font-family:var(--serif);font-weight:700;font-size:28px;margin-top:16px;padding-top:12px;border-top:2px solid var(--ink)}
+.card .x{font-size:21px;color:var(--mute);margin-top:6px;line-height:1.5}
+
+/* 7 包装 */
+.s-pack .ph{height:660px;margin-top:56px}
+.s-pack .items{display:grid;grid-template-columns:repeat(3,1fr);margin-top:40px;border-top:4px solid #F2EEE8}
+.s-pack .items div{padding:26px 0;font-family:var(--serif);font-size:26px;font-weight:700}
+.s-pack .items div::before{content:"0" counter(i) " ";counter-increment:i;color:var(--acc);font-size:22px}
+.s-pack .items{counter-reset:i}
+
+/* 8 保养售后 */
+.s-care .block{margin-top:56px}
+.s-care .bt{font-family:var(--serif);font-weight:700;font-size:36px;padding-bottom:14px;border-bottom:4px solid var(--ink)}
+.s-care ol{list-style:none;counter-reset:c}
+.s-care li{counter-increment:c;display:grid;grid-template-columns:64px 1fr;padding:22px 0;border-bottom:1px solid var(--line);font-size:24px;line-height:1.7}
+.s-care li::before{content:counter(c,decimal-leading-zero);font-family:var(--serif);font-weight:700;color:var(--acc);font-size:28px}
+
+/* 9 关于 */
+.s-about .logo{width:260px;height:auto}
+.s-about .txt{font-family:var(--serif);font-size:30px;line-height:2;margin-top:48px}
+.s-about .sign{margin-top:56px;padding-top:18px;border-top:4px solid #F2EEE8;font-size:20px;font-weight:700;letter-spacing:.4em;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<div id="page"></div>
+<script src="引擎.js"></script>
+<script>
+XS.run({
+  logo: '主标志_透明底白字_2400.png',
+  screens: {
+    hero: function (P, H) {
+      var size = (P.params || []).filter(function (r) { return /珠径|直径/.test(r[0]); })[0];
+      var num = size ? String(size[1]).replace(/^约\s*/, '').replace(/\s*mm$/i, '') : '';
+      return '<section class="screen base s-hero">' + H.unit(H.ph(P.photos.hero), '', 'frame') +
+        '<div class="issue">ISSUE ' + H.esc(P.issueNo || '01') + ' · ' + H.esc(P.series) + '</div>' +
+        '<div class="name">' + H.esc(P.name) + '</div><div class="kicker">' + H.esc(P.nameEn) + '</div>' +
+        '<div class="one">' + H.br(P.oneLiner) + '</div>' +
+        (num ? '<div class="big"><b>' + H.esc(num) + '</b><span>MM<br>' + H.esc(size[0]) + '</span></div>' : '') +
+        '<div class="tags">' + H.list(P.tags, function (t) { return '<span>' + H.esc(t) + '</span>'; }) + '</div></section>';
+    },
+    real: function (P, H) {
+      var R = P.real, tray = P.photos.tray || {};
+      var c = R.cols.map(function (x) { return String(x).split('\n')[0]; });
+      return '<section class="screen dark pad s-real">' + H.head('Real or not', R.title || '怎么分清真珍珠', R.lead) +
+        H.unit(H.ph(tray), tray.cap ? '<div class="cap">' + H.esc(tray.cap) + '</div>' : '', 'tray') +
+        H.list(R.rows, function (r, i) {
+          return '<div class="pt"><i>0' + (i + 1) + '</i><div><b>看' + H.esc(r[0]) + '</b><p><em>' + H.esc(c[0]) + '：' + H.esc(r[1]) + '</em><br>' +
+            r.slice(2).map(function (v, j) { return H.esc(c[j + 1]) + '：' + H.esc(v); }).join('<br>') + '</p></div></div>';
+        }) + (R.note ? '<div class="note">' + H.esc(R.note) + '</div>' : '') + '</section>';
+    }
+  },
+  after: function () {
+    var a = document.querySelector('.s-about .sign');
+    if (a) a.innerHTML = '<span>MYSTIC LUSTRE</span><span>珠光秘境</span>';
+  }
+});
+</script>
+</body>
+</html>

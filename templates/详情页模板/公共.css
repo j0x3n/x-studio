@@ -1,0 +1,37 @@
+/* 详情页模板公共样式：所有风格共用的骨架。颜色、字体、间距都在各风格自己的 html 里定。 */
+:root {
+  /* 字体名同时写本机和服务器（Debian fonts-noto-cjk）上的叫法 */
+  --serif: "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", serif;
+  --sans: "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  --latin: "Bodoni MT", "Didot", "Noto Serif", "Noto Serif CJK SC", serif;
+  --ai-size: 18px; --ai-color: #fff; --ai-bg: rgba(0, 0, 0, .38);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; }
+body { width: 750px; font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+html.export, html.export body { background: #00FF00; }   /* 导出时的底色，后端裁掉 */
+img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.screen { width: 750px; position: relative; overflow: hidden; }
+.center { text-align: center; }
+
+/* 照片位：缺照片时显示虚线框和要拍什么（只在预览出现，导出时收起） */
+.ph { position: relative; overflow: hidden; background: rgba(0, 0, 0, .06); }
+.ph.missing::after { content: attr(data-need); position: absolute; inset: 16px; border: 2px dashed rgba(0, 0, 0, .25);
+  display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px;
+  font-size: 24px; line-height: 1.6; color: rgba(0, 0, 0, .45); white-space: pre-line; }
+.dark .ph.missing::after { border-color: rgba(255, 255, 255, .3); color: rgba(255, 255, 255, .55); }
+
+/* AI 标识：位置和样式可由后端 window.AI_LABEL 统一设置 */
+.ai-tag { position: absolute; left: 14px; top: 14px; z-index: 2; font-family: var(--sans); font-size: var(--ai-size); color: var(--ai-color);
+  background: var(--ai-bg); padding: 4px 10px; border-radius: 2px; line-height: 1.4; letter-spacing: 0; }
+[data-ai-pos="top-right"] .ai-tag { left: auto; right: 14px; }
+[data-ai-pos="bottom-left"] .ai-tag { top: auto; bottom: 14px; }
+[data-ai-pos="bottom-right"] .ai-tag { top: auto; bottom: 14px; left: auto; right: 14px; }
+.stamp { position: absolute; right: 16px; bottom: 16px; z-index: 1; font-size: 20px; letter-spacing: .06em; color: #fff; background: rgba(0, 0, 0, .55); padding: 6px 14px; }
+.mm { position: absolute; left: 14px; bottom: 14px; z-index: 1; font-size: 30px; color: #fff; background: rgba(0, 0, 0, .6); padding: 4px 14px; letter-spacing: .04em; }
+
+/* 两列网格；只剩一张时占满 */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid2 > .unit:only-child { grid-column: 1 / -1; }
+/* 多尺寸小图在时藏掉标尺图 */
+.sizes ~ .ruler { display: none; }

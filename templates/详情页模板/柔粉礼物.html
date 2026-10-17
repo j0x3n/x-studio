@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>详情页 · 柔粉礼物</title>
+<!-- 风格 4「柔粉礼物」：圆角卡片、贴纸标签、突出礼盒。适合七夕 / 情人节 / 生日送礼、耳夹、年轻客群。
+     可选字段：PRODUCT.sticker（首屏贴纸文字，没写就不显示）。包装屏移到第 3 屏，突出礼物感 -->
+<link rel="stylesheet" href="公共.css">
+<style>
+:root{ --bg:#FBEFEC; --rose:#D98A8A; --rose-2:#F3C9C3; --deep:#6B3F45; --mute:#A07C80; --line:#F0D6D2; }
+body{color:var(--deep);background:var(--bg)}
+.pad{padding:80px 40px}
+.dark,.alt,.base,.base2{background:var(--bg)}
+.ph{background:#F6E0DC;border-radius:36px}
+.ph.missing::after{border-radius:28px;border-color:var(--rose-2);color:var(--mute)}
+.stamp,.mm{background:rgba(107,63,69,.7);border-radius:999px}
+.ai-tag{border-radius:999px}
+
+.hd{text-align:center}
+.eyebrow{display:inline-block;font-size:18px;font-weight:700;letter-spacing:.2em;color:var(--rose);background:#fff;border-radius:999px;padding:6px 20px;text-transform:uppercase}
+.h2{font-weight:800;font-size:48px;margin-top:20px;letter-spacing:.04em}
+.h2::before,.h2::after{content:"♡";font-size:26px;color:var(--rose);margin:0 16px;vertical-align:middle}
+.lead{font-size:24px;line-height:1.75;color:var(--mute);margin-top:16px}
+.rule{display:none}
+.card-w{background:#fff;border-radius:40px;padding:48px 36px;margin-top:48px}
+
+/* 1 首屏 */
+.s-hero{padding:40px 40px 72px;text-align:center}
+.s-hero .frame{position:relative}
+.s-hero .frame .ph{height:860px}
+.s-hero .sticker{position:absolute;top:30px;left:24px;z-index:3;background:#fff;color:var(--rose);font-weight:800;font-size:28px;padding:10px 26px;border-radius:999px;transform:rotate(-8deg);box-shadow:0 0 0 4px var(--rose)}
+.s-hero .name{font-weight:800;font-size:66px;margin-top:40px;letter-spacing:.06em}
+.s-hero .en{font-size:20px;letter-spacing:.3em;color:var(--rose);margin-top:8px}
+.s-hero .one{font-size:26px;line-height:1.8;margin-top:22px;color:var(--mute)}
+.s-hero .tags{display:flex;justify-content:center;flex-wrap:wrap;gap:14px;margin-top:30px}
+.s-hero .tags span{background:#fff;border-radius:999px;padding:10px 24px;font-size:22px}
+
+/* 2 真假对比：三张小卡 */
+.s-real .tray .ph{height:520px;margin-top:40px}
+.s-real .cap{font-size:21px;color:var(--mute);margin-top:12px;text-align:center}
+.vs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:36px}
+.vs .c{background:#FDF6F4;border-radius:28px;padding:26px 14px;text-align:center}
+.vs .c.me{background:var(--rose);color:#fff}
+.vs .c b{display:block;font-size:26px;font-weight:800;margin-bottom:14px;line-height:1.35}
+.vs .c p{font-size:20px;line-height:1.55;padding:10px 0;border-top:1px dashed rgba(107,63,69,.18)}
+.vs .c.me p{border-color:rgba(255,255,255,.35)}
+.vs .c p small{display:block;font-size:17px;opacity:.7}
+.s-real .note{margin-top:28px;font-size:21px;line-height:1.75;color:var(--mute);text-align:center}
+
+/* 3 包装（提前到第 3 屏） */
+.s-pack .ph{height:720px;margin-top:40px}
+.s-pack .items{display:flex;gap:14px;margin-top:24px}
+.s-pack .items div{flex:1;text-align:center;background:#fff;border-radius:999px;padding:20px 0;font-size:24px;font-weight:700}
+.s-pack .items div::before{content:"♡ ";color:var(--rose)}
+
+/* 细节 */
+.detail{margin-top:48px;background:#fff;border-radius:40px;padding:20px}
+.detail .ph{height:460px;border-radius:28px}
+.detail .txt{display:flex;gap:18px;align-items:center;padding:20px 12px 8px}
+.detail .no{flex:none;width:56px;height:56px;border-radius:50%;background:var(--rose);color:#fff;font-weight:800;font-size:22px;display:grid;place-items:center}
+.detail .t{font-weight:800;font-size:28px}
+.detail .d{font-size:22px;line-height:1.65;color:var(--mute);margin-top:4px}
+
+/* 上耳 */
+.s-wear .big{margin-top:44px} .s-wear .big .ph{height:860px}
+.s-wear .grid2{margin-top:16px} .s-wear .grid2 .ph{height:440px}
+.fig-cap{font-size:21px;color:var(--mute);text-align:center;margin-top:10px}
+
+/* 尺寸 */
+.s-size .ruler{margin-top:44px} .s-size .ruler .ph{height:500px}
+.s-size .grid2{margin-top:44px;gap:20px 16px} .s-size .grid2 .ph{height:400px}
+.params{background:#fff;border-radius:40px;padding:12px 36px;margin-top:36px}
+.params .row{display:flex;justify-content:space-between;gap:24px;padding:20px 0;border-bottom:1px dashed var(--line);font-size:24px}
+.params .row:last-child{border-bottom:0}
+.params .k{color:var(--mute);flex:none} .params .v{text-align:right;font-weight:500}
+.s-size .tip{margin-top:20px;font-size:21px;color:var(--mute);line-height:1.7;text-align:center}
+
+/* 同系列 */
+.series-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:44px}
+.card{background:#fff;border-radius:36px;padding:16px 16px 22px}
+.card .ph{height:340px;border-radius:26px}
+.card .n{font-weight:800;font-size:26px;margin-top:14px}
+.card .x{font-size:20px;color:var(--mute);margin-top:4px;line-height:1.5}
+
+/* 保养售后 */
+.s-care .block{background:#fff;border-radius:40px;padding:40px 36px;margin-top:40px}
+.s-care .bt{font-weight:800;font-size:30px}
+.s-care ol{list-style:none;counter-reset:c;margin-top:12px}
+.s-care li{counter-increment:c;display:grid;grid-template-columns:52px 1fr;padding:16px 0;border-bottom:1px dashed var(--line);font-size:23px;line-height:1.65}
+.s-care li:last-child{border-bottom:0}
+.s-care li::before{content:counter(c);width:36px;height:36px;border-radius:50%;background:var(--rose-2);color:var(--deep);font-size:20px;font-weight:800;display:grid;place-items:center;margin-top:3px}
+
+/* 关于 */
+.s-about{text-align:center;padding:96px 56px 110px}
+.s-about .logo{display:none}
+.s-about .txt{font-size:27px;line-height:2}
+.s-about .sign{margin-top:40px;font-size:24px;color:var(--rose);font-weight:700;letter-spacing:.2em}
+</style>
+</head>
+<body>
+<div id="page"></div>
+<script src="引擎.js"></script>
+<script>
+XS.run({
+  screens: {
+    hero: function (P, H) {
+      var sticker = P.sticker ? '<span class="sticker">' + H.esc(P.sticker) + '</span>' : '';
+      var photo = H.ph(P.photos.hero, '', sticker);
+      return '<section class="screen dark s-hero">' + H.unit(photo, '', 'frame') +
+        '<div class="name">' + H.esc(P.name) + '</div><div class="en">' + H.esc(P.nameEn) + '</div>' +
+        '<div class="one">' + H.br(P.oneLiner) + '</div>' +
+        '<div class="tags">' + H.list(P.tags, function (t) { return '<span>' + H.esc(t) + '</span>'; }) + '</div></section>';
+    },
+    real: function (P, H) {
+      var R = P.real, tray = P.photos.tray || {};
+      return '<section class="screen alt pad s-real">' + H.head('Real pearl', R.title || '是真珍珠哦', R.lead) +
+        H.unit(H.ph(tray), tray.cap ? '<div class="cap">' + H.esc(tray.cap) + '</div>' : '', 'tray') +
+        '<div class="vs">' + R.cols.map(function (col, i) {
+          return '<div class="c' + (i ? '' : ' me') + '"><b>' + H.br(col) + '</b>' +
+            H.list(R.rows, function (r) { return '<p><small>' + H.esc(r[0]) + '</small>' + H.esc(r[i + 1]) + '</p>'; }) + '</div>';
+        }).join('') + '</div>' + (R.note ? '<div class="note">' + H.esc(R.note) + '</div>' : '') + '</section>';
+    },
+    // 第 3 屏放包装，第 7 屏放细节：送礼款先让人看到拆开的样子
+    details: function (P, H) { return H.screens.pack(P, H).replace('Gift Ready', 'Gift Box'); },
+    pack: function (P, H) { return H.screens.details(P, H); }
+  }
+});
+</script>
+</body>
+</html>

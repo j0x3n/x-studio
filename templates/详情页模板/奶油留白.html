@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>详情页 · 奶油留白</title>
+<!-- 风格 2「奶油留白」：主理人手记感、大留白、细字重。适合 69–79 元设计款耳饰、日常通勤款。
+     可选字段：PRODUCT.story（首屏的主理人手记，没写就不显示）、PRODUCT.storySign（署名） -->
+<link rel="stylesheet" href="公共.css">
+<style>
+:root{ --bg:#F7F3EC; --bg-2:#EFE8DC; --ink:#3A3530; --mute:#9C9285; --acc:#A89276; --line:#E3DBCD; }
+body{color:var(--ink);background:var(--bg)}
+.pad{padding:100px 72px}
+.dark{background:var(--bg-2)} .alt,.base,.base2{background:var(--bg)}
+.screen+.screen{border-top:1px solid var(--line)}
+.ph{background:#E9E1D3}
+.stamp,.mm{background:rgba(58,53,48,.65);font-weight:300}
+
+.eyebrow{font-size:18px;letter-spacing:.42em;color:var(--mute);text-transform:uppercase}
+.h2{font-weight:300;font-size:44px;letter-spacing:.14em;margin-top:14px}
+.lead{font-size:24px;line-height:1.9;color:var(--mute);margin-top:18px}
+.rule{display:none}
+
+/* 1 首屏 */
+.s-hero{padding:64px 56px 96px}
+.s-hero .frame .ph{height:840px}
+.s-hero .no{display:flex;justify-content:space-between;font-size:20px;letter-spacing:.3em;color:var(--mute);margin-top:40px}
+.s-hero .name{font-weight:300;font-size:64px;letter-spacing:.2em;margin-top:16px}
+.s-hero .sub{font-size:24px;color:var(--mute);margin-top:10px;letter-spacing:.08em}
+.s-hero .one{font-size:26px;line-height:1.9;margin-top:36px}
+.s-hero .story{margin-top:48px;border-left:2px solid var(--acc);padding-left:28px;font-family:var(--serif);font-size:26px;line-height:2}
+.s-hero .sign{font-family:var(--sans);font-size:20px;color:var(--mute);margin-top:14px;letter-spacing:.12em}
+
+/* 2 真假对比：上下两列的安静列表 */
+.s-real .tray .ph{height:560px;margin-top:56px}
+.s-real .cap{font-size:20px;color:var(--mute);margin-top:14px}
+.duo{margin-top:48px}
+.duo .row{display:grid;grid-template-columns:1fr 1fr;gap:28px;padding:26px 0;border-bottom:1px dashed #D8CDBB;font-size:24px;line-height:1.6}
+.duo b{display:block;font-weight:400;font-size:18px;letter-spacing:.12em;color:var(--mute);margin-bottom:6px}
+.duo .ours{color:var(--ink)} .duo .fake{color:var(--mute)}
+.s-real .note{margin-top:40px;font-family:var(--serif);font-size:23px;line-height:1.9;color:var(--mute)}
+
+/* 3 细节 */
+.detail{margin-top:72px}
+.detail .ph{height:500px}
+.detail .txt{display:grid;grid-template-columns:72px 1fr;margin-top:24px}
+.detail .no{font-size:20px;letter-spacing:.2em;color:var(--acc);padding-top:6px}
+.detail .t{font-size:30px;font-weight:400;letter-spacing:.06em}
+.detail .d{font-size:23px;line-height:1.8;color:var(--mute);margin-top:6px}
+
+/* 4 上耳 */
+.s-wear .big{margin-top:56px} .s-wear .big .ph{height:860px}
+.s-wear .grid2{margin-top:20px;gap:20px} .s-wear .grid2 .ph{height:460px}
+.fig-cap{font-size:20px;color:var(--mute);margin-top:10px;letter-spacing:.1em}
+
+/* 5 尺寸 */
+.s-size .ruler{margin-top:56px} .s-size .ruler .ph{height:500px}
+.s-size .grid2{margin-top:56px;gap:24px 20px} .s-size .grid2 .ph{height:400px}
+.params{margin-top:48px}
+.params .row{display:flex;justify-content:space-between;gap:24px;padding:22px 0;border-bottom:1px solid var(--line);font-size:24px}
+.params .k{color:var(--mute);flex:none} .params .v{text-align:right}
+.s-size .tip{margin-top:28px;font-size:21px;color:var(--mute);line-height:1.8}
+
+/* 6 同系列 */
+.series-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px 20px;margin-top:56px}
+.card .ph{height:380px}
+.card .n{font-size:26px;margin-top:16px;letter-spacing:.06em}
+.card .x{font-size:21px;color:var(--mute);margin-top:6px;line-height:1.6}
+
+/* 7 包装 */
+.s-pack .ph{height:660px;margin-top:56px}
+.s-pack .items{display:flex;justify-content:center;gap:48px;margin-top:40px;font-size:23px;letter-spacing:.1em;color:var(--mute)}
+.s-pack .items div::before{content:"·  ";color:var(--acc)}
+
+/* 8 保养售后 */
+.s-care .block{margin-top:56px}
+.s-care .bt{font-size:28px;letter-spacing:.1em;padding-bottom:14px;border-bottom:1px solid var(--ink)}
+.s-care ol{list-style:none}
+.s-care li{padding:20px 0;border-bottom:1px solid var(--line);font-size:23px;line-height:1.8;color:#5A534B}
+
+/* 9 关于 */
+.s-about{text-align:center;padding:120px 72px}
+.s-about .logo{display:none}
+.s-about .txt{font-family:var(--serif);font-size:27px;line-height:2.1}
+.s-about .sign{margin-top:56px;font-size:18px;letter-spacing:.6em;color:var(--mute)}
+</style>
+</head>
+<body>
+<div id="page"></div>
+<script src="引擎.js"></script>
+<script>
+XS.run({
+  screens: {
+    hero: function (P, H) {
+      var size = (P.params || []).filter(function (r) { return /珠径|直径|尺寸/.test(r[0]); })[0];
+      return '<section class="screen dark s-hero">' + H.unit(H.ph(P.photos.hero), '', 'frame') +
+        '<div class="no"><span>' + H.esc(P.series) + '</span><span>' + H.esc(size ? size[1] : '') + '</span></div>' +
+        '<div class="name">' + H.esc(P.name) + '</div><div class="sub">' + H.esc(P.nameEn) + '</div>' +
+        '<div class="one">' + H.br(P.oneLiner) + '</div>' +
+        (P.story ? '<div class="story">' + H.br(P.story) + '<div class="sign">—— ' + H.esc(P.storySign || '主理人手记') + '</div></div>' : '') +
+        '</section>';
+    },
+    real: function (P, H) {
+      var R = P.real, tray = P.photos.tray || {};
+      var c = R.cols.map(function (x) { return String(x).split('\n')[0]; });
+      return '<section class="screen alt pad s-real">' + H.head('How to tell', R.title || '怎么分清真珍珠', R.lead) +
+        H.unit(H.ph(tray), tray.cap ? '<div class="cap">' + H.esc(tray.cap) + '</div>' : '', 'tray') +
+        '<div class="duo">' + H.list(R.rows, function (r) {
+          return '<div class="row"><div class="ours"><b>' + H.esc(c[0] + ' · ' + r[0]) + '</b>' + H.esc(r[1]) + '</div>' +
+            '<div class="fake"><b>' + H.esc(c[1] + ' · ' + r[0]) + '</b>' + H.esc(r[2]) + '</div></div>';
+        }) + '</div>' + (R.note ? '<div class="note">' + H.esc(R.note) + '</div>' : '') + '</section>';
+    }
+  }
+});
+</script>
+</body>
+</html>

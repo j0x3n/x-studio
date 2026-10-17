@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>详情页 · 新中式红</title>
+<!-- 风格 5「新中式红」：宣纸底、竖排标题、朱红印章。适合 2027 春节和本命年红色系（石榴石、红玛瑙配珍珠）、节日礼物。
+     可选字段：PRODUCT.festival（首屏照片下的一句节日话，没写就用 oneLiner）。文案只写"红色寓意 / 新年礼物"，不写转运辟邪 -->
+<link rel="stylesheet" href="公共.css">
+<style>
+:root{ --paper:#F3EBDD; --paper-2:#EADFCB; --ink:#2B2622; --mute:#6E645A; --red:#A8322A; --line:#CDBFA6; }
+body{color:var(--ink);background:var(--paper);font-family:var(--serif)}
+.pad{padding:96px 60px}
+.dark{background:var(--red);color:var(--paper)} .alt{background:var(--paper-2)} .base,.base2{background:var(--paper)}
+.screen+.screen{border-top:1px solid var(--line)}
+.ph{background:#E4D8C2}
+.dark .ph{background:#93291F}
+.stamp,.mm{background:var(--red);font-family:var(--serif)}
+
+.hd{text-align:center}
+.eyebrow{display:none}
+.h2{font-weight:700;font-size:46px;letter-spacing:.18em;line-height:1.4}
+.h2::before,.h2::after{content:"";display:inline-block;width:44px;height:2px;background:var(--red);vertical-align:middle;margin:0 22px}
+.dark .h2::before,.dark .h2::after{background:var(--paper)}
+.lead{font-size:25px;line-height:1.85;color:var(--mute);margin-top:22px}
+.dark .lead{color:#F0D9C9}
+.rule{display:none}
+
+/* 1 首屏：照片 + 竖排标题 + 印章 */
+.s-hero{display:grid;grid-template-columns:1fr 132px;gap:24px;padding:64px 48px 80px}
+.s-hero .frame .ph{height:900px;border:12px solid #fff}
+.s-hero .vt{display:flex;flex-direction:row-reverse;justify-content:center;align-items:flex-start;gap:14px;position:relative;padding-top:16px}
+.s-hero .vt .name{writing-mode:vertical-rl;font-size:80px;font-weight:700;letter-spacing:.3em}
+.s-hero .vt .sub{writing-mode:vertical-rl;font-size:22px;letter-spacing:.45em;color:var(--mute);margin-top:10px}
+.s-hero .seal{position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:84px;height:84px;background:var(--red);color:var(--paper);border-radius:6px;font-size:26px;line-height:1.15;display:grid;place-items:center;text-align:center;font-weight:700}
+.s-hero .one{grid-column:1/-1;text-align:center;font-size:28px;line-height:1.8;color:var(--mute);margin-top:10px}
+.s-hero .tags{grid-column:1/-1;display:flex;justify-content:center;gap:16px}
+.s-hero .tags span{border:1px solid var(--red);color:var(--red);font-size:22px;padding:6px 18px;letter-spacing:.1em}
+
+/* 2 辨珍珠：表格 */
+.s-real .tray .ph{height:540px;margin-top:48px;border:10px solid #fff}
+.s-real .cap{font-size:21px;color:var(--mute);margin-top:12px;text-align:center}
+.cmp{margin-top:48px;border:1px solid var(--line)}
+.cmp .row{display:grid;grid-template-columns:96px 1.15fr 1fr 1fr}
+.cmp .row>div{padding:20px 12px;font-size:22px;line-height:1.6;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:center}
+.cmp .row>div:last-child{border-right:0}
+.cmp .row:last-child>div{border-bottom:0}
+.cmp .head>div{background:#E2D4BB;font-weight:700;font-size:21px;line-height:1.4}
+.cmp .k{font-weight:700;background:#EFE5D3}
+.cmp .ours{color:var(--red);font-weight:700}
+.cmp .fake{color:var(--mute)}
+.s-real .note{margin-top:32px;font-size:22px;line-height:1.8;color:var(--mute);text-align:center}
+
+/* 3 细节 */
+.detail{margin-top:64px}
+.detail .ph{height:480px;border:10px solid #fff}
+.detail .txt{display:flex;gap:22px;align-items:flex-start;margin-top:20px}
+.detail .no{flex:none;width:52px;height:52px;border:2px solid var(--red);color:var(--red);font-size:24px;font-weight:700;display:grid;place-items:center}
+.detail .t{font-weight:700;font-size:30px}
+.detail .d{font-size:23px;line-height:1.75;color:var(--mute);margin-top:6px;font-family:var(--sans)}
+
+/* 4 上耳 */
+.s-wear .big{margin-top:56px} .s-wear .big .ph{height:860px;border:12px solid #fff}
+.s-wear .grid2{margin-top:16px} .s-wear .grid2 .ph{height:440px;border:8px solid #fff}
+.fig-cap{font-size:21px;color:var(--mute);text-align:center;margin-top:10px}
+
+/* 5 规格 */
+.s-size .ruler{margin-top:56px} .s-size .ruler .ph{height:500px;border:10px solid #fff}
+.s-size .grid2{margin-top:56px;gap:20px 16px} .s-size .grid2 .ph{height:400px;border:8px solid #fff}
+.params{margin-top:48px;border-top:2px solid var(--red)}
+.params .row{display:flex;justify-content:space-between;gap:24px;padding:20px 0;border-bottom:1px solid var(--line);font-size:24px;font-family:var(--sans)}
+.params .k{color:var(--mute);flex:none} .params .v{text-align:right}
+.s-size .tip{margin-top:24px;font-size:21px;color:var(--mute);line-height:1.75;font-family:var(--sans)}
+
+/* 6 同系列 */
+.series-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px 20px;margin-top:56px}
+.card .ph{height:360px;border:8px solid #fff}
+.card .n{font-weight:700;font-size:27px;margin-top:14px}
+.card .x{font-size:21px;color:var(--mute);margin-top:4px;line-height:1.55;font-family:var(--sans)}
+
+/* 7 包装（红底） */
+.s-pack .ph{height:660px;margin-top:56px;border:12px solid var(--paper)}
+.s-pack .items{display:grid;grid-template-columns:repeat(3,1fr);margin-top:40px;border-top:1px solid rgba(243,235,221,.4);border-bottom:1px solid rgba(243,235,221,.4)}
+.s-pack .items div{padding:28px 0;text-align:center;font-size:26px;letter-spacing:.15em}
+.s-pack .items div+div{border-left:1px solid rgba(243,235,221,.4)}
+
+/* 8 保养售后 */
+.s-care .block{margin-top:56px}
+.s-care .bt{font-weight:700;font-size:32px;letter-spacing:.15em;padding-bottom:14px;border-bottom:2px solid var(--red)}
+.s-care ol{list-style:none;counter-reset:c}
+.s-care li{counter-increment:c;display:grid;grid-template-columns:60px 1fr;padding:20px 0;border-bottom:1px solid var(--line);font-size:23px;line-height:1.75;font-family:var(--sans)}
+.s-care li::before{content:counter(c,cjk-ideographic);font-family:var(--serif);color:var(--red);font-size:26px;font-weight:700}
+
+/* 9 关于（红底） */
+.s-about{text-align:center}
+.s-about .logo{width:240px;height:auto;margin:0 auto}
+.s-about .txt{font-size:28px;line-height:2.1;margin-top:44px}
+.s-about .sign{margin-top:48px;font-size:24px;letter-spacing:1em;padding-left:1em}
+</style>
+</head>
+<body>
+<div id="page"></div>
+<script src="引擎.js"></script>
+<script>
+XS.run({
+  logo: '主标志_透明底白字_2400.png',
+  screens: {
+    hero: function (P, H) {
+      return '<section class="screen base s-hero">' + H.unit(H.ph(P.photos.hero), '', 'frame') +
+        '<div class="vt"><div class="name">' + H.esc(P.name) + '</div><div class="sub">' + H.esc(P.series) + '</div>' +
+        '<div class="seal">珠光<br>秘境</div></div>' +
+        '<div class="one">' + H.br(P.festival || P.oneLiner) + '</div>' +
+        '<div class="tags">' + H.list(P.tags, function (t) { return '<span>' + H.esc(t) + '</span>'; }) + '</div></section>';
+    }
+  },
+  after: function () {
+    var s = document.querySelector('.s-about .sign');
+    if (s) s.textContent = '珠光秘境';
+  }
+});
+</script>
+</body>
+</html>
