@@ -11,7 +11,7 @@ import { sourceName, assetTitle, fmtDate, opName, quickOps, imgUrl } from '../li
 type UsedBy = { type: 'code'; product_id: number; code: string } | { type: 'listing'; id: number; shop_id: number }
 type Detail = { asset: Asset; versions: Asset[]; used_by: UsedBy[] }
 
-// 图片库右侧的详情栏：预览、基本信息、标签备注、版本链、处理记录、被谁用着
+// 素材库右侧的详情栏：预览、基本信息、标签备注、版本链、处理记录、被谁用着
 export function AssetInspector({ id, onClose, onChanged, onProcess, onSimilar, onOpenProduct, onSelect }: {
   id: number; onClose: () => void; onChanged: () => void; onProcess: (id: number) => void
   onSimilar: (a: Asset) => void; onOpenProduct: (pid: number) => void; onSelect: (id: number) => void

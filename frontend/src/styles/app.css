@@ -116,6 +116,10 @@ tr.clickable:hover td { background: var(--surface-2); }
 .lib-item:hover .lib-check, .lib-item.selected .lib-check, .lib-check:focus-visible { opacity: 1; }
 .lib-check:checked { background-color: var(--primary); }
 .lib-src { position: absolute; right: 6px; top: 6px; }
+/* 鼠标移到卡片上才出现的「处理」按钮 */
+.lib-hover { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); opacity: 0; pointer-events: none; background: var(--surface); border: 1px solid var(--border); color: var(--text); transition: opacity var(--dur) var(--ease); }
+.lib-hover:hover { border-color: var(--primary); color: var(--primary-text); }
+.lib-item:hover .lib-hover, .lib-hover:focus-visible { opacity: 1; pointer-events: auto; }
 .lib-ver { position: absolute; right: 6px; bottom: 6px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: rgba(17, 24, 39, .62); color: #fff; font-size: var(--fs-11); display: inline-flex; align-items: center; }
 .lib-meta { padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .lib-meta .code { font-weight: 600; font-size: var(--fs-12); flex-shrink: 0; }
@@ -184,5 +188,21 @@ tr.clickable:hover td { background: var(--surface-2); }
 .quick.on { border-color: var(--primary); background: var(--primary-50); color: var(--primary-text); }
 .quick.heavy.on { border-color: var(--purple-text); background: var(--purple-bg); color: var(--purple-text); }
 .lib-toolbar .segmented button { display: inline-flex; align-items: center; gap: 4px; }
+.lib-toolbar .segmented button svg { width: 14px; height: 14px; }
+
+/* 处理台：添加按钮、功能选择 */
+.wb-add { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 2px 4px; }
+.wb-add .btn { justify-content: center; }
+div.proc-item { cursor: pointer; }
+.proc-item .tag-x { opacity: 0; flex-shrink: 0; }
+.proc-item:hover .tag-x { opacity: 1; }
+.proc-stage.over { outline: 2px dashed var(--primary); outline-offset: -8px; }
+.tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 58px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); color: var(--text-2); font: inherit; font-size: var(--fs-12); cursor: pointer; }
+.tool svg { width: 18px; height: 18px; color: var(--text-3); }
+.tool:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text); }
+.tool.active { border-color: var(--primary); background: var(--primary-50); color: var(--primary-text); font-weight: 500; }
+.tool.active svg { color: var(--primary); }
+.tool:disabled { opacity: .4; cursor: not-allowed; }
 @media (max-width: 1280px) { .lib-filters { width: 200px; } .lib-inspector, .proc-panel { width: 300px; } }
 @media (max-width: 1024px) { .lib-filters, .proc-list { display: none; } }

@@ -39,7 +39,14 @@ export type ProcessOps = {
   resize?: { long_side: number }
   format?: 'jpg' | 'png'
 }
-export type Preset = { id: number; name: string; owner_id: number; shared: boolean; params: { ops?: ProcessOps; set_current?: boolean }; updated_at: string }
+// 处理台里的图：上传 / 粘贴的原图（input）或处理结果（result），只有本人看得到，7 天后清掉
+export type WbItem = {
+  id: number; kind: 'input' | 'result'; orig_name: string; width: number; height: number; source: string
+  asset_id: number | null; input_id: number | null; op?: AssetOp; saved_asset_id: number | null
+  url: string; thumb_url: string; created_at: string
+  asset?: { id: number; product_id: number; product_name: string; code: string }
+}
+export type Preset ={ id: number; name: string; owner_id: number; shared: boolean; params: { ops?: ProcessOps; set_current?: boolean }; updated_at: string }
 export type Job = {
   id: number; kind: string; status: 'queued' | 'running' | 'done' | 'failed'; progress: number; message: string; created_at: string; finished_at: string
   target_type?: string; target_id?: number; result?: Record<string, unknown> | null

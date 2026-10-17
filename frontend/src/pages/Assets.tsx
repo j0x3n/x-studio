@@ -12,7 +12,7 @@ import { sourceName, assetTitle } from '../lib/format'
 const PAGE = 60
 type Hit = Asset & { distance?: number }
 
-// 图片库：左边筛选，中间网格，点开一张在右边看详情；勾选后底部出批量操作
+// 素材库：左边筛选，中间网格，点开一张在右边看详情；勾选后底部出批量操作
 export function Assets() {
   const { me, can } = useAuth()
   const toast = useToast()
@@ -102,15 +102,15 @@ export function Assets() {
     try { await downloadPost('/api/assets/download', { asset_ids: selList }, `图片_${selList.length}张.zip`) } catch (e) { toast(errText(e), 'error') }
   }
   const remove = () => confirm(`删除选中的 ${selList.length} 张？只会删你有权删的，不能恢复。`) && batch('delete')
-  const process = (ids: number[]) => nav('/process?ids=' + ids.join(','))
+  const process = (ids: number[]) => nav('/process?assets=' + ids.join(','))
 
   const shops = me?.shops || []
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE)) : 1
 
   return (
     <>
-      <Topbar crumbs={similar ? [<a className="link" onClick={() => setSimilar(null)}>图片库</a>, `与「${assetTitle(similar)}」相似`] : ['图片库']}>
-        {similar && <button className="btn btn-ghost btn-sm" onClick={() => setSimilar(null)}><ArrowLeft />返回图片库</button>}
+      <Topbar crumbs={similar ? [<a className="link" onClick={() => setSimilar(null)}>素材库</a>, `与「${assetTitle(similar)}」相似`] : ['素材库']}>
+        {similar && <button className="btn btn-ghost btn-sm" onClick={() => setSimilar(null)}><ArrowLeft />返回素材库</button>}
       </Topbar>
       <div className="lib">
         <aside className="sidebar lib-filters">
@@ -178,7 +178,7 @@ export function Assets() {
           </div>
           <div className="scroll">
             {!data ? <Loading /> : items.length === 0 ? (
-              <Empty title={similar ? '没有找到相似的图' : filtered ? '没有符合条件的图' : f.archived ? '没有归档的图' : '图片库还是空的'}
+              <Empty title={similar ? '没有找到相似的图' : filtered ? '没有符合条件的图' : f.archived ? '没有归档的图' : '素材库还是空的'}
                 desc={similar ? '这里只找得出几乎一样的图，比如重复上传的、同一张图的其他版本；换个角度重拍的不算。' : filtered ? '换个筛选条件试试。' : '在商品页上传实拍图后，会出现在这里。'} />
             ) : (
               <div className="lib-grid">
@@ -192,6 +192,7 @@ export function Assets() {
                         <input type="checkbox" className="check lib-check" checked={sel} aria-label="选择"
                           onClick={e => { e.stopPropagation(); toggle(a.id, e.shiftKey) }} onChange={() => {}} />
                         {src.label !== '实拍' && <span className="lib-src"><Pill kind={src.pill} dot={false}>{src.label}</Pill></span>}
+                        {can('asset.upload') && <button className="lib-hover btn btn-sm" onClick={e => { e.stopPropagation(); process([a.id]) }}><Wand2 />处理</button>}
                         {(a.version_count || 1) > 1 && <span className="lib-ver mono" title="同一张原图的版本数">{a.version_count} 版</span>}
                         {a.distance !== undefined && <span className="lib-ver mono" title="差异值，0 表示几乎一样">差 {a.distance}</span>}
                       </div>

@@ -9,7 +9,7 @@ import { ProductDetail } from './pages/ProductDetail'
 import { Admin } from './pages/Admin'
 import { SettingsPage } from './pages/Settings'
 import { Assets } from './pages/Assets'
-import { AssetProcess } from './pages/AssetProcess'
+import { Workbench } from './pages/Workbench'
 
 // 还在开发的模块：后端由并行的 AI 在做，合并后再接页面
 function Soon({ title, desc }: { title: string; desc: string }) {
@@ -34,7 +34,7 @@ export function App() {
         <Route path="products" element={<Products />} />
         <Route path="products/:id" element={<ProductDetail />} />
         <Route path="assets" element={<Assets />} />
-        <Route path="process" element={<AssetProcess />} />
+        <Route path="process" element={<Workbench />} />
         <Route path="copy" element={<Soon title="文案中心" desc="文案版本、AI 改写、合规检查、关键词库正在开发。" />} />
         <Route path="templates" element={<Soon title="模板中心" desc="5 套详情页模板已就绪，选模板和预览的后端正在开发。" />} />
         <Route path="review" element={<Soon title="出图审核" desc="出图审核和导出的后端正在开发。" />} />

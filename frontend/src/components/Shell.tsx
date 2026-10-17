@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Gem, LayoutGrid, Package, Images, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut } from 'lucide-react'
+import { Gem, LayoutGrid, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { initials } from '../lib/format'
 
@@ -7,7 +7,8 @@ import { initials } from '../lib/format'
 const NAV = [
   { to: '/', label: '工作台', icon: LayoutGrid, perm: '' },
   { to: '/products', label: '商品', icon: Package, perm: 'product.view' },
-  { to: '/assets', label: '图片', icon: Images, perm: 'product.view' },
+  { to: '/assets', label: '素材', icon: Images, perm: 'product.view' },
+  { to: '/process', label: '处理', icon: Wand2, perm: 'asset.upload' },
   { to: '/copy', label: '文案', icon: PenLine, perm: 'copy.view' },
   { to: '/templates', label: '模板', icon: LayoutTemplate, perm: 'product.view' },
   { to: '/review', label: '审核', icon: ClipboardCheck, perm: 'render.review' }
