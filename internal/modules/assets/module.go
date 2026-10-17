@@ -1,0 +1,83 @@
+package assets
+
+import (
+	"net/http"
+	"xstudio/internal/core"
+	"xstudio/internal/media"
+)
+
+type Module struct{ *core.Core }
+
+func New(c *core.Core) *Module                   { return &Module{c} }
+func (*Module) Name() string                     { return "assets" }
+func (*Module) Jobs() map[string]core.JobHandler { return nil }
+func (a *Module) Routes(r *core.Router) {
+	r.Handle("GET /api/products/{id}/assets", core.ProductView, a.list)
+	r.Handle("POST /api/products/{id}/assets", core.AssetUpload, a.upload)
+	r.Handle("PATCH /api/assets/{pid}", core.AssetUpload, a.patchPhoto)
+	r.Handle("DELETE /api/assets/{pid}", core.Scoped, a.deletePhoto)
+}
+
+type Object = core.Object
+type Photo = core.Photo
+
+var js = core.JS
+var now = core.Now
+var fail = core.Fail
+var writeJSON = core.WriteJSON
+var decode = core.Decode
+var idParam = core.ID
+var currentUser = core.CurrentUser
+var scanPhoto = core.ScanPhoto
+
+const photoColumns = core.PhotoColumns
+
+var validatePhoto = media.ValidatePhoto
+
+func (a *Module) authorizedProduct(w http.ResponseWriter, r *http.Request, id int64, write bool) (core.Product, bool) {
+	if !a.RequireProduct(w, r, id, write) {
+		return core.Product{}, false
+	}
+	if !a.CanUpload(core.CurrentUser(r), id) {
+		core.Fail(w, 403, "此商品不允许上传或修改素材")
+		return core.Product{}, false
+	}
+	p, e := a.Product(id)
+	return p, e == nil
+}
+func (a *Module) list(w http.ResponseWriter, r *http.Request) {
+	id := core.ID(r, "id")
+	if !a.RequireProduct(w, r, id, false) {
+		return
+	}
+	q := "SELECT " + core.PhotoColumns + " FROM assets WHERE product_id=?"
+	args := []any{id}
+	for _, key := range []string{"kind", "code"} {
+		if s := r.URL.Query().Get(key); s != "" {
+			q += " AND " + key + "=?"
+			args = append(args, s)
+		}
+	}
+	rows, e := a.DB.Query(q+" ORDER BY id", args...)
+	if e != nil {
+		core.Fail(w, 500, "读取素材失败")
+		return
+	}
+	items := []Photo{}
+	for rows.Next() {
+		p, e := core.ScanPhoto(rows)
+		if e != nil {
+			rows.Close()
+			core.Fail(w, 500, "读取素材失败")
+			return
+		}
+		items = append(items, p)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		core.Fail(w, 500, "读取素材失败")
+		return
+	}
+	core.PageItems(w, r, items)
+}

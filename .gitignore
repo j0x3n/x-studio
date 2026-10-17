@@ -6,3 +6,6 @@
 /*.test
 /coverage.out
 /测试照片/
+
+/web/dist/
+/frontend/node_modules/
