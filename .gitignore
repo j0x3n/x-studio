@@ -1,0 +1,8 @@
+/data/
+/.cache/
+/.smoke/
+/.env
+/*.exe
+/*.test
+/coverage.out
+/测试照片/

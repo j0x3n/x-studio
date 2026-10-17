@@ -1,0 +1,253 @@
+/* ==========================================================================
+   Admin Design System — Design Tokens
+   ----------------------------------------------------------------------------
+   用法：<html data-style="clean|workspace|soft|midnight" data-theme="light|dark">
+   - data-style 选风格预设（默认 clean），data-theme 切深浅色（midnight 本身就是深色）。
+   - 底层是统一的「紧凑 PC 密度」：13px 正文、32px 控件、16px 卡片内边距。
+   - 所有页面只允许用这里的变量，禁止写死十六进制色值。
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* ==========================================================================
+   基础 = clean 清爽蓝（01/02 配色 + 11 Issues 看板的结构）
+   ========================================================================== */
+:root {
+  /* ---------- 背景层级 ---------- */
+  --canvas:        #F4F5F7;   /* 最外层 / 看板列背景 / 内容区底色 */
+  --shell:         #FFFFFF;   /* 侧边栏、顶栏 */
+  --surface:       #FFFFFF;   /* 卡片 */
+  --surface-2:     #F7F8FA;   /* 表头、输入框底、次级面板 */
+  --surface-3:     #EEF0F3;   /* hover、分段控件轨道 */
+  --overlay:       rgba(15, 18, 25, .36);
+
+  /* ---------- 线条 ---------- */
+  --border:        #E6E8EC;
+  --border-strong: #D5D9DF;
+  --divider:       #EEF0F3;
+
+  /* ---------- 文本 ---------- */
+  --text:          #111827;
+  --text-2:        #4B5563;
+  --text-3:        #8B93A1;
+  --text-4:        #B8BEC8;
+  --text-inverse:  #FFFFFF;
+
+  /* ---------- 主题色 ---------- */
+  --primary:       #3478F6;
+  --primary-hover: #2563EB;
+  --primary-50:    #EFF5FF;   /* 选中行、激活导航 */
+  --primary-100:   #DDE9FE;   /* 计数芯片、tooltip 浅底 */
+  --primary-200:   #BCD4FD;   /* 次级数据系列 */
+  --primary-text:  #1F5FD8;   /* 浅底上的主题色文字 */
+  --on-primary:    #FFFFFF;
+
+  /* 深色中性按钮（workspace 的 Add node / Start 这类画布操作；扁平，无渐变） */
+  --ink:           #16181D;
+  --on-ink:        #FFFFFF;
+
+  /* ---------- 语义色：实色 / 浅底 / 深字 ---------- */
+  --success: #16A34A;  --success-bg: #E7F6EC;  --success-text: #15803D;
+  --warning: #F59E0B;  --warning-bg: #FEF4E2;  --warning-text: #B45309;
+  --danger:  #EF4444;  --danger-bg:  #FDECEC;  --danger-text:  #DC2626;
+  --info:    #3478F6;  --info-bg:    #E6EFFE;  --info-text:    #1F5FD8;
+  --purple:  #8B5CF6;  --purple-bg:  #F1ECFE;  --purple-text:  #6D3FE0;
+  --teal:    #14B8A6;  --teal-bg:    #E2F7F4;  --teal-text:    #0F8A7D;
+  --neutral: #8B93A1;  --neutral-bg: #F1F2F4;  --neutral-text: #5B6472;
+
+  /* ---------- 图表 ---------- */
+  --chart-1: #3478F6;  --chart-2: #BCD4FD;  --chart-3: #F59E0B;
+  --chart-4: #14B8A6;  --chart-5: #8B5CF6;  --chart-6: #1E3A8A;
+  --chart-grid: #EEF0F3;
+  --chart-axis: #A0A7B4;
+
+  --avatar-1: #E9E3FF; --avatar-1-fg: #6D4FD8;
+  --avatar-2: #FFE6D5; --avatar-2-fg: #C75A16;
+  --avatar-3: #DDF3E6; --avatar-3-fg: #23945A;
+  --avatar-4: #E0EAFF; --avatar-4-fg: #2F5BFF;
+
+  /* ---------- 字体 ---------- */
+  --font-sans: "Inter", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* 紧凑字号阶梯：正文 13，标题克制 */
+  --fs-11: 11px;   /* 分组标签（大写）、角标 */
+  --fs-12: 12px;   /* 表头、Tag、meta、辅助 */
+  --fs-13: 13px;   /* 正文、按钮、导航、表格（默认） */
+  --fs-14: 14px;   /* 卡片标题、强调正文 */
+  --fs-16: 16px;   /* 区块标题 */
+  --fs-18: 18px;   /* 抽屉/弹窗标题 */
+  --fs-20: 20px;   /* 页面标题 */
+  --fs-24: 24px;   /* KPI 数值 */
+  --fs-body: var(--fs-13);
+  --fs-page-title: var(--fs-20);
+  --fs-kpi: 22px;
+  --lh: 1.5;
+  --tracking-tight: -0.015em;
+
+  /* ---------- 间距（4pt 网格） ---------- */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+  --page-x: 24px;      /* 内容区左右 */
+  --page-y: 20px;      /* 内容区上下 */
+  --gap: 16px;         /* 区块/卡片间距 */
+  --card-p: 16px;      /* 卡片内边距 */
+
+  /* ---------- 圆角 ---------- */
+  --r-xs:   4px;    /* Tag、kbd */
+  --r-sm:   6px;    /* 小按钮、复选框、导航项 */
+  --r-md:   8px;    /* 按钮、输入框 */
+  --r-lg:  10px;    /* 看板卡片、下拉菜单、内层面板 */
+  --r-xl:  12px;    /* 卡片 */
+  --r-2xl: 16px;    /* framed 外壳 */
+  --r-full: 999px;
+  --r-btn: var(--r-md);   /* soft 预设会改成全圆 */
+
+  /* ---------- 阴影：扁平为主，只有浮层有阴影 ---------- */
+  --shadow-card: none;
+  --shadow-pop:  0 10px 28px -6px rgba(15, 18, 25, .14), 0 2px 6px -2px rgba(15, 18, 25, .06);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+
+  /* ---------- 尺寸 ---------- */
+  --h-control-sm: 28px;
+  --h-control:    32px;
+  --h-control-lg: 36px;
+  --h-nav:        32px;
+  --h-row:        44px;   /* 表格单行 */
+  --sidebar-w:    232px;
+  --rail-w:       64px;
+  --subnav-w:     248px;
+  --inspector-w:  320px;
+  --topbar-h:     56px;
+
+  --icon: 16px;
+  --icon-nav: 18px;
+
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --dur: 140ms;
+
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   workspace 工作台（15 Agent 编辑器 + 11 Issues）
+   暖白中性色 + 翡翠绿 + 带文字的图标栏 + 三栏编辑器
+   ========================================================================== */
+:root[data-style="workspace"] {
+  --canvas:        #F5F5F3;
+  --surface-2:     #F7F7F5;
+  --surface-3:     #EFEFEC;
+  --border:        #E6E6E2;
+  --border-strong: #D6D6D1;
+  --divider:       #EEEEEA;
+  --text:          #16181C;
+  --text-2:        #4A4E55;
+  --text-3:        #868A91;
+  --text-4:        #B5B8BC;
+
+  --primary:       #1F7A4D;
+  --primary-hover: #196640;
+  --primary-50:    #EEF6F1;
+  --primary-100:   #DCEEE3;
+  --primary-200:   #B5DBC4;
+  --primary-text:  #186A42;
+
+  --chart-1: #1F7A4D; --chart-2: #B5DBC4; --chart-6: #0F4D2F;
+  --chart-grid: #EEEEEA;
+}
+
+/* ==========================================================================
+   soft 轻盈（10 OrchestrateIQ + 05/06 Academix，间距压缩到 PC 尺寸）
+   冷灰 + 明亮蓝 + 胶囊按钮 + 彩色浅底图标
+   ========================================================================== */
+:root[data-style="soft"] {
+  --canvas:        #F2F3F5;
+  --surface-2:     #F6F7F9;
+  --surface-3:     #EDEFF2;
+
+  --primary:       #2563EB;
+  --primary-hover: #1D4ED8;
+  --primary-50:    #EEF4FF;
+  --primary-100:   #DBE7FE;
+  --primary-200:   #BFD3FE;
+  --primary-text:  #1D4ED8;
+
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl: 20px;
+  --r-btn: var(--r-full);
+  --card-p: 18px;
+}
+
+/* ==========================================================================
+   深色中性色：用于任意预设的 data-theme="dark"，以及 midnight 预设
+   （参考 08 Trackly：近黑底 + 深灰卡片 + 细边框，无阴影）
+   ========================================================================== */
+:root[data-theme="dark"],
+:root[data-style="midnight"] {
+  --canvas:        #0A0B0D;
+  --shell:         #0E0F12;
+  --surface:       #141519;
+  --surface-2:     #111215;
+  --surface-3:     #1C1E23;
+  --overlay:       rgba(0, 0, 0, .6);
+
+  --border:        #23262C;
+  --border-strong: #2E3138;
+  --divider:       #1D2025;
+
+  --text:          #F2F3F5;
+  --text-2:        #C1C5CC;
+  --text-3:        #868B95;
+  --text-4:        #555A63;
+  --text-inverse:  #0E0F12;
+
+  --primary-50:    color-mix(in srgb, var(--primary) 12%, transparent);
+  --primary-100:   color-mix(in srgb, var(--primary) 20%, transparent);
+  --primary-200:   color-mix(in srgb, var(--primary) 36%, transparent);
+  --primary-text:  color-mix(in srgb, var(--primary) 70%, white);
+
+  --ink:           #F2F3F5;
+  --on-ink:        #0E0F12;
+
+  --success-bg: rgba(34, 197, 94, .14);  --success-text: #4ADE80;
+  --warning-bg: rgba(245, 158, 11, .14); --warning-text: #FBBF24;
+  --danger-bg:  rgba(239, 68, 68, .15);  --danger-text:  #F87171;
+  --info-bg:    rgba(59, 130, 246, .16); --info-text:    #7FB0FF;
+  --purple-bg:  rgba(139, 92, 246, .16); --purple-text:  #B69CFF;
+  --teal-bg:    rgba(20, 184, 166, .15); --teal-text:    #5EEAD4;
+  --neutral-bg: rgba(255, 255, 255, .06); --neutral-text: #A1A6AF;
+
+  --chart-2: color-mix(in srgb, var(--primary) 32%, #141519);
+  --chart-grid: #1F2227;
+  --chart-axis: #6B7079;
+
+  --avatar-1: #2A2346; --avatar-1-fg: #B69CFF;
+  --avatar-2: #3A2A1D; --avatar-2-fg: #FDBA74;
+  --avatar-3: #1B3326; --avatar-3-fg: #4ADE80;
+  --avatar-4: #1D2747; --avatar-4-fg: #8FB4FF;
+
+  --shadow-card: none;
+  --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, .6), 0 0 0 1px var(--border);
+
+  color-scheme: dark;
+}
+
+/* 深色下各预设的主题色提亮一档 */
+:root[data-theme="dark"]                         { --primary: #4C8DFF; --primary-hover: #6AA0FF; }
+:root[data-theme="dark"][data-style="workspace"] { --primary: #2FA36B; --primary-hover: #3DBA7C; }
+:root[data-theme="dark"][data-style="soft"]      { --primary: #4F86F7; --primary-hover: #6B9AF9; }
+
+/* midnight：深色 + 荧光绿主题色（08 Trackly），多色图表 */
+:root[data-style="midnight"] {
+  --primary:       #3DDC84;
+  --primary-hover: #5EE89A;
+  --on-primary:    #06220F;
+  --primary-text:  #5EE89A;
+  --chart-1: #3DDC84; --chart-2: #3B82F6; --chart-3: #FBBF24;
+  --chart-4: #F87171; --chart-5: #A78BFA; --chart-6: #22D3EE;
+}
+
+/* 跟随系统：在入口 JS 里执行
+   document.documentElement.dataset.theme =
+     matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';  */

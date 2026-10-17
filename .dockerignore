@@ -1,0 +1,8 @@
+data
+.cache
+.smoke
+*.exe
+*.test
+*.zip
+.env
+.git

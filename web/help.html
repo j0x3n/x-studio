@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN" data-style="workspace" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拍摄要求 · 珠光秘境出图</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="app">
+  <div class="shell">
+    <nav class="rail"></nav>
+    <div class="main">
+      <header class="topbar"><div><div class="crumbs">珠光秘境 · 出图</div><div class="topbar-title">拍摄要求</div></div></header>
+      <div class="scroll"><main class="content doc">
+        <div class="page-head"><div><div class="page-title">上游拍哪几张</div><div class="page-sub">把这一页发给上游。每款拍下面 6 张就能出全套主图和详情页</div></div></div>
+        <div class="panel" style="padding:0"><table class="table">
+          <thead><tr><th style="width:56px">编号</th><th>拍什么</th><th>要点</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">D4</td><td class="cell-title">戴在耳朵上（必拍）</td><td>只拍耳朵到下颌，侧头或撩头发。头发拢到耳后。<b>不能用 AI 生成</b></td></tr>
+            <tr><td class="mono">E5</td><td class="cell-title">托盘上很多对一起拍</td><td>同款十几对放在托盘或布上，手托着拍。<b>原相机，不开滤镜、不修图</b></td></tr>
+            <tr><td class="mono">B1</td><td class="cell-title">珍珠微距（必拍）</td><td>开微距，尽量近，能看到珍珠表面的细纹和光泽</td></tr>
+            <tr><td class="mono">C1</td><td class="cell-title">放在尺子上（必拍）</td><td>俯拍，刻度清楚，看得出几毫米。有几个尺寸，就各戴在同一只耳朵上拍一张（C4）</td></tr>
+            <tr><td class="mono">A1</td><td class="cell-title">白纸上平放一对（必拍）</td><td>白纸或白板上，俯拍，居中，四周多留白。有几个颜色就每个颜色拍一张（A3）</td></tr>
+            <tr><td class="mono">F2</td><td class="cell-title">放在打开的礼盒里</td><td>没有礼盒可以不拍</td></tr>
+          </tbody></table></div>
+        <div class="panel"><div class="panel-title">怎么拍</div>
+          <ul>
+            <li>手机就够。开微距，关美颜、关滤镜、关闪光灯。</li>
+            <li>窗边自然光，阴天也行。<b>不要阳光直射珍珠</b>，会拍成死白。</li>
+            <li>每张拍 2–3 次，挑最清楚的发过来。发<b>原图</b>（微信选"原图"），不要截图，不要加水印。</li>
+            <li>必须是这一批要发给我们的货，不要用以前的图或者别家的图。</li>
+          </ul></div>
+        <div class="panel"><div class="panel-title">为什么</div>
+          <p>淘宝严查和实物不符的 AI 图，买家收到货不一样会退货，还会被处罚。所以商品本身必须是实拍，系统只做抠白底、轻微调亮、裁剪和排版，不改珍珠的颜色和光泽。缺了必拍的照片，系统会提示补拍，不会用 AI 补。</p></div>
+      </main></div>
+    </div>
+  </div>
+</div>
+<script src="/js/lucide.min.js"></script>
+<script src="/js/api.js"></script>
+<script>
+// 这一页不登录也能看（发给上游用）：登录了才显示图标栏
+fetch('/api/me', { credentials: 'same-origin' }).then(r => {
+  if (r.ok) App.shell('help'); else document.querySelector('nav.rail').remove();
+}).catch(() => document.querySelector('nav.rail').remove());
+</script>
+</body>
+</html>

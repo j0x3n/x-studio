@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>主图模板</title>
+<!--
+  用法：模板.html?p=<款>              预览这款全部主图（3:4 和 1:1 各一套）
+        模板.html?p=<款>&n=3&r=34     只出第 3 张 3:4 主图（导出用，见 导出.sh）；r=11 是 1:1
+  每款的主图内容在 ../详情页模板/商品/<款>/主图.js，照片在同目录的 照片/。
+  画布按 750 宽设计：3:4 是 750×1000，1:1 是 750×750；导出时放大成 1440×1920 和 1200×1200。
+-->
+<style>
+:root{
+  --navy:#1A2340; --gold:#C9A465; --gold-soft:#E3CFA6; --ivory:#F6F0E6; --paper:#FBF8F3;
+  --ink:#2B2B2B; --ink-2:#6B6459;
+  --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;
+  --sans:"Noto Sans SC","Microsoft YaHei",sans-serif;
+  --latin:"Bodoni MT","Didot","Noto Serif",serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#E9E4DC}
+body{font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;padding:32px;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+html.export,html.export body{background:#fff;padding:0;gap:0}
+.group{width:100%;font-size:14px;color:var(--ink-2)}
+html.export .group{display:none}
+
+/* 画布 */
+.cv{width:750px;position:relative;overflow:hidden;background:var(--paper)}
+.cv.r34{height:1000px}
+.cv.r11{height:750px}
+.cv .no{position:absolute;right:-1px;top:-24px;font-size:13px;color:var(--ink-2)}
+.wrap{position:relative}
+
+/* 照片位 */
+.ph{position:absolute;inset:0;background:#EDE6DA;overflow:hidden}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph.missing{background:#EDE6DA}
+.ph.missing::after{content:attr(data-need);position:absolute;inset:20px;border:2px dashed #B9AD99;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:24px;line-height:1.6;color:#8A7F6E;white-space:pre-line}
+.ai-tag{position:absolute;right:18px;bottom:18px;font-size:16px;color:#fff;background:rgba(0,0,0,.38);padding:4px 10px;border-radius:2px;z-index:3}
+
+/* 店名小字：左上角，所有主图一致 */
+.mark{position:absolute;left:32px;top:30px;z-index:2;font-family:var(--latin);font-size:17px;letter-spacing:.42em;color:#fff;opacity:.92}
+.mark.dark{color:var(--navy);opacity:.75}
+
+/* 底部文字条：深蓝半透明，宋体，一行 */
+.band{position:absolute;left:0;right:0;bottom:0;z-index:2;background:rgba(26,35,64,.86);color:var(--ivory);
+  display:flex;align-items:center;justify-content:center;gap:18px;padding:22px 32px;font-family:var(--serif);font-size:32px;letter-spacing:.1em}
+.band .sep{width:1px;height:26px;background:var(--gold)}
+.band small{font-family:var(--sans);font-size:20px;letter-spacing:.06em;color:#C9CCD8}
+
+/* 左上角标签：金边，说明这是什么图 */
+.label{position:absolute;left:32px;top:72px;z-index:2;border:1px solid var(--gold);color:var(--gold-soft);background:rgba(26,35,64,.72);
+  font-family:var(--serif);font-size:22px;letter-spacing:.14em;padding:8px 16px}
+.label.light{background:rgba(251,248,243,.86);color:var(--navy)}
+
+/* 4 尺寸：多尺寸上耳宫格 */
+.grid{position:absolute;inset:0;display:grid;gap:6px;background:var(--paper)}
+.grid.c2{grid-template-columns:1fr 1fr}
+.grid.c3{grid-template-columns:1fr 1fr 1fr}
+.grid .cell{position:relative;overflow:hidden}
+.grid .cell .ph{position:absolute;inset:0}
+.grid .cell .t{position:absolute;left:0;right:0;bottom:0;z-index:2;background:rgba(26,35,64,.82);color:var(--ivory);text-align:center;font-family:var(--latin);font-size:28px;letter-spacing:.08em;padding:10px 0}
+
+/* 4 尺寸：标尺图上的大数字 */
+.big-size{position:absolute;right:32px;top:30px;z-index:2;text-align:center;color:var(--navy);background:rgba(251,248,243,.9);padding:22px 30px 18px;border-top:2px solid var(--gold)}
+.big-size b{display:block;font-family:var(--latin);font-weight:400;font-size:76px;line-height:1;white-space:nowrap}
+.big-size span{display:block;font-family:var(--serif);font-size:26px;margin-top:12px;letter-spacing:.16em;color:var(--ink-2)}
+
+/* 5 规格：白底小图并排 */
+.variants{position:absolute;left:0;right:0;top:0;background:#fff;display:flex;flex-wrap:wrap;justify-content:center;align-content:center;gap:28px 20px;padding:80px 28px}
+.variants .v{text-align:center}
+.variants .v .box{position:relative;aspect-ratio:1/1}
+.variants .v .box .ph{position:absolute;inset:0;background:#fff}
+.variants .v .box .ph img{object-fit:contain}
+.variants .v .t{font-family:var(--serif);font-size:26px;color:var(--navy);margin-top:12px;letter-spacing:.08em}
+.variants .v .s{font-size:18px;color:var(--ink-2);margin-top:4px}
+</style>
+</head>
+<body>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var slug = q.get('p') || '示例款';
+  var only = q.get('n'), ratio = q.get('r');
+  if (only) document.documentElement.classList.add('export');
+  var base = '../详情页模板/商品/' + slug + '/';
+  var s = document.createElement('script');
+  s.src = base + '主图.js';
+  s.onload = function(){ render(window.MAIN, base, only, ratio); };
+  s.onerror = function(){ document.body.textContent = '找不到 ' + base + '主图.js'; };
+  document.head.appendChild(s);
+})();
+
+function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+// 照片位。p: {f:'D4.jpg', pos:'50% 40%', pos11:'50% 30%', need:'上耳半脸', ai:true}
+// pos 是 3:4 的取景位置，pos11 是 1:1 的（不写就用 pos）。
+function ph(base, p, r){
+  p = p || {};
+  var pos = (r === '11' && p.pos11) ? p.pos11 : (p.pos || '50% 50%');
+  var need = (p.f ? p.f.replace(/\.\w+$/, '') + '  ' : '') + (p.need || '');
+  var img = p.f ? '<img src="' + esc(base + '照片/' + p.f) + '" style="object-position:' + esc(pos) + '" onerror="this.parentNode.classList.add(\'missing\');this.remove()">' : '';
+  var tag = p.ai ? '<span class="ai-tag">' + esc(p.ai === true ? 'AI 生成背景' : p.ai) + '</span>' : '';  // ai: true 或标识文字，如 'AI 生成'
+  return '<div class="ph' + (p.f ? '' : ' missing') + '" data-need="放照片\n' + esc(need) + '">' + img + '</div>' + tag;
+}
+function band(m){
+  if (!m.text) return '';
+  var parts = [].concat(m.text);
+  return '<div class="band">' + parts.map(function(t, i){ return (i ? '<i class="sep"></i>' : '') + '<span>' + esc(t) + '</span>'; }).join('') +
+    (m.small ? '<small>' + esc(m.small) + '</small>' : '') + '</div>';
+}
+function mark(m){ return m.mark === false ? '' : '<div class="mark' + (m.darkMark ? ' dark' : '') + '">MYSTIC LUSTRE</div>'; }
+function label(m){ return m.label ? '<div class="label' + (m.lightLabel ? ' light' : '') + '">' + esc(m.label) + '</div>' : ''; }
+
+// 每种版式输出画布内部的 HTML
+var LAYOUT = {
+  // 一张照片铺满 + 可选标签 + 可选底部文字条。首图、批量实拍、微距、礼盒都用它
+  photo: function(m, base, r){ return ph(base, m, r) + mark(m) + label(m) + band(m); },
+
+  // 尺寸：单张标尺图 + 大字尺寸
+  ruler: function(m, base, r){
+    return ph(base, m, r) + mark(m) + label(m) +
+      '<div class="big-size"><b>' + esc(m.size) + '</b>' + (m.sizeNote ? '<span>' + esc(m.sizeNote) + '</span>' : '') + '</div>' + band(m);
+  },
+
+  // 尺寸：同一只耳朵分别戴各个尺寸，2 或 3 列宫格，每格标 mm
+  sizes: function(m, base, r){
+    var items = m.items || [];
+    var cols = items.length <= 4 ? 2 : 3;
+    var rows = Math.ceil(items.length / cols);
+    var bandH = m.text ? 76 : 0;
+    var H = (r === '11' ? 750 : 1000) - bandH;
+    return '<div class="grid c' + cols + '" style="bottom:' + bandH + 'px;grid-template-rows:repeat(' + rows + ',' + Math.floor((H - (rows - 1) * 6) / rows) + 'px)">' +
+      items.map(function(it){ return '<div class="cell">' + ph(base, it, r) + '<div class="t">' + esc(it.t) + '</div></div>'; }).join('') +
+      '</div>' + band(m);
+  },
+
+  // 规格：白底小图并排，每个写名字。用于"3 色可选"
+  variants: function(m, base, r){
+    // 每行几个：3:4 竖图一行最多 2 个（3 个时第三个居中），1:1 一行最多 3 个；格子尽量大
+    var items = m.items || [], k = items.length;
+    var cols = r === '11' ? (k <= 3 ? k : (k === 4 ? 2 : 3)) : (k <= 1 ? 1 : (k <= 4 ? 2 : 3));
+    var rows = Math.ceil(k / cols);
+    var H = (r === '11' ? 750 : 1000) - (m.text ? 76 : 0);
+    var w = Math.min((694 - (cols - 1) * 20) / cols, (H - 160 - rows * 50 - (rows - 1) * 28) / rows);
+    return '<div class="variants" style="bottom:' + (m.text ? 76 : 0) + 'px">' + items.map(function(it){
+      return '<div class="v" style="width:' + Math.floor(w) + 'px"><div class="box">' + ph(base, it, r) + '</div><div class="t">' + esc(it.t) + '</div>' + (it.s ? '<div class="s">' + esc(it.s) + '</div>' : '') + '</div>';
+    }).join('') + '</div>' + mark(Object.assign({darkMark: true}, m)) + band(m);
+  }
+};
+
+function canvas(m, base, r){
+  var fn = LAYOUT[m.layout || 'photo'] || LAYOUT.photo;
+  return '<div class="wrap"><div class="cv r' + r + '">' + fn(m, base, r) + '</div></div>';
+}
+
+function render(M, base, only, ratio){
+  var imgs = M.imgs || [];
+  if (only) {
+    var m = imgs.filter(function(x){ return String(x.n) === String(only); })[0];
+    document.body.innerHTML = m ? canvas(m, base, ratio || '34') : '';
+    return;
+  }
+  var html = '';
+  ['34', '11'].forEach(function(r){
+    html += '<div class="group">' + esc(M.name) + ' · ' + (r === '34' ? '3:4（1440×1920）' : '1:1（1200×1200）') + '</div>';
+    imgs.forEach(function(m){ html += canvas(m, base, r); });
+  });
+  document.body.innerHTML = html;
+  document.title = M.name + ' · 主图';
+}
+</script>
+</body>
+</html>

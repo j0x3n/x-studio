@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>详情页模板</title>
+<!--
+  用法：模板.html?p=<款的文件夹名>          预览整页
+        模板.html?p=<款的文件夹名>&s=<屏号>  只出一屏（导出用，见 导出.sh）
+  每款的文案和照片在 商品/<款>/内容.js，这个文件一般不用改。
+-->
+<style>
+:root{
+  --navy:#1A2340; --navy-2:#232E52; --gold:#C9A465; --gold-soft:#E3CFA6;
+  --ivory:#F6F0E6; --paper:#FBF8F3; --ink:#2B2B2B; --ink-2:#6B6459; --line:#E4DACB;
+  --serif:"Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --sans:"Noto Sans SC","Microsoft YaHei",sans-serif;
+  --latin:"Bodoni MT","Didot","Noto Serif",serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#fff}
+body{width:750px;font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+html.export,html.export body{background:#00FF00}           /* 导出时的底色，trim 掉 */
+img{display:block;width:100%;height:100%;object-fit:cover}
+
+.screen{width:750px;position:relative;overflow:hidden}
+.pad{padding:96px 64px}
+.navy{background:var(--navy);color:var(--ivory)}
+.ivory{background:var(--ivory)}
+.paper{background:var(--paper)}
+.white{background:#fff}
+
+/* 通用小标题：英文小字 + 中文大标题 */
+.eyebrow{font-family:var(--latin);font-size:22px;letter-spacing:.32em;color:var(--gold);text-transform:uppercase}
+.h2{font-family:var(--serif);font-weight:600;font-size:52px;line-height:1.3;margin-top:18px;letter-spacing:.04em}
+.lead{font-size:26px;line-height:1.75;color:var(--ink-2);margin-top:20px}
+.navy .lead{color:#C9CCD8}
+.rule{width:56px;height:2px;background:var(--gold);margin-top:28px}
+.center{text-align:center}.center .rule{margin-left:auto;margin-right:auto}
+
+/* 照片位：缺照片时显示虚线框和要拍什么 */
+.ph{position:relative;background:#EDE6DA;overflow:hidden}
+.ph.missing::after{content:attr(data-need);position:absolute;inset:16px;border:2px dashed #B9AD99;
+  display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;
+  font-size:24px;line-height:1.6;color:#8A7F6E;white-space:pre-line}
+.navy .ph{background:var(--navy-2)}
+.navy .ph.missing::after{border-color:#4A5682;color:#8E97B8}
+.ai-tag{position:absolute;left:14px;top:14px;font-size:18px;color:#fff;background:rgba(0,0,0,.38);padding:4px 10px;border-radius:2px}
+
+/* 1 首屏 */
+.s-hero .top{display:flex;justify-content:space-between;align-items:center;padding:44px 64px 0}
+.s-hero .top .series{font-family:var(--serif);font-size:24px;color:var(--gold-soft);letter-spacing:.2em}
+.s-hero .frame{margin:40px 64px 0;padding:14px;border:1px solid rgba(201,164,101,.55)}
+.s-hero .frame .ph{height:760px}
+.s-hero .name{font-family:var(--serif);font-weight:600;font-size:76px;letter-spacing:.12em;margin-top:64px}
+.s-hero .en{font-family:var(--latin);font-size:26px;letter-spacing:.42em;color:var(--gold);margin-top:14px}
+.s-hero .one{font-family:var(--serif);font-size:30px;line-height:1.7;color:#D9DCE6;margin:36px 64px 0;white-space:pre-line}
+.s-hero .tags{display:flex;justify-content:center;gap:16px;padding:44px 0 88px}
+.s-hero .tags span{border:1px solid var(--gold);color:var(--gold-soft);font-size:24px;padding:10px 22px;letter-spacing:.08em}
+
+/* 2 真假对比：三列 */
+.s-real .ph{height:560px;margin-top:56px}
+.s-real .cap{font-size:22px;color:var(--ink-2);margin-top:14px;text-align:center}
+.stamp{position:absolute;right:16px;bottom:16px;font-size:20px;letter-spacing:.06em;color:#fff;background:rgba(26,35,64,.72);padding:6px 14px}
+.cmp{margin-top:56px;border-top:2px solid var(--navy)}
+.cmp .row{display:grid;grid-template-columns:96px 1.15fr 1fr 1fr;border-bottom:1px solid var(--line)}
+.cmp .row>div{padding:22px 12px;font-size:23px;line-height:1.55}
+.cmp .row>div:first-child{padding-left:0}
+.cmp .row .k{font-family:var(--serif);font-weight:600;color:var(--navy)}
+.cmp .head>div{font-size:21px;line-height:1.4;color:var(--ink-2);padding-top:18px;padding-bottom:18px;white-space:pre-line}
+.cmp .head .ours{color:var(--navy);font-weight:700}
+.cmp .ours{color:var(--ink);background:rgba(201,164,101,.10)}
+.cmp .fake{color:#9A9286}
+.s-real .note{margin-top:40px;font-size:23px;line-height:1.7;color:var(--ink-2);background:#fff;padding:24px 28px;border-left:3px solid var(--gold)}
+
+/* 3 细节 */
+.detail{margin-top:64px}
+.detail .ph{height:460px}
+.detail .txt{display:flex;gap:24px;align-items:baseline;margin-top:24px}
+.detail .no{font-family:var(--latin);font-size:44px;color:var(--gold);line-height:1}
+.detail .t{font-family:var(--serif);font-weight:600;font-size:32px;color:var(--navy)}
+.detail .d{font-size:24px;line-height:1.7;color:var(--ink-2);margin-top:8px}
+
+/* 4 上耳 */
+.wear .big{margin-top:56px}
+.wear .big .ph{height:820px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.wear .grid2{margin-top:16px}
+.grid2>.unit:only-child{grid-column:1/-1}
+.wear .grid2 .ph{height:440px}
+.fig-cap{font-size:22px;color:var(--ink-2);text-align:center;margin-top:12px}
+
+/* 5 尺寸参数 */
+.size .ruler{margin-top:56px}
+.size .ruler .ph{height:500px}
+.size .grid2{margin-top:56px;gap:24px 16px}
+.size .grid2 .ph{height:400px}
+.size .sizes ~ .ruler{display:none}
+.mm{position:absolute;left:14px;bottom:14px;font-family:var(--latin);font-size:30px;color:#fff;background:rgba(26,35,64,.78);padding:4px 14px;letter-spacing:.04em}
+.params{margin-top:48px;border-top:2px solid var(--navy)}
+.params .row{display:grid;grid-template-columns:200px 1fr;border-bottom:1px solid var(--line);font-size:26px}
+.params .row>div{padding:22px 0;line-height:1.5}
+.params .k{color:var(--ink-2)}
+.params .v{color:var(--ink)}
+.size .tip{margin-top:28px;font-size:22px;color:var(--ink-2);line-height:1.7}
+
+/* 6 同系列 */
+.series-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px 20px;margin-top:56px}
+.card .ph{height:360px}
+.card .n{font-family:var(--serif);font-weight:600;font-size:28px;margin-top:18px;color:var(--navy)}
+.card .x{font-size:22px;color:var(--ink-2);margin-top:6px;line-height:1.5}
+
+/* 7 包装 */
+.pack .ph{height:640px;margin-top:56px}
+.pack .items{display:grid;grid-template-columns:repeat(3,1fr);margin-top:48px;border-top:1px solid rgba(201,164,101,.4);border-bottom:1px solid rgba(201,164,101,.4)}
+.pack .items div{padding:30px 10px;text-align:center;font-family:var(--serif);font-size:26px;color:var(--gold-soft)}
+.pack .items div+div{border-left:1px solid rgba(201,164,101,.4)}
+
+/* 8 保养售后 */
+.care .block{margin-top:56px}
+.care .bt{font-family:var(--serif);font-weight:600;font-size:34px;color:var(--navy);padding-bottom:16px;border-bottom:2px solid var(--navy)}
+.care ol{list-style:none;counter-reset:c}
+.care li{counter-increment:c;display:grid;grid-template-columns:60px 1fr;padding:22px 0;border-bottom:1px solid var(--line);font-size:25px;line-height:1.65}
+.care li::before{content:counter(c,decimal-leading-zero);font-family:var(--latin);color:var(--gold);font-size:28px}
+
+/* 9 关于 */
+.about .logo{width:300px;height:auto;margin:0 auto}
+.about .txt{font-family:var(--serif);font-size:28px;line-height:2;color:#D9DCE6;margin-top:48px;text-align:center}
+.about .sign{margin-top:56px;font-family:var(--latin);letter-spacing:.42em;font-size:22px;color:var(--gold);text-align:center}
+</style>
+</head>
+<body>
+<div id="page"></div>
+<script>
+// 导出模式（URL 带 s=）：缺的照片直接收起，不显示虚线框；
+// 标了 data-need 的屏（细节、上耳、同系列、包装）照片全缺时整屏不出。预览模式保留虚线框，提示要拍什么。
+var EXPORT = false;
+(function(){
+  var q = new URLSearchParams(location.search);
+  var slug = q.get('p') || '示例款';
+  var only = q.get('s');
+  if (only) { EXPORT = true; document.documentElement.classList.add('export'); }
+  var base = '商品/' + slug + '/';
+  var s = document.createElement('script');
+  s.src = base + '内容.js';
+  s.onload = function(){ render(window.PRODUCT, base, only); };
+  s.onerror = function(){ document.getElementById('page').textContent = '找不到 ' + base + '内容.js'; };
+  document.head.appendChild(s);
+})();
+
+function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+// 照片位。p: {f:'B1.jpg', need:'生长纹微距', ai:true, stamp:'原相机无滤镜实拍'}；overlay 是叠在图上的额外内容（如 mm 标签）
+// f 写完整文件名，jpg、png 都认。
+function ph(base, p, cls, overlay){
+  p = p || {};
+  if (EXPORT && !p.f) return '';
+  var need = (p.f ? p.f.replace(/\.\w+$/,'') + '  ' : '') + (p.need || '');
+  var img = p.f ? '<img src="' + esc(base + '照片/' + p.f) + '" onerror="miss(this)">' : '';
+  var tag = p.ai ? '<span class="ai-tag">' + esc(p.ai === true ? 'AI 生成背景' : p.ai) + '</span>' : '';
+  var stamp = p.stamp ? '<span class="stamp">' + esc(p.stamp) + '</span>' : '';
+  return '<div class="ph ' + (cls || '') + (p.f ? '' : ' missing') + '" data-need="放照片\n' + esc(need) + '">' + img + tag + stamp + (overlay || '') + '</div>';
+}
+// 一个"照片 + 说明"单元；导出时照片缺了，整个单元一起收起
+function unit(phHtml, rest, cls){
+  if (!phHtml) return '';
+  return '<div class="unit ' + (cls || '') + '">' + phHtml + (rest || '') + '</div>';
+}
+function miss(img){
+  var box = img.parentNode;
+  img.remove();
+  if (!EXPORT) { box.classList.add('missing'); return; }
+  var u = box.closest('.unit');
+  (u || box).remove();
+  prune();
+}
+// 导出时去掉照片全缺的屏
+function prune(){
+  if (!EXPORT) return;
+  document.querySelectorAll('.grid2').forEach(function(g){
+    if (!g.querySelector('.ph')) g.remove();
+  });
+  document.querySelectorAll('section[data-need]').forEach(function(sec){
+    if (!sec.querySelector('.ph')) sec.remove();
+  });
+}
+function head(eb, title, lead, center){
+  return '<div class="' + (center ? 'center' : '') + '"><div class="eyebrow">' + esc(eb) + '</div><div class="h2">' + esc(title) + '</div>' +
+    (lead ? '<div class="lead">' + esc(lead) + '</div>' : '') + '<div class="rule"></div></div>';
+}
+
+function render(P, base, only){
+  var S = [];
+
+  // 1 首屏（没有照片时只收起照片，文字照出）
+  var hero = ph(base, P.photos.hero);
+  S.push('<section class="screen navy s-hero">' +
+    '<div class="top"><div class="eyebrow">Mystic Lustre</div><div class="series">' + esc(P.series) + '</div></div>' +
+    unit(hero, '', 'frame') +
+    '<div class="center"><div class="name">' + esc(P.name) + '</div><div class="en">' + esc(P.nameEn) + '</div></div>' +
+    '<div class="one center">' + esc(P.oneLiner) + '</div>' +
+    '<div class="tags">' + P.tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + '</div>' +
+  '</section>');
+
+  // 2 真假珍珠：三列对比 + 散珠托盘实拍（没有照片时对比表照出）
+  var R = P.real;
+  var tray = P.photos.tray || {};
+  S.push('<section class="screen ivory pad s-real">' +
+    head('Real Freshwater Pearl', R.title || '怎么分清真珍珠', R.lead, true) +
+    unit(ph(base, tray), tray.cap ? '<div class="cap">' + esc(tray.cap) + '</div>' : '') +
+    '<div class="cmp"><div class="row head"><div></div>' +
+      R.cols.map(function(c, i){ return '<div class="' + (i ? '' : 'ours') + '">' + esc(c) + '</div>'; }).join('') + '</div>' +
+      R.rows.map(function(r){
+        return '<div class="row"><div class="k">' + esc(r[0]) + '</div>' +
+          r.slice(1).map(function(v, i){ return '<div class="' + (i ? 'fake' : 'ours') + '">' + esc(v) + '</div>'; }).join('') + '</div>';
+      }).join('') +
+    '</div>' + (R.note ? '<div class="note">' + esc(R.note) + '</div>' : '') +
+  '</section>');
+
+  // 3 细节
+  S.push('<section class="screen white pad" data-need>' + head('Details', '细节', P.detailsLead) +
+    P.details.map(function(d, i){
+      return unit(ph(base, d.photo), '<div class="txt"><div class="no">0' + (i + 1) + '</div><div><div class="t">' + esc(d.title) + '</div><div class="d">' + esc(d.text) + '</div></div></div>', 'detail');
+    }).join('') + '</section>');
+
+  // 4 上耳
+  var W = P.wear;
+  var small = [W.a, W.b].filter(Boolean).map(function(p){
+    return unit(ph(base, p), p.cap ? '<div class="fig-cap">' + esc(p.cap) + '</div>' : '');
+  }).join('');
+  S.push('<section class="screen paper pad wear" data-need>' + head('On You', '上耳效果', W.lead) +
+    unit(ph(base, W.big), '', 'big') +
+    (small ? '<div class="grid2">' + small + '</div>' : '') +
+  '</section>');
+
+  // 5 尺寸：多个尺寸 → 同一只耳朵戴各尺寸的小图（标 mm）；只有一个尺寸 → 标尺图
+  var sizes = (P.sizeWear || []).filter(function(x){ return x && (x.f || !EXPORT); });
+  // 导出时两种都先放上：多尺寸小图还在时用 CSS 藏掉标尺图，小图全缺被 prune() 去掉后标尺图自动露出来
+  var grid = sizes.length > 1
+    ? '<div class="grid2 sizes">' + sizes.map(function(x){
+        return unit(ph(base, x, '', '<span class="mm">' + esc(x.mm) + '</span>'));
+      }).join('') + '</div>'
+    : '';
+  var ruler = unit(ph(base, P.photos.size), '', 'ruler');
+  var sizePics = grid && !EXPORT ? grid : grid + ruler;
+  S.push('<section class="screen white pad size">' + head('Size & Spec', '尺寸参数', P.sizeLead) +
+    sizePics +
+    '<div class="params">' + P.params.map(function(r){ return '<div class="row"><div class="k">' + esc(r[0]) + '</div><div class="v">' + esc(r[1]) + '</div></div>'; }).join('') + '</div>' +
+    '<div class="tip">' + esc(P.sizeTip) + '</div>' +
+  '</section>');
+
+  // 6 同系列
+  if (P.related && P.related.length) {
+    S.push('<section class="screen ivory pad" data-need>' + head('The Collection', P.series + ' · 同系列', P.relatedLead) +
+      '<div class="series-grid">' + P.related.map(function(r){
+        return unit(ph(base, r.photo), '<div class="n">' + esc(r.name) + '</div><div class="x">' + esc(r.text) + '</div>', 'card');
+      }).join('') + '</div></section>');
+  } else {
+    S.push('');
+  }
+
+  // 7 包装
+  S.push('<section class="screen navy pad pack" data-need>' + head('Gift Ready', '包装', P.pack.lead, true) +
+    unit(ph(base, P.photos.pack)) +
+    '<div class="items">' + P.pack.items.map(function(t){ return '<div>' + esc(t) + '</div>'; }).join('') + '</div>' +
+  '</section>');
+
+  // 8 保养售后
+  S.push('<section class="screen paper pad care">' + head('Care & Service', '保养与售后') +
+    '<div class="block"><div class="bt">珍珠怎么保养</div><ol>' + P.care.map(function(t){ return '<li><span>' + esc(t) + '</span></li>'; }).join('') + '</ol></div>' +
+    '<div class="block"><div class="bt">发货与售后</div><ol>' + P.service.map(function(t){ return '<li><span>' + esc(t) + '</span></li>'; }).join('') + '</ol></div>' +
+  '</section>');
+
+  // 9 关于
+  S.push('<section class="screen navy pad about">' +
+    '<img class="logo" src="../../店铺/店标/矢量标志/主标志_透明底金字_2400.png" alt="">' +
+    '<div class="txt">' + P.about.map(esc).join('<br>') + '</div>' +
+    '<div class="sign">MYSTIC LUSTRE</div>' +
+  '</section>');
+
+  document.getElementById('page').innerHTML = only ? (S[+only - 1] || '') : S.join('');
+  prune();
+  document.title = P.name + ' · 详情页';
+}
+</script>
+</body>
+</html>

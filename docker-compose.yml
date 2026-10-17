@@ -1,0 +1,45 @@
+name: chutu
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      LISTEN: ":8080"
+      DATA_DIR: /app/data
+      TEMPLATE_DIR: /app/templates
+      PROMPT_DIR: /app/prompts
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      SESSION_SECRET: "${SESSION_SECRET:?请在 .env 设置至少 32 字符的 SESSION_SECRET}"
+      AI_BASE_URL: "${AI_BASE_URL:-https://subapi.xcc.im/v1}"
+      AI_API_KEY: "${AI_API_KEY:-}"
+      AI_MODEL_VISION: "${AI_MODEL_VISION:-gpt-6-sol}"
+      AI_MODEL_TEXT: "${AI_MODEL_TEXT:-gpt-6-sol}"
+      AI_REASONING_EFFORT: "${AI_REASONING_EFFORT-medium}"
+      IMAGE_MODEL: "${IMAGE_MODEL:-gpt-image-2.5-burst}"
+      IMAGE_TIMEOUT: "${IMAGE_TIMEOUT:-240}"
+      AUTO_UPSCALE: "${AUTO_UPSCALE:-1}"
+      AUTO_FILL: "${AUTO_FILL:-1}"
+      UPSCALE_MIN_SIDE: "${UPSCALE_MIN_SIDE:-900}"
+      REMBG_URL: http://rembg:7000
+      CHROME_PATH: /usr/bin/chromium
+      CHROME_NO_SANDBOX: "1"
+      COOKIE_SECURE: "${COOKIE_SECURE:-0}"
+      WORKERS: "${WORKERS:-2}"
+    volumes:
+      - app-data:/app/data
+      - ./prompts:/app/prompts:ro
+    shm_size: "512mb"
+    restart: unless-stopped
+    depends_on:
+      - rembg
+  rembg:
+    image: danielgatis/rembg:latest
+    command: ["s", "--host", "0.0.0.0", "--port", "7000"]
+    volumes:
+      - rembg-models:/root/.u2net
+    restart: unless-stopped
+volumes:
+  app-data:
+  rembg-models:

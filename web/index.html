@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN" data-style="workspace" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>款式 · 珠光秘境出图</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="app">
+  <div class="shell">
+    <nav class="rail"></nav>
+    <div class="main">
+      <header class="topbar"><div><div class="crumbs">珠光秘境 · 出图</div><div class="topbar-title">款式</div></div></header>
+      <div class="scroll"><main class="content">
+        <div class="page-head">
+          <div><div class="page-title">款式</div><div class="page-sub" id="summary">加载中…</div></div>
+          <button class="btn btn-primary" id="newBtn"><i data-lucide="plus"></i>新建款</button>
+        </div>
+        <div class="tabs" id="tabs"></div>
+        <div class="toolbar">
+          <label class="field" style="width:240px"><i data-lucide="search"></i><input id="q" placeholder="搜款名"></label>
+          <div class="segmented" id="scope"><button data-v="" class="active">全部人</button><button data-v="1">我建的</button></div>
+          <span class="spacer"></span>
+          <span class="fs-12 t3" id="shown"></span>
+        </div>
+        <div class="panel" style="padding:0">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>款</th><th>状态</th><th>进度</th><th class="num">照片</th><th>负责人</th><th>更新</th><th style="width:96px"></th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div id="empty" class="hidden" style="padding:32px 16px;text-align:center">
+            <div class="empty-art" style="max-width:420px;margin:0 auto;min-height:120px"><i data-lucide="images" style="width:28px;height:28px;color:var(--text-4)"></i></div>
+            <div class="empty-title">还没有款式</div>
+            <div class="empty-desc" style="margin:4px auto 12px">新建一款，上传上游给的几张实拍图，系统会自动分拣、修图、写文案，出主图和详情页。</div>
+            <button class="btn btn-secondary" onclick="document.getElementById('newBtn').click()"><i data-lucide="plus"></i>新建第一款</button>
+          </div>
+        </div>
+      </main></div>
+    </div>
+  </div>
+</div>
+<script src="/js/lucide.min.js"></script>
+<script src="/js/api.js"></script>
+<script>
+const { API, esc, ago, STATUS, STEPS, statusPill, icons, toast, drawer } = App;
+let all = [], tab = '', mine = '', me = null;
+
+function stepsMini(p) {
+  const idx = STEPS.findIndex(s => s[0] === p.step);
+  return '<span class="steps-mini">' + STEPS.map((s, i) => {
+    let c = '';
+    if (p.status === 'ready' || i < idx) c = 'on';
+    else if (i === idx) c = p.status === 'failed' ? 'bad' : (p.status === 'processing' ? 'on' : '');
+    return `<i class="${c}" title="${esc(s[1])}"></i>`;
+  }).join('') + '</span>';
+}
+
+function render() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const base = all.filter(p => !q || (p.name || '').toLowerCase().includes(q));
+  const count = s => base.filter(p => !s || p.status === s).length;
+  const tabs = [['', '全部'], ['draft', '草稿'], ['processing', '生成中'], ['ready', '已完成'], ['failed', '失败']];
+  document.getElementById('tabs').innerHTML = tabs.map(([k, t]) =>
+    `<button class="tab${tab === k ? ' active' : ''}" data-k="${k}">${t}<span class="count">${count(k)}</span></button>`).join('');
+  document.querySelectorAll('#tabs .tab').forEach(b => b.onclick = () => { tab = b.dataset.k; render(); });
+
+  const list = base.filter(p => !tab || p.status === tab);
+  document.getElementById('summary').innerHTML =
+    `${all.length} 款<span class="sep"></span>${all.filter(p => p.status === 'ready').length} 款已出图<span class="sep"></span>${all.filter(p => p.status === 'failed').length} 款失败`;
+  document.getElementById('shown').textContent = list.length ? `显示 ${list.length} 款` : '';
+  document.getElementById('empty').classList.toggle('hidden', all.length > 0);
+  document.getElementById('rows').innerHTML = list.map(p => `
+    <tr class="clickable" data-id="${p.id}">
+      <td><div class="name-cell">${p.cover_url ? `<img class="cover" src="${esc(p.cover_url)}" alt="" loading="lazy">` : '<span class="cover empty"><i data-lucide="image"></i></span>'}
+        <div style="min-width:0"><div class="cell-title ellipsis">${esc(p.name)}</div><div class="cell-sub mono">#${p.id}</div></div></div></td>
+      <td>${statusPill(p.status)}</td>
+      <td>${stepsMini(p)} <span class="fs-12 t3" style="margin-left:6px">${p.status === 'ready' ? '' : esc(App.stepName(p.step || 'check'))}</span></td>
+      <td class="num mono">${p.photo_count || 0}</td>
+      <td>${esc(p.owner || '')}</td>
+      <td class="t3">${esc(ago(p.updated_at))}</td>
+      <td style="text-align:right">${p.status === 'ready' ? `<a class="btn btn-secondary btn-sm" href="/api/products/${p.id}/download" onclick="event.stopPropagation()"><i data-lucide="download"></i>下载</a>` : ''}</td>
+    </tr>`).join('');
+  document.querySelectorAll('#rows tr').forEach(tr => tr.onclick = () => location.href = '/product.html?id=' + tr.dataset.id);
+  icons();
+}
+
+async function load() {
+  try {
+    const r = await API.get('/api/products' + (mine ? '?mine=1' : ''));
+    all = r.items || [];
+    render();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+document.getElementById('q').oninput = render;
+document.querySelectorAll('#scope button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#scope button').forEach(x => x.classList.toggle('active', x === b));
+  mine = b.dataset.v; load();
+});
+
+document.getElementById('newBtn').onclick = () => drawer(`
+  <div class="drawer-head">新建款<button class="close-btn" data-close><i data-lucide="x"></i></button></div>
+  <form class="drawer-body" id="nf">
+    <div><label class="label req">款名</label><input class="input" name="name" required maxlength="20" placeholder="如：初雪"></div>
+    <div class="form-row">
+      <div><label class="label">品类</label><select class="input" name="category"><option>耳钉</option><option>耳环</option><option>耳夹</option><option>项链</option><option>手链</option><option>戒指</option></select></div>
+      <div><label class="label">系列</label><input class="input" name="series" placeholder="可不填"></div>
+    </div>
+    <div class="form-row">
+      <div><label class="label">珍珠尺寸</label><input class="input" name="size" placeholder="如：7–8 mm"></div>
+      <div><label class="label">售价（元）</label><input class="input mono" name="price" type="number" min="0" step="1" placeholder="如：69"></div>
+    </div>
+    <div><label class="label">颜色 / 规格</label><input class="input" name="colors" placeholder="用顿号或逗号分开，如：白、粉、紫"></div>
+    <div><label class="label">配件</label><input class="input" name="metal" placeholder="如：925 银针、925 银蝴蝶结"></div>
+    <div><label class="label">亮点和备注</label><textarea class="textarea" name="highlights" rows="3" placeholder="上游怎么介绍这款、有没有精选档，都可以写在这里"></textarea></div>
+    <div class="fs-12 t3">不确定的可以空着，AI 会看照片补，补不了的标【待定】。</div>
+  </form>
+  <div class="drawer-foot"><button class="btn btn-secondary" data-close>取消</button><button class="btn btn-primary" id="create"><i data-lucide="arrow-right"></i>创建并上传照片</button></div>`,
+  (el, close) => {
+    const f = el.querySelector('#nf');
+    el.querySelector('#create').onclick = async () => {
+      if (!f.reportValidity()) return;
+      const d = Object.fromEntries(new FormData(f));
+      const info = {
+        series: d.series, category: d.category, pearl: '淡水养殖珍珠', size: d.size, metal: d.metal,
+        colors: d.colors ? d.colors.split(/[、,，\s]+/).filter(Boolean) : [],
+        price: d.price ? Number(d.price) : null, highlights: d.highlights,
+      };
+      try {
+        const r = await API.post('/api/products', { name: d.name.trim(), info });
+        location.href = '/product.html?id=' + r.product.id;
+      } catch (e) { toast(e.message, 'error'); }
+    };
+  });
+
+(async () => { me = await App.shell('products'); if (me) load(); })();
+setInterval(() => { if (all.some(p => p.status === 'processing')) load(); }, 5000);
+</script>
+</body>
+</html>
