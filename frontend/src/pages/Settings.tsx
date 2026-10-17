@@ -8,7 +8,17 @@ type Label = { text: string; position: string; size: number; color: string; opac
 type Settings = { ai_label?: Partial<Label>; ai_models?: Record<string, string>; ai_prices?: Record<string, number>; quota_default?: { month_images: number | null; month_text: number | null } }
 
 const POS: Record<string, string> = { 'top-left': '左上', 'top-right': '右上', 'bottom-left': '左下', 'bottom-right': '右下' }
-const FEATURES: Record<string, string> = { classify: '照片分拣（看图）', copy: '写文案', enhance: '高清化', fill: 'AI 补图' }
+const FEATURES: Record<string, string> = {
+  classify: '照片分拣（看图）',
+  tag: '图片打标签（看图）',
+  copy: '写文案',
+  copy_rewrite: '改写文案',
+  copy_check: '文案合规审查',
+  enhance: '一键出图·高清化',
+  fill: 'AI 补图',
+  upscale: '图片处理·高清化',
+  process: '图片处理·AI 改图',
+}
 
 export function SettingsPage() {
   const toast = useToast()

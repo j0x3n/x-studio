@@ -14,6 +14,10 @@ func (a *Core) Setting(key string) Object {
 	}
 	return JSONObj(s)
 }
+
+// aiFeatures 是 ai_models 里可以单独指定模型的功能名，对应 WithFeature 的取值。
+var aiFeatures = map[string]bool{"classify": true, "copy": true, "enhance": true, "fill": true, "tag": true, "upscale": true, "process": true, "copy_rewrite": true, "copy_check": true}
+
 func ValidateSetting(key string, v json.RawMessage) error {
 	var o Object
 	if json.Unmarshal(v, &o) != nil || o == nil {
@@ -22,7 +26,7 @@ func ValidateSetting(key string, v json.RawMessage) error {
 	switch key {
 	case "ai_models":
 		for k, v := range o {
-			if k != "classify" && k != "copy" && k != "enhance" && k != "fill" {
+			if !aiFeatures[k] {
 				return fmt.Errorf("不支持的 AI 功能")
 			}
 			if _, ok := v.(string); !ok {
