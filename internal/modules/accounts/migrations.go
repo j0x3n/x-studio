@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"database/sql"
+	"encoding/json"
 	"xstudio/internal/core"
 )
 
@@ -45,6 +46,21 @@ CREATE TABLE IF NOT EXISTS shares(id INTEGER PRIMARY KEY,product_id INTEGER NOT 
 		if cols["role"] {
 			_, e = tx.Exec("INSERT INTO user_shops(user_id,shop_id) SELECT u.id,s.id FROM users u JOIN roles r ON r.id=u.role_id JOIN shops s WHERE r.key='operator'")
 		}
+		return e
+	}}, {Version: 2, Up: func(tx *sql.Tx) error {
+		// 第一期并行阶段新增"审核出图"权限点，默认给运营；已改过的角色只追加，不覆盖
+		var raw string
+		if e := tx.QueryRow("SELECT perms FROM roles WHERE key='operator' AND builtin=1").Scan(&raw); e != nil {
+			return nil
+		}
+		var perms []string
+		_ = json.Unmarshal([]byte(raw), &perms)
+		for _, p := range perms {
+			if p == core.RenderReview {
+				return nil
+			}
+		}
+		_, e := tx.Exec("UPDATE roles SET perms=? WHERE key='operator' AND builtin=1", core.JS(append(perms, core.RenderReview)))
 		return e
 	}}}
 }

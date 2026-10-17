@@ -25,6 +25,7 @@ const (
 	RenderRun        = "render.run"
 	ExportRun        = "export.run"
 	ExportNoAILabel  = "export.no_ai_label"
+	RenderReview     = "render.review"
 	AdminUsers       = "admin.users"
 	AdminShops       = "admin.shops"
 	AdminSettings    = "admin.settings"
@@ -35,7 +36,7 @@ const (
 var Permissions = []Permission{
 	{ProductView, "看商品", "商品"}, {ProductCost, "看成本价和货源", "商品"}, {ProductEdit, "新建、修改商品和上架版本", "商品"}, {ProductDeleteOwn, "删除自己创建的商品", "商品"}, {ProductDeleteAny, "删除任何商品", "商品"},
 	{AssetUpload, "上传照片", "素材"}, {AssetUpscale, "AI 高清化", "素材"}, {AssetProcess, "图片处理", "素材"}, {AssetDeleteOwn, "删除自己的素材", "素材"}, {AssetDeleteAny, "删除任何素材", "素材"},
-	{CopyView, "看文案", "文案"}, {CopyEdit, "编辑文案", "文案"}, {TemplateManage, "管理模板", "模板"}, {RenderRun, "跑出图任务", "出图"}, {ExportRun, "导出、下载成品", "出图"}, {ExportNoAILabel, "导出时取消 AI 标识", "出图"},
+	{CopyView, "看文案", "文案"}, {CopyEdit, "编辑文案", "文案"}, {TemplateManage, "管理模板", "模板"}, {RenderRun, "跑出图任务", "出图"}, {ExportRun, "导出、下载成品", "出图"}, {ExportNoAILabel, "导出时取消 AI 标识", "出图"}, {RenderReview, "审核出图结果", "出图"},
 	{AdminUsers, "管理账号、角色、分店和额度", "管理"}, {AdminShops, "管理店铺", "管理"}, {AdminSettings, "修改系统设置", "管理"}, {AdminAudit, "看操作日志", "管理"}, {ShareManage, "分享商品给外部协作者", "管理"},
 }
 
