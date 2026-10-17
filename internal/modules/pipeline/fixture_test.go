@@ -7,6 +7,7 @@ import (
 	"xstudio/internal/modules/accounts"
 	"xstudio/internal/modules/assets"
 	"xstudio/internal/modules/products"
+	"xstudio/internal/modules/studio"
 )
 
 var EnvConfig = core.EnvConfig
@@ -18,10 +19,11 @@ func newTestApp(c Config, web fs.FS, slots []byte) (*Module, error) {
 		return nil, e
 	}
 	a := New(b)
-	if e = b.Start(accounts.New(b), products.New(b), assets.New(b), a); e != nil {
+	if e = b.Start(accounts.New(b), products.New(b), assets.New(b), a, studio.New(b)); e != nil {
 		b.Close()
 		return nil, e
 	}
+	_, _ = b.DB.Exec("UPDATE studio_settings SET value='false' WHERE key='require_review'")
 	return a, nil
 }
 func testActor(ctx context.Context) context.Context {

@@ -24,6 +24,7 @@ type listingRenderRow struct {
 	ReviewedAt       string
 	RenderedJobID    sql.NullInt64
 	RenderedTemplate string
+	RenderNote       string
 	UpdatedAt        string
 }
 
@@ -40,12 +41,12 @@ func (a *Module) ensureListingRender(listingID int64) (listingRenderRow, error) 
 	var lr listingRenderRow
 	var aiInt int
 	e := a.DB.QueryRow(
-		"SELECT listing_id,detail_template,main_template,ai_label,review_status,review_note,reviewed_by,reviewed_at,rendered_job_id,rendered_template,updated_at FROM listing_render WHERE listing_id=?",
+		"SELECT listing_id,detail_template,main_template,ai_label,review_status,review_note,reviewed_by,reviewed_at,rendered_job_id,rendered_template,render_note,updated_at FROM listing_render WHERE listing_id=?",
 		listingID,
 	).Scan(
 		&lr.ListingID, &lr.DetailTemplate, &lr.MainTemplate, &aiInt,
 		&lr.ReviewStatus, &lr.ReviewNote, &lr.ReviewedBy, &lr.ReviewedAt,
-		&lr.RenderedJobID, &lr.RenderedTemplate, &lr.UpdatedAt,
+		&lr.RenderedJobID, &lr.RenderedTemplate, &lr.RenderNote, &lr.UpdatedAt,
 	)
 	lr.AILabel = aiInt != 0
 	return lr, e
@@ -91,6 +92,7 @@ func (a *Module) renderStateJSON(listingID, shopID int64) (core.Object, error) {
 		"ai_label":                  lr.AILabel,
 		"rendered_job_id":           renderedJobID,
 		"rendered_template":         lr.RenderedTemplate,
+		"render_note":               lr.RenderNote,
 		"updated_at":                lr.UpdatedAt,
 	}
 	review := core.Object{
@@ -115,6 +117,7 @@ func (a *Module) renderStateJSON(listingID, shopID int64) (core.Object, error) {
 		"reviewed_at":       lr.ReviewedAt,
 		"rendered_job_id":   renderedJobID,
 		"rendered_template": lr.RenderedTemplate,
+		"render_note":       lr.RenderNote,
 	}, nil
 }
 
@@ -148,6 +151,23 @@ func parseAILabelValue(raw json.RawMessage) (bool, error) {
 	return false, fmt.Errorf("ai_label 只能是 0/1 或布尔值")
 }
 
+func (a *Module) validateShopDetailTemplate(shopID int64, tpl string) bool {
+	tpl = strings.TrimSpace(tpl)
+	if tpl == "" {
+		return true
+	}
+	list, manifestDef := a.readManifest()
+	_, disabled := a.shopTemplatePrefs(shopID, manifestDef)
+	found := false
+	for _, item := range list {
+		if item.Key == tpl {
+			found = true
+			break
+		}
+	}
+	return found && !slices.Contains(disabled, tpl)
+}
+
 func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 	a.Mu.Lock()
 	defer a.Mu.Unlock()
@@ -179,20 +199,9 @@ func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			tpl = strings.TrimSpace(tpl)
-			if tpl != "" {
-				list, manifestDef := a.readManifest()
-				_, disabled := a.shopTemplatePrefs(shopID, manifestDef)
-				found := false
-				for _, item := range list {
-					if item.Key == tpl {
-						found = true
-						break
-					}
-				}
-				if !found || slices.Contains(disabled, tpl) {
-					core.Fail(w, 400, "模板不存在或对该店铺已停用")
-					return
-				}
+			if !a.validateShopDetailTemplate(shopID, tpl) {
+				core.Fail(w, 400, "模板不存在或对该店铺已停用")
+				return
 			}
 			lr.DetailTemplate = tpl
 		case "main_template":
@@ -236,9 +245,6 @@ func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 		"UPDATE listing_render SET detail_template=?,main_template=?,ai_label=?,updated_at=? WHERE listing_id=?",
 		lr.DetailTemplate, lr.MainTemplate, aiInt, ts, id,
 	); e == nil {
-		_, e = tx.Exec("UPDATE listings SET ai_label=?,render_ai_label=? WHERE id=?", aiInt, aiInt, id)
-	}
-	if e == nil {
 		e = core.AuditTx(tx, r, "studio.render_settings", "listing", id, core.Object{
 			"detail_template": lr.DetailTemplate,
 			"main_template":   lr.MainTemplate,
@@ -376,6 +382,10 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 			results = append(results, core.Object{"listing_id": lid, "skipped_reason": "没有取消 AI 标识的权限"})
 			continue
 		}
+		if in.DetailTemplate != "" && !a.validateShopDetailTemplate(p.ShopID, in.DetailTemplate) {
+			results = append(results, core.Object{"listing_id": lid, "skipped_reason": "模板不存在或对该店铺已停用"})
+			continue
+		}
 		tx, e := a.DB.Begin()
 		if e != nil {
 			results = append(results, core.Object{"listing_id": lid, "skipped_reason": "创建任务失败"})
@@ -383,7 +393,11 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 		}
 		ts := core.Now()
 		if in.DetailTemplate != "" {
-			_, _ = tx.Exec("UPDATE listing_render SET detail_template=?,updated_at=? WHERE listing_id=?", in.DetailTemplate, ts, lid)
+			if _, e := tx.Exec("UPDATE listing_render SET detail_template=?,updated_at=? WHERE listing_id=?", in.DetailTemplate, ts, lid); e != nil {
+				_ = tx.Rollback()
+				results = append(results, core.Object{"listing_id": lid, "skipped_reason": "保存出图设置失败"})
+				continue
+			}
 		}
 		res, e := tx.Exec(
 			"INSERT INTO jobs(kind,target_type,target_id,user_id,params,status,created_at,steps) VALUES('pipeline','listing',?,?,?,'queued',?,'render')",
@@ -396,8 +410,18 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 		}
 		jid, _ := res.LastInsertId()
 		_, e = tx.Exec("UPDATE listings SET pipeline_status='processing',pipeline_error='',updated_at=? WHERE id=?", ts, lid)
+		if e == nil && in.DetailTemplate != "" {
+			e = core.AuditTx(tx, r, "studio.render_settings", "listing", lid, core.Object{
+				"detail_template": in.DetailTemplate,
+				"main_template":   lr.MainTemplate,
+				"ai_label":        lr.AILabel,
+			})
+		}
 		if e == nil && !lr.AILabel {
 			e = core.AuditTx(tx, r, "export.no_ai_label", "listing", lid, core.Object{"job_id": jid, "stage": "run"})
+		}
+		if e == nil {
+			e = core.AuditTx(tx, r, "studio.render", "listing", lid, core.Object{"job_id": jid, "ai_label": lr.AILabel})
 		}
 		if e != nil || tx.Commit() != nil {
 			_ = tx.Rollback()
@@ -410,15 +434,14 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 	a.Audit(r, "studio.render_batch", "listing", 0, core.Object{
 		"listing_ids":     in.ListingIDs,
 		"detail_template": in.DetailTemplate,
-		"results":         results,
+		"items":           results,
 	})
 	if woke {
 		a.Wake()
 	}
 	core.WriteJSON(w, 200, core.Object{
-		"items":   results,
-		"results": results,
-		"total":   len(results),
+		"items": results,
+		"total": len(results),
 	})
 }
 

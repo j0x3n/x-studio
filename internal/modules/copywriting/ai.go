@@ -275,20 +275,29 @@ func (a *Module) runRewrite(ctx context.Context, j core.Job) error {
 		return e
 	}
 
+	voiceText, voiceExamples, topKeywords, bannedWords := a.shopContext(p.ShopID)
+	voiceFull := voiceText
+	if len(voiceExamples) > 0 {
+		voiceFull = strings.TrimSpace(voiceFull + "\n示例：" + strings.Join(voiceExamples, "；"))
+	}
+	if topKeywords == nil {
+		topKeywords = []core.Object{}
+	}
+	if bannedWords == nil {
+		bannedWords = []string{}
+	}
+
 	input := core.Object{
-		"scope":        scope,
-		"instructions": instructions,
-		"version": core.Object{
-			"title":   orig.Title,
+		"copy": core.Object{
 			"content": orig.Content,
 			"main":    orig.Main,
 			"meta":    orig.Meta,
-			"listing": orig.Meta,
 		},
-		"content": orig.Content,
-		"main":    orig.Main,
-		"meta":    orig.Meta,
-		"listing": orig.Meta,
+		"scope":        scope,
+		"instructions": instructions,
+		"voice":        voiceFull,
+		"keywords":     topKeywords,
+		"banned":       bannedWords,
 	}
 	var rawAI core.Object
 	if e = a.AIJSON(core.WithFeature(ctx, "copy_rewrite"), a.Cfg.TextModel, prompt, core.JS(input), &rawAI); e != nil {
@@ -298,107 +307,17 @@ func (a *Module) runRewrite(ctx context.Context, j core.Job) error {
 		return fmt.Errorf("AI 改写返回为空")
 	}
 
-	newContent := cloneObject(orig.Content)
-	newMain := cloneObject(orig.Main)
-	newMeta := cloneObject(orig.Meta)
-
-	aiContent, _ := rawAI["content"].(core.Object)
-	aiMain, _ := rawAI["main"].(core.Object)
-	aiMeta, _ := rawAI["meta"].(core.Object)
-	if aiMeta == nil {
-		aiMeta, _ = rawAI["listing"].(core.Object)
-	}
-
-	switch scope {
-	case "title":
-		src := aiMeta
-		if src == nil {
-			src = rawAI
-		}
-		if t, ok := src["title"].(string); ok {
-			newMeta["title"] = t
-		} else if t, ok := rawAI["title"].(string); ok {
-			newMeta["title"] = t
-		}
-		if alts, ok := src["title_alts"].([]any); ok {
-			if validateValue(alts, listingSpec["title_alts"], "meta.title_alts") == nil {
-				newMeta["title_alts"] = alts
-			}
-		} else if alts, ok := rawAI["title_alts"].([]any); ok {
-			if validateValue(alts, listingSpec["title_alts"], "meta.title_alts") == nil {
-				newMeta["title_alts"] = alts
-			}
-		}
-	case "selling":
-		src := aiContent
-		if src == nil {
-			src = rawAI
-		}
-		for _, k := range []string{"oneLiner", "detailsLead", "story", "storySign", "sticker", "festival"} {
-			if s, ok := src[k].(string); ok {
-				newContent[k] = s
-			}
-		}
-		if tags, ok := src["tags"].([]any); ok {
-			if validateValue(tags, contentSpec["tags"], "content.tags") == nil {
-				newContent["tags"] = tags
-			}
-		}
-		if details, ok := src["details"].([]any); ok {
-			if validateValue(details, contentSpec["details"], "content.details") == nil {
-				origDetails, _ := orig.Content["details"].([]any)
-				merged := make([]any, 0, len(details))
-				for i, d := range details {
-					dm, ok := d.(core.Object)
-					if !ok {
-						continue
-					}
-					item := cloneObject(dm)
-					if i < len(origDetails) {
-						if od, ok := origDetails[i].(core.Object); ok && od["photo"] != nil {
-							item["photo"] = od["photo"]
-						}
-					}
-					merged = append(merged, item)
-				}
-				newContent["details"] = merged
-			}
-		}
-		if aiWear, ok := src["wear"].(core.Object); ok {
-			if lead, ok := aiWear["lead"].(string); ok {
-				wear := cloneObject( nilIfNotObj(newContent["wear"]) )
-				wear["lead"] = lead
-				newContent["wear"] = wear
-			}
-		}
-		if aiReal, ok := src["real"].(core.Object); ok {
-			if note, ok := aiReal["note"].(string); ok {
-				real := cloneObject( nilIfNotObj(newContent["real"]) )
-				real["note"] = note
-				newContent["real"] = real
-			}
-		}
-	case "all":
-		if aiContent != nil {
-			newContent = aiContent
-		}
-		if aiMain != nil {
-			newMain = aiMain
-		}
-		if aiMeta != nil {
-			newMeta = aiMeta
-		}
-		newMain = a.cleanMainForProduct(p.ID, newMain)
-		if e = a.annotateAI(p.ID, newContent, newMain); e != nil {
-			return e
-		}
-		newContent = a.cleanObjectForProduct(p.ID, newContent)
-	}
+	newContent, newMain, newMeta, ignored := mergeRewriteCopy(orig.Content, orig.Main, orig.Meta, rawAI, scope)
 
 	if e = validateCopy(newContent, newMain, newMeta); e != nil {
 		return e
 	}
 	normalizeCopy(newContent, newMain, newMeta)
+	bannedText, _ := a.prompt("违禁词.txt")
+	if len(bannedWords) > 0 {
+		bannedText += "\n" + strings.Join(bannedWords, "\n")
+	}
+	newMeta["compliance"] = appendCompliance(newContent, newMain, newMeta, bannedText)
 
 	title, _ := newMeta["title"].(string)
 	if title == "" {
@@ -412,15 +331,286 @@ func (a *Module) runRewrite(ctx context.Context, j core.Job) error {
 		return e
 	}
 	vid, _ := res.LastInsertId()
-	_, e = a.DB.Exec("UPDATE jobs SET message='文案改写完成',result=? WHERE id=?", core.JS(core.Object{"copy_id": vid}), j.ID)
+	msg := "文案改写完成"
+	if ignored > 0 {
+		msg = fmt.Sprintf("文案改写完成；已忽略 %d 处超出改写范围的改动", ignored)
+	}
+	_, e = a.DB.Exec("UPDATE jobs SET message=?,result=? WHERE id=?", msg, core.JS(core.Object{"copy_id": vid}), j.ID)
 	return e
 }
 
-func nilIfNotObj(v any) core.Object {
-	if o, ok := v.(core.Object); ok {
-		return o
+func sameTextOrSliceType(origVal, aiVal any) bool {
+	switch origVal.(type) {
+	case string:
+		_, ok := aiVal.(string)
+		return ok
+	case []any:
+		arr, ok := aiVal.([]any)
+		if !ok {
+			return false
+		}
+		for _, elem := range arr {
+			if _, ok := elem.(string); !ok {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
 	}
-	return core.Object{}
+}
+
+func cloneValue(v any) any {
+	b, _ := json.Marshal(v)
+	var out any
+	_ = json.Unmarshal(b, &out)
+	return out
+}
+
+func isAllowedRewriteScalarOrSlice(scope, path string) bool {
+	switch path {
+	case "meta.title", "meta.title_alts":
+		return scope == "title" || scope == "all"
+	case "content.oneLiner", "content.tags", "content.real.note", "content.detailsLead", "content.wear.lead", "content.sizeLead", "content.relatedLead":
+		return scope == "selling" || scope == "all"
+	case "content.name", "content.nameEn":
+		return scope == "all"
+	default:
+		return false
+	}
+}
+
+func hasComplianceWarn(list []any, text string) bool {
+	for _, item := range list {
+		if m, ok := item.(core.Object); ok {
+			if m["level"] == "warn" && m["text"] == text {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasComplianceExact(list []any, target core.Object) bool {
+	want := core.JS(target)
+	for _, item := range list {
+		if core.JS(item) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeRewriteCopy(origContent, origMain, origMeta, rawAI core.Object, scope string) (newContent, newMain, newMeta core.Object, ignored int) {
+	newContent = cloneObject(origContent)
+	newMain = cloneObject(origMain)
+	newMeta = cloneObject(origMeta)
+
+	for k := range rawAI {
+		if k != "content" && k != "main" && k != "meta" && k != "listing" {
+			ignored++
+		}
+	}
+
+	var aiContent, aiMain, aiMeta core.Object
+	if v, exists := rawAI["content"]; exists && v != nil {
+		if o, ok := v.(core.Object); ok {
+			aiContent = o
+		} else {
+			ignored++
+		}
+	}
+	if v, exists := rawAI["main"]; exists && v != nil {
+		if o, ok := v.(core.Object); ok {
+			aiMain = o
+		} else {
+			ignored++
+		}
+	}
+	if v, exists := rawAI["meta"]; exists && v != nil {
+		if o, ok := v.(core.Object); ok {
+			aiMeta = o
+		} else {
+			ignored++
+		}
+	} else if v, exists := rawAI["listing"]; exists && v != nil {
+		if o, ok := v.(core.Object); ok {
+			aiMeta = o
+		} else {
+			ignored++
+		}
+	}
+
+	allowSelling := scope == "selling" || scope == "all"
+
+	for k, aiVal := range aiContent {
+		switch k {
+		case "real", "wear":
+			origSub, origOk := origContent[k].(core.Object)
+			aiSub, aiOk := aiVal.(core.Object)
+			if !origOk || !aiOk {
+				if core.JS(aiVal) != core.JS(origContent[k]) {
+					ignored++
+				}
+				continue
+			}
+			newSub, _ := newContent[k].(core.Object)
+			for sk, sAIVal := range aiSub {
+				sOrigVal, sExists := origSub[sk]
+				if !sExists {
+					ignored++
+					continue
+				}
+				subpath := "content." + k + "." + sk
+				if isAllowedRewriteScalarOrSlice(scope, subpath) && sameTextOrSliceType(sOrigVal, sAIVal) {
+					newSub[sk] = cloneValue(sAIVal)
+				} else if core.JS(sAIVal) != core.JS(sOrigVal) {
+					ignored++
+				}
+			}
+		case "details":
+			origArr, origOk := origContent["details"].([]any)
+			aiArr, aiOk := aiVal.([]any)
+			if !origOk || !aiOk {
+				if core.JS(aiVal) != core.JS(origContent["details"]) {
+					ignored++
+				}
+				continue
+			}
+			newArr, _ := newContent["details"].([]any)
+			for i, item := range aiArr {
+				if i >= len(origArr) {
+					ignored++
+					continue
+				}
+				origElem, oOk := origArr[i].(core.Object)
+				aiElem, aOk := item.(core.Object)
+				if !oOk || !aOk {
+					if core.JS(item) != core.JS(origArr[i]) {
+						ignored++
+					}
+					continue
+				}
+				newElem, _ := newArr[i].(core.Object)
+				for ek, eAIVal := range aiElem {
+					eOrigVal, eExists := origElem[ek]
+					if !eExists {
+						ignored++
+						continue
+					}
+					if allowSelling && (ek == "title" || ek == "text") && sameTextOrSliceType(eOrigVal, eAIVal) {
+						newElem[ek] = cloneValue(eAIVal)
+					} else if core.JS(eAIVal) != core.JS(eOrigVal) {
+						ignored++
+					}
+				}
+			}
+		default:
+			origVal, exists := origContent[k]
+			if !exists {
+				ignored++
+				continue
+			}
+			path := "content." + k
+			if isAllowedRewriteScalarOrSlice(scope, path) && sameTextOrSliceType(origVal, aiVal) {
+				newContent[k] = cloneValue(aiVal)
+			} else if core.JS(aiVal) != core.JS(origVal) {
+				ignored++
+			}
+		}
+	}
+
+	for k, aiVal := range aiMain {
+		if k == "imgs" {
+			origArr, origOk := origMain["imgs"].([]any)
+			aiArr, aiOk := aiVal.([]any)
+			if !origOk || !aiOk {
+				if core.JS(aiVal) != core.JS(origMain["imgs"]) {
+					ignored++
+				}
+				continue
+			}
+			newArr, _ := newMain["imgs"].([]any)
+			for i, item := range aiArr {
+				if i >= len(origArr) {
+					ignored++
+					continue
+				}
+				origElem, oOk := origArr[i].(core.Object)
+				aiElem, aOk := item.(core.Object)
+				if !oOk || !aOk {
+					if core.JS(item) != core.JS(origArr[i]) {
+						ignored++
+					}
+					continue
+				}
+				newElem, _ := newArr[i].(core.Object)
+				for ek, eAIVal := range aiElem {
+					eOrigVal, eExists := origElem[ek]
+					if !eExists {
+						ignored++
+						continue
+					}
+					if allowSelling && (ek == "text" || ek == "label") && sameTextOrSliceType(eOrigVal, eAIVal) {
+						newElem[ek] = cloneValue(eAIVal)
+					} else if core.JS(eAIVal) != core.JS(eOrigVal) {
+						ignored++
+					}
+				}
+			}
+			continue
+		}
+		origVal, exists := origMain[k]
+		if !exists || core.JS(aiVal) != core.JS(origVal) {
+			ignored++
+		}
+	}
+
+	for k, aiVal := range aiMeta {
+		if k == "compliance" {
+			aiComp, aiOk := aiVal.([]any)
+			if !aiOk {
+				if core.JS(aiVal) != core.JS(origMeta["compliance"]) {
+					ignored++
+				}
+				continue
+			}
+			origComp, _ := origMeta["compliance"].([]any)
+			mergedComp, _ := newMeta["compliance"].([]any)
+			for _, item := range aiComp {
+				m, ok := item.(core.Object)
+				if !ok {
+					ignored++
+					continue
+				}
+				level, _ := m["level"].(string)
+				text, textOk := m["text"].(string)
+				if level == "warn" && textOk && strings.TrimSpace(text) != "" {
+					if !hasComplianceWarn(mergedComp, text) {
+						mergedComp = append(mergedComp, core.Object{"level": "warn", "text": text})
+					}
+				} else if !hasComplianceExact(origComp, m) {
+					ignored++
+				}
+			}
+			if len(mergedComp) > 0 || origMeta["compliance"] != nil {
+				newMeta["compliance"] = mergedComp
+			}
+			continue
+		}
+		origVal, exists := origMeta[k]
+		if !exists {
+			ignored++
+			continue
+		}
+		path := "meta." + k
+		if isAllowedRewriteScalarOrSlice(scope, path) && sameTextOrSliceType(origVal, aiVal) {
+			newMeta[k] = cloneValue(aiVal)
+		} else if core.JS(aiVal) != core.JS(origVal) {
+			ignored++
+		}
+	}
+	return
 }
 
 type ruleItem struct {

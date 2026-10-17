@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -56,8 +58,8 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, statErr := os.Stat(filepath.Join(a.ListingDir(id), "导出.zip"))
-	if a.requireReviewForDownload(id, statErr == nil) {
-		fail(w, 409, "出图结果还没审核通过")
+	if code, msg := a.checkDownloadReview(id, statErr == nil); code != 0 {
+		fail(w, code, msg)
 		return
 	}
 	if statErr != nil {
@@ -77,29 +79,35 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `attachment; filename="export.zip"; filename*=UTF-8''%E5%AF%BC%E5%87%BA.zip`)
 	serveRoot(w, r, a.ListingDir(id), "导出.zip")
 }
-func (a *Module) requireReviewForDownload(listingID int64, hasZip bool) bool {
+func (a *Module) checkDownloadReview(listingID int64, hasZip bool) (int, string) {
 	var raw string
 	if err := a.DB.QueryRow("SELECT value FROM studio_settings WHERE key='require_review'").Scan(&raw); err != nil {
-		if strings.Contains(err.Error(), "no such table") {
-			return false
+		if !errors.Is(err, sql.ErrNoRows) {
+			return 500, "读取出图设置失败"
 		}
 		raw = "true"
 	}
 	if raw == "false" || raw == "0" {
-		return false
+		return 0, ""
 	}
 	var status string
 	var renderedJobID int64
 	if err := a.DB.QueryRow("SELECT review_status, coalesce(rendered_job_id, 0) FROM listing_render WHERE listing_id=?", listingID).Scan(&status, &renderedJobID); err != nil {
-		if strings.Contains(err.Error(), "no such table") {
-			return false
+		if errors.Is(err, sql.ErrNoRows) {
+			if !hasZip {
+				return 0, ""
+			}
+			return 409, "出图结果还没审核通过"
 		}
-		return hasZip
+		return 500, "读取审核状态失败"
 	}
 	if !hasZip && renderedJobID == 0 && (status == "" || status == "none") {
-		return false
+		return 0, ""
 	}
-	return status != "approved"
+	if status != "approved" {
+		return 409, "出图结果还没审核通过"
+	}
+	return 0, ""
 }
 func (a *Module) renderRoute(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'")

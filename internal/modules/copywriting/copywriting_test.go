@@ -67,7 +67,9 @@ func newTestEnv(t *testing.T, cfgFn func(*core.Config)) *testEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := c.Start(accounts.New(c), products.New(c), assets.New(c), pipeline.New(c), copywriting.New(c)); err != nil {
+	cw := copywriting.New(c)
+	cw.ScanInterval = 20 * time.Millisecond
+	if err := c.Start(accounts.New(c), products.New(c), assets.New(c), pipeline.New(c), cw); err != nil {
 		_ = c.Close()
 		t.Fatal(err)
 	}
@@ -94,7 +96,7 @@ func writeTestPrompts(t *testing.T, dir string) {
 		"分拣.md":    "按编号分拣，输出 JSON",
 		"文案.md":    "按要求生成 content/main/listing JSON",
 		"文案-附加.md": "口吻：{{voice}}\n关键词：{{keywords}}\n禁用词：{{banned}}\n附加要求：{{instructions}}",
-		"文案-改写.md": "改写文案",
+		"文案-改写.md": "你是电商文案编辑，负责在不破坏结构的前提下按指令局部改写已有文案。只输出合法 JSON。",
 		"合规审查.md":  "审查以下文案 JSON 并返回 issues 数组",
 		"违禁词.txt":  "# 违禁词\n保证招财\n疗愈\n",
 	}
@@ -657,4 +659,358 @@ func TestComplianceCheckAndAIFallback(t *testing.T) {
 	if !foundWarn {
 		t.Fatalf("expected AI fallback warn issue, got %v", issues2)
 	}
+}
+
+func TestRewriteScopesWhitelistMergeAndCompliance(t *testing.T) {
+	var lastUserReq atomic.Value
+	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req Object
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		msgs, _ := req["messages"].([]any)
+		if len(msgs) >= 2 {
+			if m1, ok := msgs[1].(Object); ok {
+				if s, ok := m1["content"].(string); ok {
+					var parsed Object
+					_ = json.Unmarshal([]byte(s), &parsed)
+					lastUserReq.Store(parsed)
+				}
+			}
+		}
+		// Fake AI intentionally modifies both in-scope and out-of-scope fields across content, main, and meta,
+		// adds extra array elements, adds nonexistent fields, and appends a warn compliance item.
+		reply := Object{
+			"content": Object{
+				"name":     "AI新名称",
+				"nameEn":   "AI NEW NAME",
+				"oneLiner": "AI新卖点",
+				"tags":     []string{"AI新标签"},
+				"real": Object{
+					"note": "AI新实拍说明",
+					"lead": "被篡改实拍导语",
+				},
+				"detailsLead": "AI新细节导语",
+				"details": []Object{
+					{
+						"photo": Object{"f": "HACKED.jpg", "need": "被篡改need"},
+						"title": "AI新细节标题",
+						"text":  "AI新细节正文",
+					},
+					{
+						"title": "多余的第二个细节",
+						"text":  "多余正文",
+					},
+				},
+				"wear": Object{
+					"lead": "AI新佩戴导语",
+					"big":  Object{"f": "HACKED.jpg"},
+				},
+				"sizeLead":    "AI新尺码导语",
+				"relatedLead": "AI新搭配导语",
+				"story":       "被篡改的品牌故事",
+				"storySign":   "被篡改的落款",
+				"sticker":     "被新增的贴纸字段",
+				"params":      [][]string{{"材质", "假黄金"}},
+				"photos":      Object{"hero": Object{"f": "B1.jpg"}},
+			},
+			"main": Object{
+				"imgs": []Object{
+					{
+						"n":      99,
+						"layout": "hacked",
+						"f":      "HACKED.jpg",
+						"text":   "AI新主图文案",
+						"label":  "AI新主图标签",
+					},
+					{
+						"n":      2,
+						"layout": "photo",
+						"f":      "B1.jpg",
+						"text":   "多余主图",
+					},
+				},
+			},
+			"meta": Object{
+				"title":      "AI新标题",
+				"title_alts": []string{"AI新备选1", "AI新备选2"},
+				"attrs":      [][]string{{"材质", "被篡改材质"}},
+				"sku":        []Object{{"name": "被篡改SKU", "price": 9999}},
+				"compliance": []Object{
+					{"level": "warn", "text": "部分夸张要求未照做，因违反广告法"},
+				},
+			},
+		}
+		b, _ := json.Marshal(reply)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(Object{
+			"choices": []Object{{"message": Object{"content": string(b)}}},
+		})
+	}))
+	defer ai.Close()
+
+	env := newTestEnv(t, func(c *core.Config) {
+		c.AIBaseURL = ai.URL + "/v1"
+	})
+	env.login(t, "admin", "AdminPassword123!")
+
+	// Configure shop 1 voice and keywords (including banned words)
+	env.req(t, "PUT", "/api/shops/1/voice", Object{
+		"text":     "法式克制温润",
+		"examples": []string{"晨露般的光泽"},
+	}, 200)
+	env.req(t, "POST", "/api/keywords/import", Object{
+		"shop_id": 1,
+		"lines":   "巴洛克珍珠\t品类词\t90\n顶级皇家\t禁用词\t100",
+	}, 200)
+
+	// Create product + listing + retouched photo B1.jpg
+	prod := env.req(t, "POST", "/api/products", Object{"name": "白名单改写测试耳环", "shop_ids": []int64{1}}, 201)["product"].(Object)
+	pid := int64(prod["id"].(float64))
+	lid := int64(prod["listings"].([]any)[0].(Object)["id"].(float64))
+	photoID := env.uploadPhoto(t, pid, "b1.png")
+	env.req(t, "PATCH", fmt.Sprintf("/api/assets/%d", photoID), Object{"code": "B1"}, 200)
+	retJob := env.req(t, "POST", fmt.Sprintf("/api/listings/%d/run?step=retouch", lid), nil, 202)["job"].(Object)
+	if j := env.waitJob(t, int64(retJob["id"].(float64))); j["status"] != "done" {
+		t.Fatalf("retouch failed: %v", j)
+	}
+
+	// Create original version with existing whitelisted fields and out-of-scope fields
+	origCreate := env.req(t, "POST", fmt.Sprintf("/api/listings/%d/copies", lid), Object{
+		"content": Object{
+			"name":     "原名称",
+			"nameEn":   "ORIG NAME",
+			"oneLiner": "原一句话卖点",
+			"tags":     []string{"原标签1", "原标签2"},
+			"real": Object{
+				"note": "原实拍说明",
+				"lead": "原实拍导语",
+			},
+			"detailsLead": "原细节导语",
+			"details": []Object{
+				{
+					"photo": Object{"f": "B1.jpg", "need": "原需求"},
+					"title": "原细节标题",
+					"text":  "原细节正文",
+				},
+			},
+			"wear": Object{
+				"lead": "原佩戴导语",
+				"big":  Object{"f": "B1.jpg"},
+			},
+			"sizeLead":    "原尺码导语",
+			"relatedLead": "原搭配导语",
+			"story":       "原品牌故事",
+			"storySign":   "原落款",
+			"params":      [][]string{{"材质", "925银"}},
+			"photos":      Object{"hero": Object{"f": "B1.jpg"}},
+		},
+		"main": Object{
+			"imgs": []Object{
+				{
+					"n":      1,
+					"layout": "photo",
+					"f":      "B1.jpg",
+					"text":   "原主图文案",
+					"label":  "原主图标签",
+				},
+			},
+		},
+		"meta": Object{
+			"title":      "原标题",
+			"title_alts": []string{"原备选标题1"},
+			"attrs":      [][]string{{"材质", "淡水珍珠"}},
+			"sku":        []Object{{"name": "银针款", "price": 129}},
+			"compliance": []Object{{"level": "info", "text": "原有提示"}},
+		},
+	}, 201)["copy"].(Object)
+	origID := int64(origCreate["id"].(float64))
+	origCopy := env.req(t, "GET", fmt.Sprintf("/api/copies/%d", origID), nil, 200)["copy"].(Object)
+
+	checkReqPayload := func(t *testing.T, wantScope string) {
+		t.Helper()
+		sent, ok := lastUserReq.Load().(Object)
+		if !ok || sent == nil {
+			t.Fatalf("expected JSON request payload sent to AI")
+		}
+		if sent["scope"] != wantScope || sent["instructions"] != "按要求改写" {
+			t.Fatalf("unexpected scope/instructions in AI payload: %v", sent)
+		}
+		copyObj, ok := sent["copy"].(Object)
+		if !ok || copyObj["content"] == nil || copyObj["main"] == nil || copyObj["meta"] == nil {
+			t.Fatalf("expected copy.{content,main,meta} in AI payload, got %v", sent["copy"])
+		}
+		voiceStr, _ := sent["voice"].(string)
+		if !strings.Contains(voiceStr, "法式克制温润") || !strings.Contains(voiceStr, "晨露般的光泽") {
+			t.Fatalf("expected voice with examples in AI payload, got %q", voiceStr)
+		}
+		if !strings.Contains(core.JS(sent["keywords"]), "巴洛克珍珠") {
+			t.Fatalf("expected keywords in AI payload, got %v", sent["keywords"])
+		}
+		if !strings.Contains(core.JS(sent["banned"]), "顶级皇家") {
+			t.Fatalf("expected shop banned words in AI payload, got %v", sent["banned"])
+		}
+	}
+
+	checkComplianceWarn := func(t *testing.T, meta Object) {
+		t.Helper()
+		compJS := core.JS(meta["compliance"])
+		if !strings.Contains(compJS, "原有提示") || !strings.Contains(compJS, "部分夸张要求未照做，因违反广告法") {
+			t.Fatalf("expected original compliance + model appended warn compliance, got %s", compJS)
+		}
+	}
+
+	// 1. Scope = "title"
+	jTitle := env.req(t, "POST", fmt.Sprintf("/api/copies/%d/rewrite", origID), Object{
+		"scope":        "title",
+		"instructions": "按要求改写",
+	}, 202)["job"].(Object)
+	doneTitle := env.waitJob(t, int64(jTitle["id"].(float64)))
+	if doneTitle["status"] != "done" || !strings.Contains(doneTitle["message"].(string), "已忽略") {
+		t.Fatalf("expected done job with ignored count message for title scope, got %v", doneTitle)
+	}
+	checkReqPayload(t, "title")
+	copiesAfterTitle := env.req(t, "GET", fmt.Sprintf("/api/listings/%d/copies", lid), nil, 200)["items"].([]any)
+	cTitle := env.req(t, "GET", fmt.Sprintf("/api/copies/%d", int64(copiesAfterTitle[0].(Object)["id"].(float64))), nil, 200)["copy"].(Object)
+
+	// In-scope title fields changed
+	if cTitle["meta"].(Object)["title"] != "AI新标题" || core.JS(cTitle["meta"].(Object)["title_alts"]) != `["AI新备选1","AI新备选2"]` {
+		t.Fatalf("scope=title did not update title/title_alts: %v", cTitle["meta"])
+	}
+	checkComplianceWarn(t, cTitle["meta"].(Object))
+	// Out-of-scope content & main must be byte-for-byte identical to origCopy
+	if core.JS(cTitle["content"]) != core.JS(origCopy["content"]) {
+		t.Fatalf("scope=title modified content!\ngot:  %s\nwant: %s", core.JS(cTitle["content"]), core.JS(origCopy["content"]))
+	}
+	if core.JS(cTitle["main"]) != core.JS(origCopy["main"]) {
+		t.Fatalf("scope=title modified main!\ngot:  %s\nwant: %s", core.JS(cTitle["main"]), core.JS(origCopy["main"]))
+	}
+	// Restore title, title_alts, compliance on meta and verify byte-for-byte identical to origCopy["meta"]
+	cTitleMetaRestored := cloneTestMap(cTitle["meta"].(Object))
+	origMeta := origCopy["meta"].(Object)
+	cTitleMetaRestored["title"] = origMeta["title"]
+	cTitleMetaRestored["title_alts"] = origMeta["title_alts"]
+	cTitleMetaRestored["compliance"] = origMeta["compliance"]
+	if core.JS(cTitleMetaRestored) != core.JS(origMeta) {
+		t.Fatalf("scope=title modified out-of-scope meta fields!\ngot:  %s\nwant: %s", core.JS(cTitleMetaRestored), core.JS(origMeta))
+	}
+
+	// 2. Scope = "selling"
+	jSelling := env.req(t, "POST", fmt.Sprintf("/api/copies/%d/rewrite", origID), Object{
+		"scope":        "selling",
+		"instructions": "按要求改写",
+	}, 202)["job"].(Object)
+	doneSelling := env.waitJob(t, int64(jSelling["id"].(float64)))
+	if doneSelling["status"] != "done" || !strings.Contains(doneSelling["message"].(string), "已忽略") {
+		t.Fatalf("expected done job with ignored count message for selling scope, got %v", doneSelling)
+	}
+	checkReqPayload(t, "selling")
+	copiesAfterSelling := env.req(t, "GET", fmt.Sprintf("/api/listings/%d/copies", lid), nil, 200)["items"].([]any)
+	cSelling := env.req(t, "GET", fmt.Sprintf("/api/copies/%d", int64(copiesAfterSelling[0].(Object)["id"].(float64))), nil, 200)["copy"].(Object)
+
+	sContent := cSelling["content"].(Object)
+	sMain := cSelling["main"].(Object)
+	sMeta := cSelling["meta"].(Object)
+	sDetails := sContent["details"].([]any)
+	sImgs := sMain["imgs"].([]any)
+	if sContent["oneLiner"] != "AI新卖点" ||
+		core.JS(sContent["tags"]) != `["AI新标签"]` ||
+		sContent["real"].(Object)["note"] != "AI新实拍说明" ||
+		sContent["detailsLead"] != "AI新细节导语" ||
+		len(sDetails) != 1 ||
+		sDetails[0].(Object)["title"] != "AI新细节标题" ||
+		sDetails[0].(Object)["text"] != "AI新细节正文" ||
+		sContent["wear"].(Object)["lead"] != "AI新佩戴导语" ||
+		sContent["sizeLead"] != "AI新尺码导语" ||
+		sContent["relatedLead"] != "AI新搭配导语" ||
+		len(sImgs) != 1 ||
+		sImgs[0].(Object)["text"] != "AI新主图文案" ||
+		sImgs[0].(Object)["label"] != "AI新主图标签" {
+		t.Fatalf("scope=selling did not update expected selling fields: content=%s main=%s", core.JS(sContent), core.JS(sMain))
+	}
+	checkComplianceWarn(t, sMeta)
+
+	// Restore only selling whitelisted fields and verify byte-for-byte identical to origCopy
+	origContent := origCopy["content"].(Object)
+	origMain := origCopy["main"].(Object)
+	sContentRestored := cloneTestMap(sContent)
+	sContentRestored["oneLiner"] = origContent["oneLiner"]
+	sContentRestored["tags"] = origContent["tags"]
+	sContentRestored["real"].(Object)["note"] = origContent["real"].(Object)["note"]
+	sContentRestored["detailsLead"] = origContent["detailsLead"]
+	sContentRestored["details"].([]any)[0].(Object)["title"] = origContent["details"].([]any)[0].(Object)["title"]
+	sContentRestored["details"].([]any)[0].(Object)["text"] = origContent["details"].([]any)[0].(Object)["text"]
+	sContentRestored["wear"].(Object)["lead"] = origContent["wear"].(Object)["lead"]
+	sContentRestored["sizeLead"] = origContent["sizeLead"]
+	sContentRestored["relatedLead"] = origContent["relatedLead"]
+	if core.JS(sContentRestored) != core.JS(origContent) {
+		t.Fatalf("scope=selling modified out-of-scope content fields!\ngot:  %s\nwant: %s", core.JS(sContentRestored), core.JS(origContent))
+	}
+	sMainRestored := cloneTestMap(sMain)
+	sMainRestored["imgs"].([]any)[0].(Object)["text"] = origMain["imgs"].([]any)[0].(Object)["text"]
+	sMainRestored["imgs"].([]any)[0].(Object)["label"] = origMain["imgs"].([]any)[0].(Object)["label"]
+	if core.JS(sMainRestored) != core.JS(origMain) {
+		t.Fatalf("scope=selling modified out-of-scope main fields!\ngot:  %s\nwant: %s", core.JS(sMainRestored), core.JS(origMain))
+	}
+	sMetaRestored := cloneTestMap(sMeta)
+	sMetaRestored["compliance"] = origMeta["compliance"]
+	if core.JS(sMetaRestored) != core.JS(origMeta) {
+		t.Fatalf("scope=selling modified out-of-scope meta fields!\ngot:  %s\nwant: %s", core.JS(sMetaRestored), core.JS(origMeta))
+	}
+
+	// 3. Scope = "all"
+	jAll := env.req(t, "POST", fmt.Sprintf("/api/copies/%d/rewrite", origID), Object{
+		"scope":        "all",
+		"instructions": "按要求改写",
+	}, 202)["job"].(Object)
+	doneAll := env.waitJob(t, int64(jAll["id"].(float64)))
+	if doneAll["status"] != "done" || !strings.Contains(doneAll["message"].(string), "已忽略") {
+		t.Fatalf("expected done job with ignored count message for all scope, got %v", doneAll)
+	}
+	checkReqPayload(t, "all")
+	copiesAfterAll := env.req(t, "GET", fmt.Sprintf("/api/listings/%d/copies", lid), nil, 200)["items"].([]any)
+	cAll := env.req(t, "GET", fmt.Sprintf("/api/copies/%d", int64(copiesAfterAll[0].(Object)["id"].(float64))), nil, 200)["copy"].(Object)
+
+	aContent := cAll["content"].(Object)
+	aMain := cAll["main"].(Object)
+	aMeta := cAll["meta"].(Object)
+	if aContent["name"] != "AI新名称" || aContent["nameEn"] != "AI NEW NAME" || aContent["oneLiner"] != "AI新卖点" || aMeta["title"] != "AI新标题" {
+		t.Fatalf("scope=all did not update expected fields: content=%s meta=%s", core.JS(aContent), core.JS(aMeta))
+	}
+	checkComplianceWarn(t, aMeta)
+
+	// Restore only all whitelisted fields and verify byte-for-byte identical to origCopy
+	aContentRestored := cloneTestMap(aContent)
+	aContentRestored["name"] = origContent["name"]
+	aContentRestored["nameEn"] = origContent["nameEn"]
+	aContentRestored["oneLiner"] = origContent["oneLiner"]
+	aContentRestored["tags"] = origContent["tags"]
+	aContentRestored["real"].(Object)["note"] = origContent["real"].(Object)["note"]
+	aContentRestored["detailsLead"] = origContent["detailsLead"]
+	aContentRestored["details"].([]any)[0].(Object)["title"] = origContent["details"].([]any)[0].(Object)["title"]
+	aContentRestored["details"].([]any)[0].(Object)["text"] = origContent["details"].([]any)[0].(Object)["text"]
+	aContentRestored["wear"].(Object)["lead"] = origContent["wear"].(Object)["lead"]
+	aContentRestored["sizeLead"] = origContent["sizeLead"]
+	aContentRestored["relatedLead"] = origContent["relatedLead"]
+	if core.JS(aContentRestored) != core.JS(origContent) {
+		t.Fatalf("scope=all modified out-of-scope content fields!\ngot:  %s\nwant: %s", core.JS(aContentRestored), core.JS(origContent))
+	}
+	aMainRestored := cloneTestMap(aMain)
+	aMainRestored["imgs"].([]any)[0].(Object)["text"] = origMain["imgs"].([]any)[0].(Object)["text"]
+	aMainRestored["imgs"].([]any)[0].(Object)["label"] = origMain["imgs"].([]any)[0].(Object)["label"]
+	if core.JS(aMainRestored) != core.JS(origMain) {
+		t.Fatalf("scope=all modified out-of-scope main fields!\ngot:  %s\nwant: %s", core.JS(aMainRestored), core.JS(origMain))
+	}
+	aMetaRestored := cloneTestMap(aMeta)
+	aMetaRestored["title"] = origMeta["title"]
+	aMetaRestored["title_alts"] = origMeta["title_alts"]
+	aMetaRestored["compliance"] = origMeta["compliance"]
+	if core.JS(aMetaRestored) != core.JS(origMeta) {
+		t.Fatalf("scope=all modified out-of-scope meta fields!\ngot:  %s\nwant: %s", core.JS(aMetaRestored), core.JS(origMeta))
+	}
+}
+
+func cloneTestMap(m Object) Object {
+	var out Object
+	b, _ := json.Marshal(m)
+	_ = json.Unmarshal(b, &out)
+	return out
 }

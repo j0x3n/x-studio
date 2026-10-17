@@ -105,5 +105,8 @@ func (a *Module) Migrations() []core.Migration {
 			}
 		}
 		return nil
+	}}, {Version: 2, Up: func(tx *sql.Tx) error {
+		_, e := tx.Exec("ALTER TABLE listing_render ADD COLUMN render_note TEXT NOT NULL DEFAULT ''")
+		return e
 	}}}
 }

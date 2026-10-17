@@ -15,12 +15,13 @@ import (
 
 type Module struct {
 	*core.Core
-	syncMu sync.Mutex
-	bgWG   sync.WaitGroup
+	ScanInterval time.Duration
+	syncMu       sync.Mutex
+	bgWG         sync.WaitGroup
 }
 
 func New(c *core.Core) *Module {
-	return &Module{Core: c}
+	return &Module{Core: c, ScanInterval: 30 * time.Second}
 }
 
 func (*Module) Name() string { return "copywriting" }
@@ -57,7 +58,11 @@ func (a *Module) Routes(r *core.Router) {
 
 func (a *Module) syncLoop() {
 	defer a.bgWG.Done()
-	ticker := time.NewTicker(500 * time.Millisecond)
+	interval := a.ScanInterval
+	if interval <= 0 {
+		interval = 30 * time.Second
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {

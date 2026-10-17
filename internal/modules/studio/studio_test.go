@@ -446,7 +446,7 @@ func TestRenderCreamFallbackBatchAndReviewWorkflow(t *testing.T) {
 		t.Fatalf("expected 200 ZIP after approval, got status=%d", dlApproved.StatusCode)
 	}
 
-	// 4. Disable cream in shop 1 prefs and re-render -> falls back to 模板.html (navy), job message has warning, review_status resets to pending!
+	// 4. Disable cream in shop 1 prefs and re-render -> falls back to 模板.html (navy), render_note has warning, review_status resets to pending!
 	env.req(t, "PUT", "/api/shops/1/template-prefs", Object{
 		"default_detail": "navy",
 		"disabled":       []string{"cream"},
@@ -456,12 +456,13 @@ func TestRenderCreamFallbackBatchAndReviewWorkflow(t *testing.T) {
 	if doneRerun["status"] != "done" {
 		t.Fatalf("rerun failed: %v", doneRerun)
 	}
-	if !strings.Contains(doneRerun["message"].(string), "回退到 模板.html") {
-		t.Fatalf("expected fallback warning in job message, got %q", doneRerun["message"])
-	}
 	renFallback := env.req(t, "GET", fmt.Sprintf("/api/listings/%d/render", l1ID), nil, 200)
 	if renFallback["rendered_template"] != "navy" || renFallback["review_status"] != "pending" {
 		t.Fatalf("expected fallback rendered_template=navy and review_status=pending, got %v", renFallback)
+	}
+	renderNote, _ := renFallback["render_note"].(string)
+	if !strings.Contains(renderNote, "回退到 模板.html") {
+		t.Fatalf("expected fallback warning in render_note, got %q", renderNote)
 	}
 	dlAfterRerun, err := env.client.Get(fmt.Sprintf("%s/api/listings/%d/download", env.s.URL, l1ID))
 	if err != nil {
@@ -472,7 +473,7 @@ func TestRenderCreamFallbackBatchAndReviewWorkflow(t *testing.T) {
 		t.Fatalf("expected 409 after re-render reset to pending, got %d", dlAfterRerun.StatusCode)
 	}
 
-	// 5. require_review=false -> render sets review_status=approved directly and download succeeds
+	// 5. require_review=false -> render sets review_status=approved directly, clears render_note, and download succeeds
 	env.req(t, "PATCH", "/api/studio/settings", Object{"require_review": false}, 200)
 	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", l1ID), Object{"detail_template": "navy"}, 200)
 	noRevJob := env.req(t, "POST", fmt.Sprintf("/api/listings/%d/render/run", l1ID), nil, 202)["job"].(Object)
@@ -480,22 +481,81 @@ func TestRenderCreamFallbackBatchAndReviewWorkflow(t *testing.T) {
 		t.Fatalf("no-review render failed: %v", j)
 	}
 	renNoRev := env.req(t, "GET", fmt.Sprintf("/api/listings/%d/render", l1ID), nil, 200)
-	if renNoRev["review_status"] != "approved" {
-		t.Fatalf("expected review_status=approved when require_review=false, got %v", renNoRev)
+	if renNoRev["review_status"] != "approved" || renNoRev["render_note"] != "" {
+		t.Fatalf("expected review_status=approved and empty render_note when require_review=false, got %v", renNoRev)
 	}
 	dlNoRev, err := env.client.Get(fmt.Sprintf("%s/api/listings/%d/download", env.s.URL, l1ID))
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = dlNoRev.Body.Close()
-	if dlNoRev.StatusCode != 200 {
-		t.Fatalf("expected 200 download when require_review=false, got %d", dlNoRev.StatusCode)
+	if dlNoRev.StatusCode != 200 || dlNoRev.Header.Get("X-AI-Label") != "1" {
+		t.Fatalf("expected 200 download with X-AI-Label=1, got status=%d header=%q", dlNoRev.StatusCode, dlNoRev.Header.Get("X-AI-Label"))
 	}
 
-	// 6. Batch render skips invisible and active listings, enqueues idle visible listing
+	// 6. PUT /api/listings/{id}/render changing ai_label=false must NOT overwrite listings.render_ai_label until re-rendered
+	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", l1ID), Object{"ai_label": false}, 200)
+	listingBeforeRerender := env.req(t, "GET", fmt.Sprintf("/api/listings/%d", l1ID), nil, 200)["listing"].(Object)
+	if int(listingBeforeRerender["render_ai_label"].(float64)) != 1 {
+		t.Fatalf("expected render_ai_label to remain 1 before re-render, got %v", listingBeforeRerender["render_ai_label"])
+	}
+	dlBeforeRerender, err := env.client.Get(fmt.Sprintf("%s/api/listings/%d/download", env.s.URL, l1ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = dlBeforeRerender.Body.Close()
+	if dlBeforeRerender.StatusCode != 200 || dlBeforeRerender.Header.Get("X-AI-Label") != "1" {
+		t.Fatalf("expected download before re-render to still have X-AI-Label=1, got status=%d header=%q", dlBeforeRerender.StatusCode, dlBeforeRerender.Header.Get("X-AI-Label"))
+	}
+	noLabelJob := env.req(t, "POST", fmt.Sprintf("/api/listings/%d/render/run", l1ID), nil, 202)["job"].(Object)
+	if j := env.waitJob(t, int64(noLabelJob["id"].(float64))); j["status"] != "done" {
+		t.Fatalf("no-label render failed: %v", j)
+	}
+	listingAfterRerender := env.req(t, "GET", fmt.Sprintf("/api/listings/%d", l1ID), nil, 200)["listing"].(Object)
+	if int(listingAfterRerender["render_ai_label"].(float64)) != 0 {
+		t.Fatalf("expected render_ai_label=0 after re-render, got %v", listingAfterRerender["render_ai_label"])
+	}
+	dlAfterRerender, err := env.client.Get(fmt.Sprintf("%s/api/listings/%d/download", env.s.URL, l1ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = dlAfterRerender.Body.Close()
+	if dlAfterRerender.StatusCode != 200 || dlAfterRerender.Header.Get("X-AI-Label") != "0" {
+		t.Fatalf("expected download after re-render to have X-AI-Label=0, got status=%d header=%q", dlAfterRerender.StatusCode, dlAfterRerender.Header.Get("X-AI-Label"))
+	}
+	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", l1ID), Object{"ai_label": true}, 200)
+
+	// 7. Batch render:
+	// (a) Admin batch with detail_template="cream" (disabled in shop 1, enabled in shop 2):
+	//     l1ID (shop 1) is skipped due to disabled template; l2ID (shop 2) is enqueued;
+	//     enqueued job has identical kind/steps/params structure as single render.
+	batchTplRaw := env.req(t, "POST", "/api/render/batch", Object{
+		"listing_ids":     []int64{l1ID, l2ID},
+		"detail_template": "cream",
+	}, 200)
+	if batchTplRaw["results"] != nil {
+		t.Fatalf("expected batch response to only have items (no duplicate results key), got %v", batchTplRaw)
+	}
+	batchTplItems := batchTplRaw["items"].([]any)
+	if len(batchTplItems) != 2 {
+		t.Fatalf("expected 2 batch items, got %v", batchTplItems)
+	}
+	if batchTplItems[0].(Object)["skipped_reason"] != "模板不存在或对该店铺已停用" {
+		t.Fatalf("expected l1ID with disabled template to be skipped, got %v", batchTplItems[0])
+	}
+	l2BatchJobID, ok := batchTplItems[1].(Object)["job_id"].(float64)
+	if !ok || l2BatchJobID < 1 {
+		t.Fatalf("expected l2ID to be enqueued in batch, got %v", batchTplItems[1])
+	}
+	l2BatchJob := env.waitJob(t, int64(l2BatchJobID))
+	if l2BatchJob["kind"] != doneJob["kind"] || core.JS(l2BatchJob["steps"]) != core.JS(doneJob["steps"]) || core.JS(l2BatchJob["params"]) != core.JS(doneJob["params"]) {
+		t.Fatalf("batch job structure mismatch vs single render: batch=%v single=%v", l2BatchJob, doneJob)
+	}
+
+	// (b) Operator batch skips invisible and active listings, enqueues idle visible listing
 	pBatch := env.req(t, "POST", "/api/products", Object{"name": "批量测试第二款", "shop_ids": []int64{1}}, 201)["product"].(Object)
 	lBatchBusy := int64(pBatch["listings"].([]any)[0].(Object)["id"].(float64))
-	// Insert a queued job on lBatchBusy to simulate busy listing
+	// Insert a running job on lBatchBusy to simulate busy listing
 	_, err = env.c.DB.Exec(
 		"INSERT INTO jobs(kind,target_type,target_id,user_id,params,status,created_at,steps) VALUES('pipeline','listing',?,1,'{}','running',?,'render')",
 		lBatchBusy, core.Now(),
