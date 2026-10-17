@@ -154,10 +154,13 @@ function ListingCard({ listing, shopName, onChange }: { listing: Listing; shopNa
     <section className="panel">
       <div className="panel-head">
         <span className="icon-tile"><Package /></span>
-        <div className="titles"><div className="panel-title">{shopName}</div><div className="panel-sub">{title || '还没有标题'}</div></div>
-        <Pill kind={ls?.pill || 'pill-neutral'}>{ls?.label}</Pill>
-        <Pill kind={st.pill}>{st.label}</Pill>
-        <span className="grow" />
+        <div className="titles">
+          <div className="panel-title inline">{shopName}
+            <Pill kind={ls?.pill || 'pill-neutral'}>{ls?.label}</Pill>
+            <Pill kind={st.pill}>{st.label === '失败' ? '出图失败' : st.label}</Pill>
+          </div>
+          <div className="panel-sub ellipsis">{title || '还没有标题'}</div>
+        </div>
         {l.url && <a className="btn btn-ghost btn-sm" href={l.url} target="_blank" rel="noreferrer"><ExternalLink />商品链接</a>}
         {out?.zip && can('export.run') && <a className="btn btn-secondary btn-sm" href={out.zip}><Download />下载成品</a>}
         {can('render.run') && <button className="btn btn-primary btn-sm" disabled={!!running} onClick={run}><Sparkles />{running ? '出图中…' : out?.zip ? '重新出图' : '一键出图'}</button>}

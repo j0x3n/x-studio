@@ -81,14 +81,23 @@ export function Dashboard() {
           </section>
           <section className="panel">
             <div className="panel-head"><div className="titles"><div className="panel-title">要处理的</div><div className="panel-sub">出图失败和缺照片的商品</div></div></div>
-            <div className="list" style={{ padding: '4px 0' }}>
-              {[...failed.map(p => ({ p, why: '出图失败' })), ...noPhoto.map(p => ({ p, why: '还没传照片' }))].slice(0, 10).map(({ p, why }) => (
-                <a key={why + p.id} className="list-item" onClick={() => nav(`/products/${p.id}`)} style={{ cursor: 'pointer' }}>
-                  <span className="cell-title grow">{p.name}</span><span className="t3 fs-12">{why}</span>
-                </a>
-              ))}
-              {failed.length + noPhoto.length === 0 && <div className="t3" style={{ padding: 16 }}>暂时没有要处理的。</div>}
-            </div>
+            {failed.length + noPhoto.length === 0 ? <Empty title="暂时没有要处理的" /> : (
+              <div className="list todo-list">
+                {[...failed.map(p => ({ p, bad: true })), ...noPhoto.map(p => ({ p, bad: false }))].slice(0, 10).map(({ p, bad }) => {
+                  const err = bad ? p.listings?.find(l => l.pipeline_status === 'failed')?.pipeline_error : ''
+                  return (
+                    <a key={(bad ? 'f' : 'n') + p.id} className="list-item" onClick={() => nav(`/products/${p.id}`)}>
+                      <span className={'icon-tile sm ' + (bad ? 'tint-red' : 'tint-orange')}>{bad ? <AlertTriangle /> : <ImageIcon />}</span>
+                      <div className="grow" style={{ minWidth: 0 }}>
+                        <div className="title ellipsis">{p.name}</div>
+                        <div className="meta ellipsis" title={err || undefined}>{bad ? `出图失败${err ? '：' + err : ''}` : '还没传照片'}</div>
+                      </div>
+                      <ChevronRight className="end t4" />
+                    </a>
+                  )
+                })}
+              </div>
+            )}
           </section>
         </div>
       </main></div>

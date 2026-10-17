@@ -17,6 +17,25 @@ const ACTION: Record<string, string> = {
   'export.run': '下载成品', 'export.no_ai_label': '取消 AI 标识'
 }
 const PAGE = 50
+const TARGET: Record<string, string> = { user: '账号', role: '角色', shop: '店铺', product: '商品', listing: '上架版本', asset: '素材', share: '分享', settings: '设置', job: '任务' }
+const FIELD: Record<string, string> = {
+  name: '名称', perms: '权限', scope: '数据范围', status: '状态', info: '基础信息', cost: '成本', supplier: '货源', content: '详情页文案', main: '主图文案', meta: '标题和规格',
+  url: '链接', username: '登录名', password: '密码', role_id: '角色', disabled: '启用状态', display_name: '显示名', shop_ids: '分店', archived: '归档', platform: '平台', language: '语言',
+  code: '编号', crop: '裁剪', rotate: '旋转', white_bg: '白底', tags: '标签', ai_label: 'AI 标识', ai_models: 'AI 模型', ai_prices: '模型单价', quota_default: '默认额度'
+}
+// 把日志详情转成一句中文：改了哪些字段，其余键值照列
+function detailText(d: unknown): string {
+  if (!d || typeof d !== 'object') return d == null ? '' : String(d)
+  const o = d as Record<string, unknown>
+  const parts: string[] = []
+  for (const [k, v] of Object.entries(o)) {
+    if (k === 'fields' && Array.isArray(v)) parts.push('改了：' + v.map(f => FIELD[String(f)] || String(f)).join('、'))
+    else if (k === 'ai_label') parts.push(v ? '带 AI 标识' : '不带 AI 标识')
+    else if (k === 'stage') continue
+    else parts.push(`${FIELD[k] || k}：${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+  }
+  return parts.join('；')
+}
 
 export function AuditTab() {
   const [rows, setRows] = useState<AuditRow[] | null>(null)
@@ -53,8 +72,8 @@ export function AuditTab() {
               <td className="mono fs-12">{fmtDate(r.at, true)}</td>
               <td>{who(r.user_id)}</td>
               <td>{ACTION[r.action] || <span className="mono">{r.action}</span>}</td>
-              <td className="mono fs-12">{r.target_type ? `${r.target_type} #${r.target_id}` : '—'}</td>
-              <td className="fs-12 t3 ellipsis" style={{ maxWidth: 320 }} title={JSON.stringify(r.detail)}>{r.detail && JSON.stringify(r.detail) !== '{}' ? JSON.stringify(r.detail) : ''}</td>
+              <td className="fs-12">{r.target_type ? <>{TARGET[r.target_type] || r.target_type} <span className="mono t3">#{r.target_id}</span></> : '—'}</td>
+              <td className="fs-12 t3 ellipsis" style={{ maxWidth: 360 }} title={detailText(r.detail)}>{detailText(r.detail)}</td>
               <td className="mono fs-12 t3">{r.ip}</td>
             </tr>
           ))}</tbody>

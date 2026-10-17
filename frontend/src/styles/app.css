@@ -58,7 +58,8 @@ tr.clickable:hover td { background: var(--surface-2); }
 .kv { display: grid; grid-template-columns: 120px 1fr; gap: 8px 12px; font-size: var(--fs-13); }
 .kv dt { color: var(--text-3); font-size: var(--fs-12); padding-top: 1px; }
 .kv dd { margin: 0; color: var(--text); min-width: 0; word-break: break-all; }
-.two-col { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.two-col { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.two-col.top { align-items: start; }
 @media (max-width: 1100px) { .two-col { grid-template-columns: 1fr; } }
 .panel-pad { padding: var(--card-p); }
 
@@ -91,3 +92,9 @@ tr.clickable:hover td { background: var(--surface-2); }
 .pill.dot { width: auto; height: 22px; border-radius: var(--r-full); }
 /* 设置行：左边说明占满，右边控件靠右 */
 .setting > .cell-title, .setting > div:first-child { flex: 1; min-width: 0; }
+
+/* 卡片里的列表：.list-item 本身没有左右内边距，统一由容器给 */
+.panel > .list { padding: 0 var(--card-p); }
+.todo-list .list-item { cursor: pointer; }
+.todo-list .list-item:hover .title { color: var(--primary-text); }
+.list-item svg.end { width: 16px; height: 16px; flex-shrink: 0; }
