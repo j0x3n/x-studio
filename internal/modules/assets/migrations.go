@@ -23,5 +23,16 @@ CREATE INDEX asset_product ON assets(product_id);`); e != nil {
 			_, e = tx.Exec(`INSERT INTO assets(id,product_id,file,orig_name,width,height,metrics,code,crop,rotate,white_bg,ai_note,retouch_log,manual,enhanced_file,ai_enhanced,ai_generated,source,created_by,created_at) SELECT ph.id,ph.product_id,ph.file,ph.orig_name,ph.width,ph.height,ph.metrics,ph.code,ph.crop,ph.rotate,ph.white_bg,ph.ai_note,ph.retouch_log,ph.manual,ph.enhanced_file,ph.ai_enhanced,ph.ai_generated,CASE WHEN ph.ai_generated=1 THEN 'ai_generated' WHEN ph.ai_enhanced=1 THEN 'ai_enhanced' ELSE 'original' END,p.created_by,p.created_at FROM photos ph JOIN products p ON p.id=ph.product_id;DROP TABLE photos;`)
 		}
 		return e
+	}}, {Version: 2, Up: func(tx *sql.Tx) error {
+		if err := core.AddColumns(tx, "assets", [][2]string{{"title", "TEXT NOT NULL DEFAULT ''"}, {"note", "TEXT NOT NULL DEFAULT ''"}, {"archived", "INTEGER NOT NULL DEFAULT 0"}, {"updated_at", "TEXT NOT NULL DEFAULT ''"}, {"phash", "TEXT NOT NULL DEFAULT ''"}}); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`UPDATE assets SET updated_at=created_at WHERE updated_at='';
+CREATE INDEX IF NOT EXISTS assets_created_at ON assets(created_at);
+CREATE INDEX IF NOT EXISTS assets_source ON assets(source);
+CREATE INDEX IF NOT EXISTS assets_parent_id ON assets(parent_id);
+CREATE TABLE IF NOT EXISTS asset_presets(id INTEGER PRIMARY KEY,name TEXT NOT NULL,owner_id INTEGER NOT NULL REFERENCES users(id),shared INTEGER NOT NULL DEFAULT 0,params TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TRIGGER IF NOT EXISTS assets_updated_at_insert AFTER INSERT ON assets WHEN NEW.updated_at='' BEGIN UPDATE assets SET updated_at=NEW.created_at WHERE id=NEW.id; END;`)
+		return err
 	}}}
 }
