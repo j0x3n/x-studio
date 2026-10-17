@@ -1,14 +1,15 @@
-# 珠光秘境出图服务
+# X Studio
+
+内部电商管理工具：商品库、图片库、图片处理、文案、多模板出图，多账户和多店铺权限。正在从"上传实拍图自动出主图和详情页"的出图工具改造过来，功能规划见 [功能模块设计.md](功能模块设计.md)。
 
 Go 1.26 + SQLite + chromedp。前端整目录 embed；模板、AI 提示词从磁盘读取。接口以 [接口约定.md](接口约定.md) 为准。
 
 ## Windows 本机运行
 
-先安装 Go 1.26、Google Chrome 和 Git for Windows（同步脚本使用 Git Bash）。在 PowerShell 中：
+先安装 Go 1.26、Google Chrome 和 Git for Windows。在 PowerShell 中：
 
 ```powershell
-cd C:\Users\xcc19\Documents\跨境电商\出图网站
-bash scripts/sync-templates.sh
+cd C:\Users\xcc19\Documents\x-studio
 go mod download
 $env:ADMIN_USER = 'admin'
 $env:ADMIN_PASSWORD = '请换成自己的初始密码123'
@@ -32,7 +33,7 @@ rembg 可以单独运行，也可以不运行；请求失败、超时、返回�
 
 ## Docker Compose 部署
 
-先同步模板，在 `出图网站/.env` 中填真实配置（不要提交密钥）：
+在仓库根目录的 `.env` 中填真实配置（不要提交密钥）：
 
 ```dotenv
 ADMIN_USER=admin
@@ -53,12 +54,11 @@ WORKERS=2
 ```
 
 ```bash
-bash scripts/sync-templates.sh
 docker compose up -d --build
 docker compose logs -f app
 ```
 
-app 镜像安装 Chromium、`fonts-noto-cjk` 和 CA 证书，以非 root 用户运行。Docker 构建上下文就是 `出图网站/`，只使用 `templates/` 副本，不依赖上层仓库路径。`prompts/` 通过 compose 只读挂载，修改提示词无须重编译。数据放在 `app-data` 卷；rembg 模型缓存放在 `rembg-models` 卷，首次使用模型可能需要联网下载。rembg 镜像已含 `rembg` 入口，因此 compose 的 command 从 `s` 开始。接口按 [rembg 官方文档](https://github.com/danielgatis/rembg#rembg-s) 的 multipart `POST /api/remove` 调用。
+app 镜像安装 Chromium、`fonts-noto-cjk` 和 CA 证书，以非 root 用户运行。Docker 构建上下文就是仓库根目录，主图和详情页模板、店标都在 `templates/`，直接在这里改。`prompts/` 通过 compose 只读挂载，修改提示词无须重编译。数据放在 `app-data` 卷；rembg 模型缓存放在 `rembg-models` 卷，首次使用模型可能需要联网下载。rembg 镜像已含 `rembg` 入口，因此 compose 的 command 从 `s` 开始。接口按 [rembg 官方文档](https://github.com/danielgatis/rembg#rembg-s) 的 multipart `POST /api/remove` 调用。
 
 compose 为受限的容器内核设置 `CHROME_NO_SANDBOX=1`，Chrome 因而关闭自身沙箱；app 仍以非 root 用户运行，模板响应限制外部资源加载。正常本机运行默认保留 Chrome 沙箱。对公网部署应由 HTTPS 反向代理接入，将 `COOKIE_SECURE=1`，并保留同源访问，不开放 rembg 端口。反向代理的上传限制应不小于 256 MB，渲染路由不能被代理缓存。
 
@@ -110,7 +110,7 @@ compose 为受限的容器内核设置 `CHROME_NO_SANDBOX=1`，Chrome 因而关�
 
 图像接口使用 multipart `POST /images/edits`，所有参考图字段均叫 `image`，附 `model`、`prompt`、最接近输入比例的三种 size 之一、`quality=high`，读取 `data[0].b64_json`。按实际返回尺寸保存 PNG，不强制拉伸到请求尺寸；后续仍按原有规则导出标准尺寸。
 
-后端在 copy、PATCH、render 和渲染预览读取时按照片记录纠正 `ai`：生成图为 `AI 生成`，高清图为 `AI 增强`，实拍删除该字段。coverage 每项提供 `ai` 布尔值；need_reshoot 只提示不能用 AI 补的必需位，关掉自动补图后可补的位置仍在 coverage 显示缺失。同步脚本会让旧模板副本兼容字符串 ai 原样显示，不改上层源模板；修改上层模板后再次同步即可。
+后端在 copy、PATCH、render 和渲染预览读取时按照片记录纠正 `ai`：生成图为 `AI 生成`，高清图为 `AI 增强`，实拍删除该字段。coverage 每项提供 `ai` 布尔值；need_reshoot 只提示不能用 AI 补的必需位，关掉自动补图后可补的位置仍在 coverage 显示缺失。`templates/` 里的模板已兼容字符串 ai，原样显示。
 
 旧数据库启动时自动通过 `ALTER TABLE photos ADD COLUMN` 补齐以下字段，不清空数据，也无需手动重建数据库：
 
@@ -128,7 +128,7 @@ compose 为受限的容器内核设置 `CHROME_NO_SANDBOX=1`，Chrome 因而关�
 在第一个终端按上面启动服务，先保持 `AI_API_KEY` 为空。下面在第二个 PowerShell 终端执行：登录、新建、上传 3 张自生成图片、跑全流程并确认 AI 失败、手动指定编号、修图、保存最小文案、真正用 Chrome 出图并下载 ZIP。脚本只在 `.smoke/` 写测试素材和下载包；服务内创建的“冒烟测试”款可在验收后删除。
 
 ```powershell
-cd C:\Users\xcc19\Documents\跨境电商\出图网站
+cd C:\Users\xcc19\Documents\x-studio
 New-Item -ItemType Directory -Force .smoke | Out-Null
 $base = 'http://127.0.0.1:8080'
 $cookie = '.smoke/cookies.txt'

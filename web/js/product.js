@@ -11,7 +11,7 @@
     try { S.data = await API.get('/api/products/' + id); }
     catch (e) { toast(e.message, 'error'); return; }
     const p = S.data.product;
-    document.title = p.name + ' · 珠光秘境出图';
+    document.title = p.name + ' · X Studio';
     $('#title').textContent = p.name;
     $('#pid').textContent = '#' + p.id;
     $('#statusPill').innerHTML = statusPill(p.status);

@@ -57,7 +57,7 @@
     if (rail) {
       const item = (href, icon, text, key) => `<a class="rail-item${active === key ? ' active' : ''}" href="${href}"><i data-lucide="${icon}"></i>${text}</a>`;
       rail.innerHTML =
-        `<a class="rail-logo" href="/" title="珠光秘境 · 出图"><i data-lucide="gem"></i></a>` +
+        `<a class="rail-logo" href="/" title="X Studio"><i data-lucide="gem"></i></a>` +
         item('/', 'layout-grid', '款式', 'products') +
         (me.role === 'admin' ? item('/users.html', 'users', '账号', 'users') : '') +
         item('/help.html', 'book-open', '拍摄要求', 'help') +
