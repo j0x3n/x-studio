@@ -1,8 +1,16 @@
+FROM node:24-bookworm-slim AS frontend
+WORKDIR /src
+COPY . .
+RUN if [ -f frontend/package.json ]; then cd frontend && npm ci && npm run build; fi \
+    && mkdir -p /src/web/dist \
+    && if [ ! -f /src/web/dist/index.html ]; then cp /src/web/placeholder.html /src/web/dist/index.html; fi
+
 FROM golang:1.26-bookworm AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+COPY --from=frontend /src/web/dist ./web/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /server ./cmd/server
 
 FROM debian:bookworm-slim

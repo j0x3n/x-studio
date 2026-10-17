@@ -2,7 +2,13 @@
 
 内部电商管理工具：商品库、图片库、图片处理、文案、多模板出图，多账户和多店铺权限。正在从"上传实拍图自动出主图和详情页"的出图工具改造过来，功能规划见 [功能模块设计.md](功能模块设计.md)。
 
-Go 1.26 + SQLite + chromedp。前端整目录 embed；模板、AI 提示词从磁盘读取。接口以 [接口约定.md](接口约定.md) 为准。
+Go 1.26 + SQLite + chromedp。React 编译结果（`web/dist/`）embed；模板、AI 提示词从磁盘读取。接口以 [接口约定.md](接口约定.md) 为准。
+
+当前后端已完成地基拆分：`internal/core` 提供认证、权限、迁移、通用任务、AI 计量和文件工具；`internal/modules/{accounts,products,assets,pipeline}` 各自注册接口及迁移，`cmd/server/main.go` 统一组装。模块名为 `xstudio`。接口和数据范围以 [接口约定.md](接口约定.md) 为准。
+
+商品保存共用基础信息和素材；每个店铺版本独立保存文案、任务状态和导出文件。商品状态为 `sampling/pending/listed/archived`，流水线状态在上架版本的 `pipeline_*` 字段。商品和版本 ID 不能混用。旧的 photos、商品 run/download 和把文案写进商品的接口已移除。
+
+出图时用 `POST /api/listings/{id}/run?ai_label=0/1` 决定标识（默认 1）。有效来源为 AI 生成或改图时才加角标和隐式标识；实拍、AI 增强均不加。取消需要 `export.no_ai_label` 权限并记审计。下载始终返回最近一次成品，`X-AI-Label` 表示那次出图的参数，下载参数不会重新渲染。AI 白底图仍沿用原规则，不单独导出。
 
 ## Windows 本机运行
 
@@ -25,7 +31,7 @@ $env:REMBG_URL = 'http://127.0.0.1:7000'
 go run ./cmd/server
 ```
 
-打开 <http://localhost:8080>。Chrome 从常见安装目录或 PATH 自动寻找；也可设置 `$env:CHROME_PATH = 'C:\Program Files\Google\Chrome\Application\chrome.exe'`。前端页面缺失时服务仍能启动，页面会提示待同步；补齐 `web/` 后重新编译。运行目录应为 `出图网站/`，这样默认相对路径能找到模板和提示词。
+打开 <http://localhost:8080>。Chrome 从常见安装目录或 PATH 自动寻找；也可设置 `$env:CHROME_PATH = 'C:\Program Files\Google\Chrome\Application\chrome.exe'`。前端尚未构建时显示“前端未构建”；在 `frontend/` 执行 `npm ci && npm run build` 后重新编译 Go。运行目录应为仓库根目录，这样默认相对路径能找到模板和提示词。
 
 只有数据库里还没有任何用户时，才会使用 `ADMIN_USER` / `ADMIN_PASSWORD` 建管理员。密码要求 8–72 字节。首次成功后可以删除这两个环境变量，用管理员登录 `/users.html` 建员工账号。`SESSION_SECRET` 必须至少 32 字符，应保存好并在重启时复用；改变它会使已有登录失效。修改密码、角色或禁用账号也会使该账号已有会话失效。最后一个启用的管理员不能被禁用或降级。
 
@@ -112,16 +118,7 @@ compose 为受限的容器内核设置 `CHROME_NO_SANDBOX=1`，Chrome 因而关�
 
 后端在 copy、PATCH、render 和渲染预览读取时按照片记录纠正 `ai`：生成图为 `AI 生成`，高清图为 `AI 增强`，实拍删除该字段。coverage 每项提供 `ai` 布尔值；need_reshoot 只提示不能用 AI 补的必需位，关掉自动补图后可补的位置仍在 coverage 显示缺失。`templates/` 里的模板已兼容字符串 ai，原样显示。
 
-旧数据库启动时自动通过 `ALTER TABLE photos ADD COLUMN` 补齐以下字段，不清空数据，也无需手动重建数据库：
-
-| 字段 | 类型与默认值 |
-|---|---|
-| `enhanced_file` | TEXT，`''` |
-| `ai_enhanced` | INTEGER 布尔，`0` |
-| `ai_generated` | INTEGER 布尔，`0` |
-| `source` | TEXT，`original`；AI 补图为 `ai` |
-
-迁移支持重复启动和部分字段已存在的数据库。上线前仍应备份原数据库和照片目录。
+旧库启动前会自动生成 `data/app.db.bak-<UTC 时间>`，然后在一个事务里升级用户、角色、店铺、商品、上架版本、素材和任务。默认店铺为“淘宝店”，旧员工分到该店；旧成品移到 `data/listings/<listing_id>/`。迁移失败时数据库回滚，并恢复已经搬移的导出文件。重启不会重复迁移。旧任务原类型保存在 `params.legacy_kind`，步骤继续由 `steps` 决定。
 
 ## 可复制的冒烟测试
 
@@ -155,7 +152,10 @@ function Wait-Job($jid) {
 }
 # 这里的密码要与第一个终端 ADMIN_PASSWORD 相同。
 Send-JSON 'POST' '/api/login' @{username='admin';password='请换成自己的初始密码123'} | Out-Null
-$productID = (Send-JSON 'POST' '/api/products' @{name='冒烟测试';info=@{}}).product.id
+$shopID = ((& curl.exe -f -sS -b $cookie "$base/api/shops" | ConvertFrom-Json).items | Select-Object -First 1).id
+$created = (Send-JSON 'POST' '/api/products' @{name='冒烟测试';info=@{};shop_ids=@($shopID)}).product
+$productID = $created.id
+$listingID = $created.listings[0].id
 Add-Type -AssemblyName System.Drawing
 for ($i=1; $i -le 3; $i++) {
   $bmp = New-Object Drawing.Bitmap(240,320)
@@ -167,30 +167,30 @@ for ($i=1; $i -le 3; $i++) {
 }
 $uploaded = & curl.exe -f -sS -b $cookie -H 'X-Requested-With: fetch' `
   -F 'files=@.smoke/photo1.png' -F 'files=@.smoke/photo2.png' -F 'files=@.smoke/photo3.png' `
-  "$base/api/products/$productID/photos"
+  "$base/api/products/$productID/assets"
 if ($LASTEXITCODE -ne 0) { throw '上传失败' }
-$photos = ($uploaded | ConvertFrom-Json).photos
-$j = Send-JSON 'POST' "/api/products/$productID/run" @{}
+$photos = ($uploaded | ConvertFrom-Json).items
+$j = Send-JSON 'POST' "/api/listings/$listingID/run" @{}
 $result = Wait-Job $j.job.id
 $result | Format-List
 if ($result.status -ne 'failed') { throw '此段预期 AI_API_KEY 为空而失败' }
 $codes = @('A1','B1','C1')
 for ($i=0; $i -lt 3; $i++) {
-  Send-JSON 'PATCH' "/api/photos/$($photos[$i].id)" `
+  Send-JSON 'PATCH' "/api/assets/$($photos[$i].id)" `
     @{code=$codes[$i];white_bg=($i -eq 0);rotate=0} | Out-Null
 }
-$j = Send-JSON 'POST' "/api/products/$productID/run?step=retouch" @{}
+$j = Send-JSON 'POST' "/api/listings/$listingID/run?step=retouch" @{}
 $result = Wait-Job $j.job.id
 if ($result.status -ne 'done') { throw $result.message }
-Send-JSON 'PATCH' "/api/products/$productID" @{
+Send-JSON 'PATCH' "/api/listings/$listingID" @{
   content=@{name='冒烟测试';photos=@{hero=@{f='B1.jpg'}}}
   main=@{name='冒烟测试';imgs=@(@{n=1;layout='photo';f='B1.jpg'})}
-  listing=@{title='测试珍珠耳钉';sku=@(@{name='测试规格';price=69})}
+  meta=@{title='测试珍珠耳钉';sku=@(@{name='测试规格';price=69})}
 } | Out-Null
-$j = Send-JSON 'POST' "/api/products/$productID/run?from=render" @{}
+$j = Send-JSON 'POST' "/api/listings/$listingID/run?from=render" @{}
 $result = Wait-Job $j.job.id
 if ($result.status -ne 'done') { throw $result.message }
-& curl.exe -f -sS -b $cookie "$base/api/products/$productID/download" -o .smoke/export.zip
+& curl.exe -f -sS -b $cookie "$base/api/listings/$listingID/download" -o .smoke/export.zip
 if ($LASTEXITCODE -ne 0) { throw '下载失败' }
 Get-Item .smoke/export.zip
 ```
@@ -202,8 +202,8 @@ go build ./...
 go vet ./...
 go test ./...
 # 仅跑实际 Chrome + 假 AI 的完整流程：
-go test ./internal/app -run TestRenderFullPipelineDimensionsAndZip -count=1 -v
-docker build -t chutu .
+go test ./internal/modules/pipeline -run TestRenderFullPipelineDimensionsAndZip -count=1 -v
+docker build -t xstudio .
 ```
 
 没有 Chrome 时只跳过真实渲染测试；检测到 Chrome 却启动或渲染失败会让测试失败。渲染测试会自动采用 compose 相同的 `CHROME_NO_SANDBOX=1` 模式，以便在受限桌面和 CI 中运行，仍然真实启动 Chrome。正常本机服务默认保留 Chrome 沙箱；受限环境启动服务需要时也可设置该变量。
@@ -212,7 +212,7 @@ docker build -t chutu .
 
 ## 对约定的具体解释与局限
 
-- `photos.manual` 按处理流程补为持久字段；另有会话表、账号版本号，以及 jobs 的内部 `steps` 字段，支持退出/禁用后的会话撤销和重启继续 queued 任务。running 任务在重启后标记“服务重启中断”。
+- `assets.manual` 按处理流程补为持久字段；另有会话表、账号版本号，以及 jobs 的内部 `steps` 字段，支持退出/禁用后的会话撤销和重启继续 queued 任务。running 任务在重启后标记“服务重启中断”。
 - `step` 只执行一步；`from` 执行该步及以后步骤；二者不能同时传。不带参数跑六步。单步或部分处理完成后保持 draft，render 成功后为 ready。保留已有的中间结果和成品，编辑后的预览需重新 render 才会更新下载包。
 - AI 使用 JSON 模式，分拣同时接受数组和 `{photos:[...]}` 包装，以适配只支持 JSON 对象的兼容服务。crop 坐标以 **EXIF 转正 → 手动顺时针旋转** 后的图片为基准，再按比例裁剪。
 - 没有提供之前 Python 版源码；清晰度、偏色、dHash 阈值采用本项目内明确实现的启发式规则。白平衡仅从中性色样本估计，通道增益 0.94–1.06，并增加色相保护；亮度增益 1–1.25，死白按 RGB 三通道均 ≥250 计算，增量最多 0.005。E5 不校色。
@@ -228,7 +228,7 @@ docker build -t chutu .
 - Linux / amd64、`CGO_ENABLED=0` 交叉编译通过；`docker compose config --no-interpolate --quiet` 通过。
 - 实际 `go run ./cmd/server` 启动，并复制执行上面的 curl 冒烟命令：上传 3 张、AI Key 为空报错、手动编号修图、Chrome 渲染、下载 ZIP 全部跑通。
 - 当前受限 Windows 环境的 Chrome 自身沙箱会导致 GPU 子进程退出，验收使用 `CHROME_NO_SANDBOX=1`；没有修改正常服务的默认值。
-- 已尝试 `docker build -t chutu .`，本机 Docker daemon 未运行（`//./pipe/docker_engine` 不存在），所以尚未实际完成镜像构建，也未启动真实 rembg 容器。rembg HTTP 集成与失败降级已用本地假服务测试。
+- 已尝试 `docker build -t xstudio .`，本机 Docker daemon 未运行（`//./pipe/docker_engine` 不存在），所以尚未实际完成镜像构建，也未启动真实 rembg 容器。rembg HTTP 集成与失败降级已用本地假服务测试。
 
 ## 高清化与补图验收（2026-10-18）
 

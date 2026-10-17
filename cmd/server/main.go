@@ -11,27 +11,36 @@ import (
 	"syscall"
 	"time"
 
-	"chutu"
-	"chutu/internal/app"
+	"xstudio"
+	"xstudio/internal/core"
+	"xstudio/internal/modules/accounts"
+	"xstudio/internal/modules/assets"
+	"xstudio/internal/modules/pipeline"
+	"xstudio/internal/modules/products"
 )
 
 func main() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.LstdFlags)
-	c, e := app.EnvConfig()
+	c, e := core.EnvConfig()
 	if e != nil {
 		log.Fatal("配置错误：", e)
 	}
-	web, e := fs.Sub(chutu.Assets, "web")
+	web, e := fs.Sub(xstudio.Assets, "web/dist")
 	if e != nil {
 		log.Fatal("加载前端失败：", e)
 	}
-	slots, e := chutu.Assets.ReadFile("槽位.json")
+	slots, e := xstudio.Assets.ReadFile("槽位.json")
 	if e != nil {
 		log.Fatal("加载槽位失败：", e)
 	}
-	a, e := app.New(c, web, slots)
+	a, e := core.New(c, web, slots)
 	if e != nil {
+		log.Fatal("启动失败：", e)
+	}
+	modules := []core.Module{accounts.New(a), products.New(a), assets.New(a), pipeline.New(a)}
+	if e = a.Start(modules...); e != nil {
+		_ = a.Close()
 		log.Fatal("启动失败：", e)
 	}
 	listener, e := net.Listen("tcp", c.Listen)
@@ -55,7 +64,7 @@ func main() {
 		defer cancel()
 		_ = server.Shutdown(shutdown)
 	}()
-	log.Printf("出图服务已启动，监听 %s", listener.Addr())
+	log.Printf("X Studio 已启动，监听 %s", listener.Addr())
 	e = server.Serve(listener)
 	if e != nil && e != http.ErrServerClosed {
 		log.Print("HTTP 服务停止：", e)

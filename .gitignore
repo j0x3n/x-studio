@@ -7,3 +7,5 @@
 /coverage.out
 /测试照片/
 /templates/详情页模板/商品/_*/
+/web/dist/
+/frontend/node_modules/

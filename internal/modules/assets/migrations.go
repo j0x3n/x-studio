@@ -1,0 +1,27 @@
+package assets
+
+import (
+	"database/sql"
+	"xstudio/internal/core"
+)
+
+func (a *Module) Migrations() []core.Migration {
+	return []core.Migration{{Version: 1, Up: func(tx *sql.Tx) error {
+		cols, e := core.Columns(tx, "photos")
+		if e != nil {
+			return e
+		}
+		if _, e = tx.Exec(`CREATE TABLE assets(id INTEGER PRIMARY KEY,product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,file TEXT NOT NULL,orig_name TEXT NOT NULL,width INTEGER NOT NULL,height INTEGER NOT NULL,metrics TEXT NOT NULL DEFAULT '{}',code TEXT NOT NULL DEFAULT '',crop TEXT NOT NULL DEFAULT 'null',rotate INTEGER NOT NULL DEFAULT 0,white_bg INTEGER NOT NULL DEFAULT 0,ai_note TEXT NOT NULL DEFAULT '',retouch_log TEXT NOT NULL DEFAULT '{}',manual INTEGER NOT NULL DEFAULT 0,enhanced_file TEXT NOT NULL DEFAULT '',ai_enhanced INTEGER NOT NULL DEFAULT 0,ai_generated INTEGER NOT NULL DEFAULT 0,source TEXT NOT NULL DEFAULT 'original',parent_id INTEGER REFERENCES assets(id) ON DELETE SET NULL,kind TEXT NOT NULL DEFAULT 'photo',tags TEXT NOT NULL DEFAULT '[]',op TEXT NOT NULL DEFAULT '{}',created_by INTEGER NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,source_override TEXT NOT NULL DEFAULT '');
+CREATE UNIQUE INDEX asset_code ON assets(product_id,code) WHERE code<>'';
+CREATE INDEX asset_product ON assets(product_id);`); e != nil {
+			return e
+		}
+		if len(cols) > 0 {
+			if e = core.AddColumns(tx, "photos", [][2]string{{"manual", "INTEGER NOT NULL DEFAULT 0"}, {"enhanced_file", "TEXT NOT NULL DEFAULT ''"}, {"ai_enhanced", "INTEGER NOT NULL DEFAULT 0"}, {"ai_generated", "INTEGER NOT NULL DEFAULT 0"}}); e != nil {
+				return e
+			}
+			_, e = tx.Exec(`INSERT INTO assets(id,product_id,file,orig_name,width,height,metrics,code,crop,rotate,white_bg,ai_note,retouch_log,manual,enhanced_file,ai_enhanced,ai_generated,source,created_by,created_at) SELECT ph.id,ph.product_id,ph.file,ph.orig_name,ph.width,ph.height,ph.metrics,ph.code,ph.crop,ph.rotate,ph.white_bg,ph.ai_note,ph.retouch_log,ph.manual,ph.enhanced_file,ph.ai_enhanced,ph.ai_generated,CASE WHEN ph.ai_generated=1 THEN 'ai_generated' WHEN ph.ai_enhanced=1 THEN 'ai_enhanced' ELSE 'original' END,p.created_by,p.created_at FROM photos ph JOIN products p ON p.id=ph.product_id;DROP TABLE photos;`)
+		}
+		return e
+	}}}
+}
