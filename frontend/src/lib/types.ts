@@ -19,8 +19,31 @@ export type Asset = {
   id: number; product_id: number; file: string; orig_name: string; width: number; height: number
   code: string; source: string; source_override?: string; kind: string; tags: string[]; url: string
   ai_note: string; metrics: Record<string, unknown>; created_by: number; created_at: string; parent_id?: number | null
+  // 图片库接口多出来的字段
+  title?: string; note?: string; archived?: boolean; updated_at?: string
+  product?: { id: number; name: string }; effective_source?: string; thumb_url?: string; version_count?: number
+  op?: AssetOp
 }
-export type Job = { id: number; kind: string; status: 'queued' | 'running' | 'done' | 'failed'; progress: number; message: string; created_at: string; finished_at: string }
+// 处理出来的新版本在 op 里记做了什么
+export type AssetOp = {
+  ops?: ProcessOps; preset_id?: number | null; prompts?: string[]; models?: Record<string, string>
+  warnings?: string[]; diff?: { phash_distance: number; color_delta: number }; elapsed_ms?: number; cutout?: string
+}
+export type ProcessOps = {
+  geometry?: { rotate: number; crop?: number[] }
+  aspect?: '1:1' | '3:4' | '4:3' | '16:9' | 'free'
+  color?: { auto_wb?: boolean; match_to?: number }
+  cutout?: { background: 'white' | 'transparent' }
+  upscale?: { target_long_side: number }
+  ai?: { quick?: string[]; extra?: string }
+  resize?: { long_side: number }
+  format?: 'jpg' | 'png'
+}
+export type Preset = { id: number; name: string; owner_id: number; shared: boolean; params: { ops?: ProcessOps; set_current?: boolean }; updated_at: string }
+export type Job = {
+  id: number; kind: string; status: 'queued' | 'running' | 'done' | 'failed'; progress: number; message: string; created_at: string; finished_at: string
+  target_type?: string; target_id?: number; result?: Record<string, unknown> | null
+}
 export type UserRow = { id: number; username: string; display_name: string; role_id: number; created_at: string; disabled: boolean; shop_ids?: number[]; quota?: { month_images: number | null; month_text: number | null } | null }
 export type Permission = { key: string; name: string; group: string }
 export type AuditRow = { id: number; at: string; user_id: number; action: string; target_type: string; target_id: number; detail: unknown; ip: string }

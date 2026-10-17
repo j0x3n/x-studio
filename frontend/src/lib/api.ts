@@ -44,3 +44,21 @@ export const qs = (o: Record<string, string | number | boolean | undefined | nul
   const s = p.toString()
   return s ? '?' + s : ''
 }
+
+// POST 后直接拿到文件（如批量下载 zip），用浏览器保存
+export async function downloadPost(path: string, body: unknown, filename: string) {
+  const res = await fetch(path, { method: 'POST', headers: { 'X-Requested-With': 'fetch', 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' })
+  if (!res.ok) {
+    let msg = `下载失败（${res.status}）`
+    try { const d = await res.json(); if (d?.error) msg = String(d.error) } catch { /* 不是 JSON */ }
+    throw new ApiError(msg, res.status)
+  }
+  const cd = res.headers.get('Content-Disposition') || ''
+  const m = /filename\*=UTF-8''([^;]+)/i.exec(cd)
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = m ? decodeURIComponent(m[1]) : filename
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
