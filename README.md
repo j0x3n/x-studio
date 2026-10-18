@@ -346,3 +346,10 @@ go test ./... -count=1 -v
 
 AI 整理使用文本模型、功能名 `kb.organize`，每次读取 `<PROMPT_DIR>/知识库整理.md`，计入用户文本额度，只返回草稿，不保存文章。
 
+
+## 采购（供应商）
+
+供应商管理在 `internal/modules/purchase`，接口以《接口约定-进销存》第 6 节为准。
+
+- 迁移建立 `suppliers` 表，并从 `products.supplier` 自动去重导入已有货源名称（不修改 `products` 表）。
+- 提供 `GET/POST /api/suppliers`、`GET/PATCH /api/suppliers/{id}`：有 `purchase.manage` 或 `inventory.view` 可查看，有 `purchase.manage` 可新建与修改（外部协作者不可访问）；不提供物理删除，使用 `archived` 归档，写操作记录 `supplier.create`、`supplier.update` 审计日志。
