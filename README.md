@@ -332,3 +332,11 @@ go test ./... -count=1 -v
 - 通知用 SSE：`GET /api/notifications/stream`。连上先发 `unread`，新通知发 `notification`，里面带 `desktop`。收件箱关掉就不写表；免打扰或桌面关掉时照样写表，但 `desktop` 为 false。到期、逾期、额度 80% 每种只发一次。
 - 负载是 `GET /api/tasks/load`（`task.manage`）。完成统计是 `GET /api/tasks/stats`，路由挂在 `task.manage` 上，实际只允许管理员。
 
+## 知识库
+
+`internal/modules/kb` 提供目录、Markdown 文章、版本回退、关联、附件和搜索；接口见《接口约定-知识库》。员工需有 `kb.view`，修改需同时有 `kb.edit`，外部协作者不可访问，回收站仅管理员可用。
+
+附件存于 `<DATA_DIR>/kb`，通过 `/files/kb/` 鉴权访问；每小时清理超过 24 小时且没有正文或历史版本引用的附件，服务关闭时等待清理循环退出。`kb.Search(db, q, limit)` 可供其他模块查询。
+
+AI 整理使用文本模型、功能名 `kb.organize`，每次读取 `<PROMPT_DIR>/知识库整理.md`，计入用户文本额度，只返回草稿，不保存文章。
+
