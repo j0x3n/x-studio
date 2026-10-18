@@ -338,3 +338,11 @@ go test ./... -count=1 -v
 `StockIn`、`StockOut`、`Reserve`、`Release`、`Stock` 供后续 purchase、orders 模块调用：所有写函数只使用调用方传入的 `*sql.Tx`，由调用方记录业务审计并提交或回滚；发货先释放占用再出库。
 安全库存跌破时只写一次 `inventory.low_stock` 系统审计，恢复后再次跌破才重发；通知和补货任务留给后续 tasks 接入。
 
+## 知识库
+
+`internal/modules/kb` 提供目录、Markdown 文章、版本回退、关联、附件和搜索；接口见《接口约定-知识库》。员工需有 `kb.view`，修改需同时有 `kb.edit`，外部协作者不可访问，回收站仅管理员可用。
+
+附件存于 `<DATA_DIR>/kb`，通过 `/files/kb/` 鉴权访问；每小时清理超过 24 小时且没有正文或历史版本引用的附件，服务关闭时等待清理循环退出。`kb.Search(db, q, limit)` 可供其他模块查询。
+
+AI 整理使用文本模型、功能名 `kb.organize`，每次读取 `<PROMPT_DIR>/知识库整理.md`，计入用户文本额度，只返回草稿，不保存文章。
+
