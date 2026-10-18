@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import type { Asset, Job, Listing, Product, Task } from '../lib/types'
 import { TaskMiniList, TaskDrawer, NewTaskDrawer } from '../components/TaskViews'
+import { ProductStock, RelatedArticles } from '../components/ProductExtras'
 import { Topbar, Pill, Loading, Empty, Tabs } from '../components/ui'
 import { fmtAgo, money, productStatus, pipelineStatus, listingStatus, sourceName, platformName } from '../lib/format'
 import { useCategories, missingAttrs, emptyValue, attrText } from '../lib/categories'
@@ -13,7 +14,7 @@ import { AttrFields } from '../components/AttrFields'
 
 type Detail = { product: Product; assets: Asset[] }
 type ListingDetail = { listing: Listing; job: Job | null; outputs: { main34: string[]; main11: string[]; detail: string[]; white: string; zip: string } }
-type TabKey = 'assets' | 'listings' | 'info' | 'tasks'
+type TabKey = 'assets' | 'listings' | 'info' | 'stock' | 'tasks'
 
 const STEP: Record<string, string> = { check: '检查照片', classify: 'AI 分拣', enhance: '补图和高清化', retouch: '修图', copy: '写文案', render: '出图' }
 
@@ -71,6 +72,7 @@ export function ProductDetail() {
           { key: 'assets', label: '素材', count: photos.length },
           { key: 'listings', label: '店铺版本', count: p.listings.length },
           { key: 'info', label: '基础信息' },
+          ...(can('inventory.view') ? [{ key: 'stock' as const, label: '库存' }] : []),
           ...(canTasks ? [{ key: 'tasks' as const, label: '任务', count: tasks?.filter(t => t.status !== 'done' && t.status !== 'canceled').length }] : [])
         ]} />
         {tab === 'assets' && <AssetsTab product={p} assets={photos} onChange={load} />}
@@ -86,6 +88,7 @@ export function ProductDetail() {
           </div>
         )}
         {tab === 'info' && <InfoTab product={p} onChange={load} />}
+        {tab === 'stock' && <ProductStock product={p} />}
         {tab === 'tasks' && <TasksTab product={p} tasks={tasks} onChange={loadTasks} />}
       </main></div>
     </>
@@ -282,6 +285,7 @@ function InfoTab({ product, onChange }: { product: Product; onChange: () => void
           </dl></div>
         </section>
       )}
+      {can('kb.view') && <RelatedArticles product={product} />}
     </div>
   )
 }

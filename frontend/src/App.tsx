@@ -15,6 +15,12 @@ import { TemplateCenter } from './pages/TemplateCenter'
 import { Review } from './pages/Review'
 import { ShootingGuide } from './pages/ShootingGuide'
 import { Tasks } from './pages/Tasks'
+import { Kb } from './pages/Kb'
+import { KbArticle } from './pages/KbArticle'
+import { KbEdit } from './pages/KbEdit'
+import { Inventory } from './pages/Inventory'
+import { InventoryItem } from './pages/InventoryItem'
+import { InventoryCount } from './pages/InventoryCount'
 
 // 占位页（目前只用于地址不存在）
 function Soon({ title, desc }: { title: string; desc: string }) {
@@ -45,6 +51,13 @@ export function App() {
         <Route path="review" element={<Review />} />
         <Route path="tasks/:id?" element={<Tasks />} />
         <Route path="guide" element={<ShootingGuide />} />
+        <Route path="inventory" element={<Inventory />} />
+        <Route path="inventory/items/:id" element={<InventoryItem />} />
+        <Route path="inventory/counts/:id" element={<InventoryCount />} />
+        <Route path="kb" element={<Kb />} />
+        <Route path="kb/new" element={<KbEdit />} />
+        <Route path="kb/:id" element={<KbArticle />} />
+        <Route path="kb/:id/edit" element={<KbEdit key="edit" />} />
         <Route path="admin" element={<Admin />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Soon title="页面不存在" desc="检查一下地址，或者从左侧导航进入。" />} />

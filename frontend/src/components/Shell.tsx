@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, Camera, type LucideIcon } from 'lucide-react'
+import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, Camera, BookOpen, Boxes, type LucideIcon } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { AssistantProvider, useAssistant } from '../lib/assistant'
@@ -14,7 +14,8 @@ type Item = { to: string; label: string; icon: LucideIcon; perm?: string; badge?
 const GROUPS: { label?: string; items: Item[] }[] = [
   { items: [
     { to: '/', label: '今天', icon: Sun, badge: 'todo' },
-    { to: '/tasks', label: '任务', icon: ListTodo, perm: 'task.view', badge: 'tasks' }
+    { to: '/tasks', label: '任务', icon: ListTodo, perm: 'task.view', badge: 'tasks' },
+    { to: '/kb', label: '知识库', icon: BookOpen, perm: 'kb.view' }
   ] },
   { label: '商品', items: [
     { to: '/products', label: '商品库', icon: Package, perm: 'product.view' },
@@ -26,6 +27,9 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     { to: '/copy', label: '文案', icon: PenLine, perm: 'copy.view' },
     { to: '/templates', label: '模板', icon: LayoutTemplate, perm: 'product.view' },
     { to: '/review', label: '出图审核', icon: ClipboardCheck, perm: 'render.review', badge: 'review' }
+  ] },
+  { label: '经营', items: [
+    { to: '/inventory', label: '库存', icon: Boxes, perm: 'inventory.view' }
   ] }
 ]
 
