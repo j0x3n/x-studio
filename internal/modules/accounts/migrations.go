@@ -70,6 +70,27 @@ CREATE TABLE IF NOT EXISTS shares(id INTEGER PRIMARY KEY,product_id INTEGER NOT 
 			return e
 		}
 		return appendBuiltinPerms(tx, "photographer", core.TaskView)
+	}}, {Version: 4, Up: func(tx *sql.Tx) error {
+		// 二 B：知识库、库存、采购、订单的权限点给现有角色补上，并新增仓管、财务两个内置角色
+		if e := appendBuiltinPerms(tx, "operator", core.KBView, core.KBEdit, core.InventoryView, core.PurchaseManage, core.OrderView, core.OrderManage); e != nil {
+			return e
+		}
+		if e := appendBuiltinPerms(tx, "designer", core.KBView); e != nil {
+			return e
+		}
+		if e := appendBuiltinPerms(tx, "photographer", core.KBView); e != nil {
+			return e
+		}
+		roles := []core.Role{
+			{Key: "warehouse", Name: "仓管", Scope: "shops", Perms: []string{core.ProductView, core.InventoryView, core.InventoryEdit, core.PurchaseManage, core.OrderView, core.OrderManage, core.TaskView, core.KBView}},
+			{Key: "finance", Name: "财务", Scope: "shops", Perms: []string{core.ProductView, core.ProductCost, core.InventoryView, core.OrderView, core.FinanceView, core.FinanceEdit, core.TaskView, core.KBView}},
+		}
+		for _, r := range roles {
+			if _, e := tx.Exec("INSERT OR IGNORE INTO roles(key,name,builtin,scope,perms,created_at) VALUES(?,?,1,?,?,?)", r.Key, r.Name, r.Scope, core.JS(r.Perms), core.Now()); e != nil {
+				return e
+			}
+		}
+		return nil
 	}}}
 }
 

@@ -32,6 +32,15 @@ const (
 	ShareManage      = "share.manage"
 	TaskView         = "task.view"
 	TaskManage       = "task.manage"
+	KBView           = "kb.view"
+	KBEdit           = "kb.edit"
+	InventoryView    = "inventory.view"
+	InventoryEdit    = "inventory.edit"
+	PurchaseManage   = "purchase.manage"
+	OrderView        = "order.view"
+	OrderManage      = "order.manage"
+	FinanceView      = "finance.view"
+	FinanceEdit      = "finance.edit"
 )
 
 var Permissions = []Permission{
@@ -40,6 +49,11 @@ var Permissions = []Permission{
 	{CopyView, "看文案", "文案"}, {CopyEdit, "编辑文案", "文案"}, {TemplateManage, "管理模板", "模板"}, {RenderRun, "跑出图任务", "出图"}, {ExportRun, "导出、下载成品", "出图"}, {RenderReview, "审核出图结果", "出图"},
 	{AdminUsers, "管理账号、角色、分店和额度", "管理"}, {AdminShops, "管理店铺", "管理"}, {AdminSettings, "修改系统设置", "管理"}, {AdminAudit, "看操作日志", "管理"}, {ShareManage, "分享商品给外部协作者", "管理"},
 	{TaskView, "看任务、管自己的任务", "任务"}, {TaskManage, "给别人派活、改别人的任务、看负载", "任务"},
+	{KBView, "看知识库", "知识库"}, {KBEdit, "编辑知识库", "知识库"},
+	{InventoryView, "看库存和物料", "库存"}, {InventoryEdit, "出入库、调拨、盘点、管物料和仓库", "库存"},
+	{PurchaseManage, "供应商、采购单、到货质检", "采购"},
+	{OrderView, "看订单", "订单"}, {OrderManage, "录单、发货、取消、售后", "订单"},
+	{FinanceView, "看财务数据", "财务"}, {FinanceEdit, "改财务数据", "财务"},
 }
 
 func KnownPermission(p string) bool {
