@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { X, Inbox, Sparkles } from 'lucide-react'
 import { useAssistant } from '../lib/assistant'
+import { NoticeBell } from './NoticeBell'
 
 // 顶栏 = 页头：上级面包屑 + 页面标题 + 一行摘要 + 本页操作 + 助手开关。
 // 只传 crumbs 时最后一项当标题；传了 title 时 crumbs 全部当上级。
@@ -22,6 +23,7 @@ export function Topbar({ crumbs = [], title, sub, children }: { crumbs?: ReactNo
       </div>
       <span className="grow" />
       {children}
+      <NoticeBell />
       {assist && !assist.open && (
         <button className="btn btn-secondary assist-toggle" onClick={() => assist.setOpen(true)} title="打开 AI 助手"><Sparkles />助手</button>
       )}

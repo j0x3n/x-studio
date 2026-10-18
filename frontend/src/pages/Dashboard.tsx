@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Package, AlertTriangle, Sparkles, ClipboardCheck, Camera, PenLine, ChevronRight, ImageOff, type LucideIcon } from 'lucide-react'
-import { api } from '../lib/api'
+import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useAssistant, runAction } from '../lib/assistant'
 import { useToast, errText } from '../lib/toast'
-import type { Home, Todo } from '../lib/types'
+import type { Home, Task, Todo } from '../lib/types'
+import { TaskMiniList, TaskDrawer } from '../components/TaskViews'
 import { Topbar, Loading, Empty } from '../components/ui'
 import { fmtAgo, sourceName } from '../lib/format'
 
@@ -22,7 +23,7 @@ const greet = () => { const h = new Date().getHours(); return h < 6 ? '夜深了
 
 // 首页「今天」：要处理的事按紧急程度排好，可以直接点按钮处理，也可以交给助手
 export function Dashboard() {
-  const { me } = useAuth()
+  const { me, can } = useAuth()
   const nav = useNavigate()
   const toast = useToast()
   const assist = useAssistant()
@@ -30,6 +31,14 @@ export function Dashboard() {
   const [err, setErr] = useState('')
   const [usage, setUsage] = useState<Usage | null>(null)
   const [busy, setBusy] = useState<number | null>(null)
+  const [tasks, setTasks] = useState<Page<Task> | null>(null)
+  const [taskId, setTaskId] = useState<number | null>(null)
+  const canTasks = can('task.view')
+  const loadTasks = useCallback(() => {
+    if (!canTasks) return
+    api<Page<Task>>('/api/tasks' + qs({ view: 'mine', status: 'open', page_size: 6 })).then(setTasks).catch(() => setTasks({ items: [], total: 0 }))
+  }, [canTasks])
+  useEffect(() => { loadTasks() }, [loadTasks])
 
   const load = useCallback(() => {
     api<Home>('/api/home').then(h => { setHome(h); setErr('') }).catch(e => setErr(errText(e)))
@@ -120,6 +129,17 @@ export function Dashboard() {
             )}
           </section>
 
+          <div className="stack">
+          {canTasks && (
+            <section className="panel">
+              <div className="panel-head">
+                <div className="titles"><div className="panel-title">我的任务</div><div className="panel-sub">逾期的在前，再按截止时间</div></div>
+                {(tasks?.total || 0) > 0 && <span className="chip">{tasks!.total} 件</span>}
+                <button className="btn btn-ghost btn-sm" onClick={() => nav('/tasks')}>全部任务<ChevronRight /></button>
+              </div>
+              {!tasks ? <Loading /> : <TaskMiniList items={tasks.items} onOpen={t => setTaskId(t.id)} empty={<Empty title="手上没有任务" desc="派给你的任务会出现在这里。" />} />}
+            </section>
+          )}
           <section className="panel">
             <div className="panel-head">
               <div className="titles"><div className="panel-title">最近产出</div><div className="panel-sub">新上传和处理出来的素材</div></div>
@@ -142,8 +162,10 @@ export function Dashboard() {
               </div>
             )}
           </section>
+          </div>
         </div>
       </main></div>
+      {taskId && <TaskDrawer id={taskId} onClose={() => setTaskId(null)} onChanged={loadTasks} />}
     </>
   )
 }

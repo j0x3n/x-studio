@@ -1,10 +1,11 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package, Pencil } from 'lucide-react'
-import { api } from '../lib/api'
+import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
-import type { Asset, Job, Listing, Product } from '../lib/types'
+import type { Asset, Job, Listing, Product, Task } from '../lib/types'
+import { TaskMiniList, TaskDrawer, NewTaskDrawer } from '../components/TaskViews'
 import { Topbar, Pill, Loading, Empty, Tabs } from '../components/ui'
 import { fmtAgo, money, productStatus, pipelineStatus, listingStatus, sourceName, platformName } from '../lib/format'
 import { useCategories, missingAttrs, emptyValue, attrText } from '../lib/categories'
@@ -12,7 +13,7 @@ import { AttrFields } from '../components/AttrFields'
 
 type Detail = { product: Product; assets: Asset[] }
 type ListingDetail = { listing: Listing; job: Job | null; outputs: { main34: string[]; main11: string[]; detail: string[]; white: string; zip: string } }
-type TabKey = 'assets' | 'listings' | 'info'
+type TabKey = 'assets' | 'listings' | 'info' | 'tasks'
 
 const STEP: Record<string, string> = { check: '检查照片', classify: 'AI 分拣', enhance: '补图和高清化', retouch: '修图', copy: '写文案', render: '出图' }
 
@@ -23,6 +24,15 @@ export function ProductDetail() {
   const toast = useToast()
   const [d, setD] = useState<Detail | null>(null)
   const [tab, setTab] = useState<TabKey>('assets')
+  const [tasks, setTasks] = useState<Task[] | null>(null)
+  const canTasks = can('task.view')
+  // 挂在这款商品上的任务（后端只按 product 对象查；店铺版本上的任务 target 也指向这款商品时一并显示）
+  const loadTasks = useCallback(() => {
+    if (!canTasks || !id) return
+    api<Page<Task>>('/api/tasks' + qs({ view: 'all', status: '', target_type: 'product', target_id: id, page_size: 50 }))
+      .then(r => setTasks(r.items || [])).catch(() => setTasks([]))
+  }, [canTasks, id])
+  useEffect(() => { loadTasks() }, [loadTasks])
   const load = useCallback(() => api<Detail>(`/api/products/${id}`).then(setD).catch(e => { toast(errText(e), 'error'); nav('/products') }), [id, nav, toast])
   useEffect(() => { load() }, [load])
   if (!d) return <><Topbar crumbs={['商品', '…']} /><Loading /></>
@@ -58,7 +68,8 @@ export function ProductDetail() {
         <Tabs value={tab} onChange={setTab} items={[
           { key: 'assets', label: '素材', count: photos.length },
           { key: 'listings', label: '店铺版本', count: p.listings.length },
-          { key: 'info', label: '基础信息' }
+          { key: 'info', label: '基础信息' },
+          ...(canTasks ? [{ key: 'tasks' as const, label: '任务', count: tasks?.filter(t => t.status !== 'done' && t.status !== 'canceled').length }] : [])
         ]} />
         {tab === 'assets' && <AssetsTab product={p} assets={photos} onChange={load} />}
         {tab === 'listings' && (
@@ -73,6 +84,7 @@ export function ProductDetail() {
           </div>
         )}
         {tab === 'info' && <InfoTab product={p} onChange={load} />}
+        {tab === 'tasks' && <TasksTab product={p} tasks={tasks} onChange={loadTasks} />}
       </main></div>
     </>
   )
@@ -269,5 +281,25 @@ function InfoTab({ product, onChange }: { product: Product; onChange: () => void
         </section>
       )}
     </div>
+  )
+}
+
+function TasksTab({ product, tasks, onChange }: { product: Product; tasks: Task[] | null; onChange: () => void }) {
+  const [open, setOpen] = useState<number | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [showDone, setShowDone] = useState(false)
+  const list = (tasks || []).filter(t => showDone || (t.status !== 'done' && t.status !== 'canceled'))
+  const closed = (tasks || []).length - (tasks || []).filter(t => t.status !== 'done' && t.status !== 'canceled').length
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <div className="titles"><div className="panel-title">相关任务</div><div className="panel-sub">挂在这款商品上的任务，包括自动派活建的</div></div>
+        {closed > 0 && <label className="row t3 fs-12"><input type="checkbox" className="check" checked={showDone} onChange={e => setShowDone(e.target.checked)} />显示已完成 {closed} 件</label>}
+        <button className="btn btn-secondary btn-sm" onClick={() => setCreating(true)}><Plus />新建任务</button>
+      </div>
+      {!tasks ? <Loading /> : <TaskMiniList items={list} onOpen={t => setOpen(t.id)} empty={<Empty title="没有进行中的任务" desc="拍样、修图、处理出图失败等事情可以建成任务派给同事。" />} />}
+      {open && <TaskDrawer id={open} onClose={() => setOpen(null)} onChanged={onChange} />}
+      {creating && <NewTaskDrawer target={{ type: 'product', id: product.id, label: product.name }} onClose={() => setCreating(false)} onCreated={t => { setCreating(false); onChange(); setOpen(t.id) }} />}
+    </section>
   )
 }

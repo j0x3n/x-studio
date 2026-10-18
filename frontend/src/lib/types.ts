@@ -101,3 +101,26 @@ export type Category = {
   attrs: AttrField[]; codes: ShotCode[]; slots: Record<string, unknown>; rules: string; banned: string[]; default_template: string
   product_count?: number; created_at: string; updated_at: string
 }
+
+// 任务和通知（接口约定-任务和通知.md）
+export type TaskStatus = 'todo' | 'doing' | 'waiting' | 'done' | 'canceled'
+export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type PersonRef = { id: number; name: string }
+export type Task = {
+  id: number; title: string; body: string; status: TaskStatus; priority: TaskPriority
+  assignee: PersonRef | null; created_by: PersonRef; due_at: string; overdue: boolean
+  target: { type: string; id: number; label: string; path: string } | null
+  checklist: { text: string; done: boolean }[]; checklist_done: number
+  watchers: PersonRef[]; comment_count: number; rule_id: number | null; reopen_count: number
+  created_at: string; updated_at: string; done_at: string
+}
+export type TaskComment = { id: number; task_id: number; user_id: number; user?: PersonRef; user_name?: string; body: string; mentions: number[]; created_at: string }
+export type TaskEvent = { id: number; task_id: number; user_id: number; user?: PersonRef; user_name?: string; kind: string; detail: Record<string, unknown>; created_at: string }
+export type Assignee = { id: number; name: string; role_name: string; open_count: number }
+export type TaskRule = {
+  id: number; name: string; enabled: boolean; event: string; title_tpl: string; body_tpl: string
+  assign_mode: 'fixed' | 'role_round_robin' | 'role_least_loaded' | 'product_owner' | 'job_user'
+  assign_user_id: number | null; assign_role_id: number | null; due_hours: number | null; priority: TaskPriority
+}
+export type Notice = { id: number; user_id: number; type: string; title: string; body: string; link: string; target_type: string; target_id: number; read_at: string; created_at: string; desktop?: boolean }
+export type NoticePrefs = { types: Record<string, { inbox: boolean; desktop: boolean }>; quiet: { from: string; to: string } | null }
