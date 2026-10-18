@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="zh-CN" data-style="clean" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X Studio 重设计方案</title>
+<link rel="stylesheet" href="../frontend/src/styles/tokens.css">
+<link rel="stylesheet" href="../frontend/src/styles/components.css">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style>
+  /* ---------- 方案切换条（只属于这个对比页） ---------- */
+  body { margin: 0; background: var(--canvas); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  .pbar, .pnote { flex-shrink: 0; }
+  .pbar { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--ink); color: var(--on-ink); }
+  .pbar b { font-weight: 600; white-space: nowrap; }
+  .pbar .opts { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-md); background: rgba(255,255,255,.08); }
+  .pbar .opts button { height: 28px; padding: 0 12px; border: 0; border-radius: var(--r-sm); background: transparent; color: rgba(255,255,255,.7); font: inherit; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .pbar .opts button:hover { color: #fff; }
+  .pbar .opts button.active { background: #fff; color: #111; }
+  .pnote { min-height: 36px; display: flex; align-items: center; gap: 16px; padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: var(--fs-12); flex-wrap: wrap; }
+  .pnote .k { color: var(--text-3); margin-right: 4px; }
+  .pnote .t1 { font-weight: 500; }
+  .mock { flex: 1; min-height: 0; }
+  .mock[hidden] { display: none; }
+  .mock > .app { height: 100%; }
+
+  /* ---------- 通用小件 ---------- */
+  .thumb { width: 36px; height: 36px; border-radius: var(--r-sm); object-fit: cover; flex-shrink: 0; background: var(--surface-3); border: 1px solid var(--border); }
+  .thumb.ph { display: grid; place-items: center; color: var(--text-4); }
+  .thumb.ph svg { width: 16px; height: 16px; }
+  .name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+  /* A：每个店铺版本的 6 步进度 */
+  .lanes { display: flex; gap: 14px; }
+  .lane { display: flex; flex-direction: column; gap: 4px; width: 92px; flex-shrink: 0; }
+  .lane .top { display: flex; justify-content: space-between; font-size: var(--fs-12); color: var(--text-3); }
+  .lane .top b { color: var(--text-2); font-weight: 500; }
+  .segs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
+  .segs i { height: 4px; border-radius: 2px; background: var(--surface-3); }
+  .segs i.on { background: var(--primary); }
+  .segs i.run { background: var(--primary-200); }
+  .segs i.bad { background: var(--danger); }
+  .lane.ok .top em { color: var(--success-text); } .lane.bad .top em { color: var(--danger-text); } .lane.run .top em { color: var(--primary-text); }
+  .lane .top em { font-style: normal; }
+  .lane.none .top { color: var(--text-4); }
+  .quota { padding: 10px; border-radius: var(--r-lg); background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-12); color: var(--text-3); }
+
+  /* B：一款一屏 */
+  .stepper { display: flex; align-items: center; gap: 4px; padding: 0 var(--page-x); height: 48px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; overflow-x: auto; }
+  .step { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border-radius: var(--r-md); color: var(--text-3); font-weight: 500; white-space: nowrap; cursor: pointer; }
+  .step .n { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-family: var(--font-mono); background: var(--surface-3); color: var(--text-3); flex-shrink: 0; }
+  .step .n svg { width: 12px; height: 12px; }
+  .step .m { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--text-4); font-weight: 400; }
+  .step.done { color: var(--text-2); } .step.done .n { background: var(--primary-50); color: var(--primary); }
+  .step.active { background: var(--primary-50); color: var(--primary-text); } .step.active .n { background: var(--primary); color: var(--on-primary); } .step.active .m { color: var(--primary-text); }
+  .step-sep { width: 16px; height: 1px; background: var(--border-strong); flex-shrink: 0; }
+  .shoptabs { display: inline-flex; gap: 2px; margin-left: auto; }
+  .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 16px var(--page-x); overflow: auto; background: var(--surface-2); }
+  .compare { position: relative; flex: 1; min-height: 300px; border-radius: var(--r-lg); border: 1px solid var(--border); background: var(--surface); overflow: hidden; display: grid; place-items: center; }
+  .compare .pair { position: relative; height: calc(100% - 24px); aspect-ratio: 1; max-width: calc(100% - 24px); }
+  .compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: var(--r-md); }
+  .compare .before { filter: blur(1.4px) brightness(.9) saturate(.75) sepia(.12); }
+  .compare .after { clip-path: inset(0 0 0 50%); filter: contrast(1.05) brightness(1.04); }
+  .compare .handle { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: #fff; }
+  .compare .handle::after { content: ""; position: absolute; top: 50%; left: -11px; width: 24px; height: 24px; margin-top: -12px; border-radius: 50%; background: #fff; border: 1px solid var(--border-strong); }
+  .compare .lab { position: absolute; top: 12px; padding: 0 8px; height: 22px; display: inline-flex; align-items: center; border-radius: var(--r-xs); background: rgba(17,24,39,.6); color: #fff; font-size: var(--fs-12); }
+  .compare .tools { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; }
+  .film { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; flex-shrink: 0; }
+  .fr { position: relative; width: 88px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+  .fr img, .fr .ph { width: 88px; height: 88px; border-radius: var(--r-md); object-fit: cover; border: 1px solid var(--border); background: var(--surface-3); }
+  .fr.sel img { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .fr .c { position: absolute; top: 5px; left: 5px; }
+  .fr .s { font-size: 11px; color: var(--text-3); display: flex; justify-content: space-between; }
+  .fr .v { position: absolute; top: 5px; right: 5px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: rgba(17,24,39,.6); color: #fff; font: 11px var(--font-mono); display: inline-flex; align-items: center; }
+  .toolgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .toolgrid button { height: 56px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); color: var(--text-2); font: inherit; font-size: var(--fs-12); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+  .toolgrid button svg { width: 16px; height: 16px; color: var(--text-3); }
+  .toolgrid button.active { border-color: var(--primary); background: var(--primary-50); color: var(--primary-text); }
+  .toolgrid button.active svg { color: var(--primary); }
+  .pl-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--r-md); cursor: pointer; min-width: 0; }
+  .pl-item:hover { background: var(--surface-3); }
+  .pl-item.active { background: var(--primary-50); }
+  .pl-item .t { color: var(--text); font-weight: 500; line-height: 1.3; }
+  .pl-item .d { color: var(--text-3); font-size: var(--fs-12); }
+  .pl-item .thumb { width: 32px; height: 32px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .qchip { height: 26px; padding: 0 10px; border-radius: var(--r-full); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); font: inherit; font-size: var(--fs-12); cursor: pointer; }
+  .qchip.on { border-color: var(--primary); background: var(--primary-50); color: var(--primary-text); }
+
+  /* C：流水线看板 */
+  .kanban.pipe { grid-auto-columns: minmax(180px, 1fr); }
+  .kcard .cov { display: flex; gap: 4px; margin: -4px -4px 0; }
+  .kcard .cov img { flex: 1; min-width: 0; height: 64px; object-fit: cover; border-radius: var(--r-sm); background: var(--surface-3); }
+  .kcard .cov .ph { flex: 1; height: 64px; border-radius: var(--r-sm); background: var(--surface-2); border: 1px dashed var(--border-strong); display: grid; place-items: center; color: var(--text-3); font-size: var(--fs-12); }
+  .kcard.sel { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .kcard .warn { display: flex; gap: 6px; align-items: flex-start; padding: 6px 8px; border-radius: var(--r-sm); background: var(--danger-bg); color: var(--danger-text); font-size: var(--fs-12); }
+  .kcard .warn svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
+  .outs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .outs img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--border); }
+  .checks { display: flex; flex-direction: column; gap: 6px; }
+  .checks div { display: flex; align-items: center; gap: 8px; font-size: var(--fs-13); color: var(--text-2); }
+  .checks svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .checks .ok svg { color: var(--success); } .checks .wn svg { color: var(--warning); }
+
+  /* D：AI 助手 */
+  .d-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--gap); }
+  .next { display: flex; flex-direction: column; gap: 8px; }
+  .next-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
+  .next-item.first { background: var(--warning-bg); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
+  .next-item .title { color: var(--text); font-weight: 500; }
+  .next-item .meta { color: var(--text-3); font-size: var(--fs-12); }
+  .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .gallery figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+  .gallery img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-md); border: 1px solid var(--border); }
+  .gallery figcaption { font-size: var(--fs-12); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ai-panel { width: 340px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--shell); display: flex; flex-direction: column; }
+  .ai-panel .body { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .ai-ctx { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-lg); border: 1px solid var(--border); font-size: var(--fs-12); color: var(--text-2); }
+  .bubble { padding: 10px 12px; border-radius: var(--r-lg); background: var(--surface-2); color: var(--text); line-height: 1.6; }
+  .bubble.me { background: var(--primary-50); color: var(--primary-text); align-self: flex-end; max-width: 85%; }
+  .act-card { border: 1px solid var(--border); border-radius: var(--r-lg); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
+  .ai-input { margin: 0 16px 16px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
+  .ai-input .ph { color: var(--text-4); }
+
+  @media (max-width: 1280px) { .d-grid { grid-template-columns: minmax(0, 1fr); } .lane { width: 80px; } }
+  @media (max-width: 1100px) { .ai-panel { width: 300px; } .mock-c .inspector { display: none; } }
+  @media (max-width: 1024px) {
+    .mock-a .sidebar { width: var(--rail-w); align-items: center; padding: 12px 8px; }
+    .mock-a .sidebar .hide-rail { display: none !important; }
+    .mock-a .sidebar .nav-item { justify-content: center; width: 40px; padding: 0; }
+    .mock-b .subnav { display: none; }
+    .mock-d .ai-panel { display: none; }
+    .lanes { gap: 8px; } .lane { width: 64px; } .lane .top em { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="pbar">
+  <b>X Studio · 重设计方案</b>
+  <div class="opts" id="opts">
+    <button data-k="a" class="active">A 清爽后台</button>
+    <button data-k="b">B 一款一屏</button>
+    <button data-k="c">C 流水线看板</button>
+    <button data-k="d">D AI 助手</button>
+  </div>
+</div>
+<div class="pnote" id="note"></div>
+
+<!-- =====================================================================
+     方案 A：清爽后台（clean）—— 按模块分页，侧边栏分组
+     ===================================================================== -->
+<div class="mock mock-a" data-k="a">
+<div class="app"><div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark"><i data-lucide="gem"></i></span><span class="hide-rail">X Studio</span></div>
+    <span class="field soft hide-rail" style="cursor:pointer"><i data-lucide="store"></i><span class="grow">全部店铺</span><span class="mono t3 fs-12">3</span><i data-lucide="chevrons-up-down"></i></span>
+    <label class="field soft hide-rail"><i data-lucide="search"></i><input placeholder="搜商品、编号、素材"><span class="kbd">⌘K</span></label>
+    <nav class="nav-group">
+      <a class="nav-item"><i data-lucide="layout-grid"></i><span class="hide-rail">工作台</span><span class="end badge hide-rail">6</span></a>
+    </nav>
+    <nav class="nav-group">
+      <div class="nav-label hide-rail">商品</div>
+      <a class="nav-item active"><i data-lucide="package"></i><span class="hide-rail">商品库</span><span class="end nav-count hide-rail">128</span></a>
+      <a class="nav-item"><i data-lucide="images"></i><span class="hide-rail">素材库</span><span class="end nav-count hide-rail">2,416</span></a>
+    </nav>
+    <nav class="nav-group">
+      <div class="nav-label hide-rail">生产</div>
+      <a class="nav-item"><i data-lucide="wand-2"></i><span class="hide-rail">图片处理</span></a>
+      <a class="nav-item"><i data-lucide="pen-line"></i><span class="hide-rail">文案</span></a>
+      <a class="nav-item"><i data-lucide="layout-template"></i><span class="hide-rail">模板</span></a>
+      <a class="nav-item"><i data-lucide="clipboard-check"></i><span class="hide-rail">出图审核</span><span class="end badge hide-rail">4</span></a>
+    </nav>
+    <nav class="nav-group">
+      <div class="nav-label hide-rail">管理</div>
+      <a class="nav-item"><i data-lucide="users"></i><span class="hide-rail">账号与权限</span></a>
+      <a class="nav-item"><i data-lucide="settings"></i><span class="hide-rail">设置</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="quota hide-rail">
+        <div class="row between"><span>本月 AI 出图</span><span class="mono t1">128 / 500</span></div>
+        <div class="progress"><span style="width:26%"></span></div>
+      </div>
+      <div class="user-row">
+        <span class="avatar lg c1">X</span>
+        <div class="grow hide-rail"><div class="name">X</div><div class="role">管理员</div></div>
+        <i data-lucide="chevrons-up-down" class="hide-rail t3"></i>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs">商品<span class="sep"></span><span class="t1">商品库</span></div>
+      <span class="grow"></span>
+      <button class="btn btn-ghost btn-icon has-dot"><i data-lucide="bell"></i></button>
+    </header>
+    <div class="scroll"><main class="content">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">商品库</h1>
+          <p class="page-sub">128 款在用<span class="sep"></span>23 款待上架<span class="sep"></span>4 款等你审核</p>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-secondary"><i data-lucide="upload"></i>导入</button>
+          <button class="btn btn-primary"><i data-lucide="plus"></i>新建商品</button>
+        </div>
+      </div>
+      <section class="panel">
+        <div class="stat-strip">
+          <div><div class="k">拍样中</div><div class="v">18</div><div class="m">5 款还没传照片</div></div>
+          <div><div class="k">素材处理</div><div class="v">9</div><div class="m">高清化 3 · 抠图 6</div></div>
+          <div><div class="k">待出图</div><div class="v">14</div><div class="m">文案已定稿</div></div>
+          <div><div class="k">待审核</div><div class="v">4</div><div class="m">最早 2 小时前</div></div>
+          <div class="is-alert"><div class="k">出图失败</div><div class="v">2</div><div class="m">需要重跑</div></div>
+        </div>
+      </section>
+      <div>
+        <div class="tabs">
+          <a class="tab active">全部 <span class="count">128</span></a><a class="tab">拍样中 <span class="count">18</span></a><a class="tab">待上架 <span class="count">23</span></a><a class="tab">已上架 <span class="count">87</span></a><a class="tab">已归档 <span class="count">41</span></a>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="viewswitch"><button class="active"><i data-lucide="table-2"></i>表格</button><button><i data-lucide="layout-grid"></i>图墙</button></div>
+        <span class="field">店铺 <span class="hint">不限</span><i data-lucide="chevron-down"></i></span>
+        <span class="field">负责人 <span class="hint">所有人</span><i data-lucide="chevron-down"></i></span>
+        <button class="btn btn-ghost"><i data-lucide="list-filter"></i>筛选</button>
+        <span class="spacer"></span>
+        <label class="field" style="width:220px"><i data-lucide="search"></i><input placeholder="搜款名或编号"></label>
+      </div>
+      <section class="panel">
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th class="w-check"><input type="checkbox" class="check"></th><th>商品</th><th style="width:96px">状态</th><th>店铺版本 · 6 步进度</th><th class="num">素材</th><th>负责人</th><th>更新</th><th style="width:40px"></th></tr></thead>
+          <tbody id="a-rows"></tbody>
+        </table></div>
+        <div class="bulkbar">
+          <span class="count">已选 2 款</span><span class="sum">共 21 张素材</span>
+          <div class="actions"><button class="btn btn-secondary"><i data-lucide="download"></i>下载素材</button><button class="btn btn-primary"><i data-lucide="sparkles"></i>批量出图 2 款</button></div>
+        </div>
+      </section>
+    </main></div>
+  </div>
+</div></div>
+</div>
+
+<!-- =====================================================================
+     方案 B：一款一屏（workspace）—— 商品列表 | 当前环节 | 配置面板
+     ===================================================================== -->
+<div class="mock mock-b" data-k="b" hidden>
+<div class="app"><div class="shell">
+  <nav class="rail">
+    <div class="rail-logo"><i data-lucide="gem"></i></div>
+    <a class="rail-item"><i data-lucide="layout-grid"></i>工作台</a>
+    <a class="rail-item active"><i data-lucide="package"></i>商品</a>
+    <a class="rail-item"><i data-lucide="images"></i>素材库</a>
+    <a class="rail-item"><i data-lucide="layout-template"></i>模板</a>
+    <a class="rail-item"><i data-lucide="clipboard-check"></i>审核<span class="badge">4</span></a>
+    <span class="rail-spacer"></span>
+    <a class="rail-item"><i data-lucide="settings"></i>设置</a>
+    <span class="avatar lg c1" style="margin-top:6px">X</span>
+  </nav>
+  <div class="main white">
+    <header class="topbar" style="padding-left:12px">
+      <button class="btn btn-secondary btn-icon"><i data-lucide="chevron-left"></i></button>
+      <div style="margin-left:4px;min-width:0">
+        <div class="crumbs">商品<span class="sep"></span><span class="mono">ZD-1017</span><span class="sep"></span>耳饰</div>
+        <div class="topbar-title ellipsis">10-11mm 强光爱迪生蝴蝶结耳钉</div>
+      </div>
+      <span class="status-note" style="margin-left:8px">虾皮版本有改动未出图</span>
+      <span class="grow"></span>
+      <div class="segmented"><button title="已上架">淘宝 ✓</button><button class="active">虾皮台湾</button><button>X</button></div>
+      <span class="vr" style="margin:12px 4px"></span>
+      <button class="btn btn-secondary"><i data-lucide="eye"></i>预览</button>
+      <button class="btn btn-secondary"><i data-lucide="download"></i>下载</button>
+      <button class="btn btn-primary"><i data-lucide="send"></i>提交审核</button>
+    </header>
+    <div class="row" style="flex:1;min-height:0;align-items:stretch;gap:0">
+      <aside class="subnav" style="gap:10px">
+        <span class="field soft"><i data-lucide="store"></i><span class="grow">全部店铺</span><i data-lucide="chevron-down"></i></span>
+        <label class="field"><i data-lucide="search"></i><input placeholder="搜款名或编号"><span class="kbd">/</span></label>
+        <div class="col" style="gap:2px" id="b-list"></div>
+      </aside>
+      <div class="col" style="flex:1;min-width:0">
+        <div class="stepper">
+          <span class="step done"><span class="n"><i data-lucide="check"></i></span>素材<span class="m">12</span></span><span class="step-sep"></span>
+          <span class="step active"><span class="n">2</span>处理<span class="m">8/12</span></span><span class="step-sep"></span>
+          <span class="step done"><span class="n"><i data-lucide="check"></i></span>文案<span class="m">v3</span></span><span class="step-sep"></span>
+          <span class="step"><span class="n">4</span>出图</span><span class="step-sep"></span>
+          <span class="step"><span class="n">5</span>审核</span><span class="step-sep"></span>
+          <span class="step"><span class="n">6</span>上架</span>
+        </div>
+        <div class="stage">
+          <div class="row between">
+            <div class="metabar"><span>12 张素材</span><span>实拍 7 · AI 增强 4 · AI 改图 1</span><span class="t3">选中 3 张</span></div>
+            <div class="row" style="gap:6px">
+              <div class="viewswitch"><button class="active"><i data-lucide="split-square-horizontal"></i>滑动</button><button><i data-lucide="columns-2"></i>并排</button></div>
+            </div>
+          </div>
+          <div class="compare">
+            <div class="pair">
+              <img class="before" src="../测试照片/10-11mm强光爱迪生蝴蝶结耳钉/微信图片_2026-10-17_235619_579.jpg" alt="">
+              <img class="after" src="../测试照片/10-11mm强光爱迪生蝴蝶结耳钉/微信图片_2026-10-17_235619_579.jpg" alt="">
+              <span class="handle"></span>
+              <span class="lab" style="left:12px">原图 · 1080×1440</span>
+              <span class="lab" style="right:12px">高清化 · 2048×2730</span>
+            </div>
+          </div>
+          <div class="film" id="b-film"></div>
+        </div>
+      </div>
+      <aside class="inspector">
+        <div class="inspector-head"><div class="segmented block"><button class="active">处理</button><button>文案</button><button>属性</button></div></div>
+        <div class="inspector-body">
+          <div class="inspector-section">
+            <div class="eyebrow">工具</div>
+            <div class="toolgrid">
+              <button class="active"><i data-lucide="maximize-2"></i>高清化</button>
+              <button><i data-lucide="sparkles"></i>AI 改图</button>
+              <button><i data-lucide="scissors"></i>抠图</button>
+              <button><i data-lucide="palette"></i>调色</button>
+              <button><i data-lucide="crop"></i>裁剪旋转</button>
+              <button><i data-lucide="ruler"></i>尺寸格式</button>
+            </div>
+          </div>
+          <div class="inspector-section">
+            <div class="head"><span class="eyebrow">高清化</span><span class="chip outline">AI 增强 · 不加角标</span></div>
+            <span class="label" style="margin:0">长边</span>
+            <div class="segmented block"><button>1600</button><button class="active">2048</button><button>3000</button></div>
+            <span class="label" style="margin:4px 0 0">顺手处理</span>
+            <div class="chips"><button class="qchip on">去灰尘</button><button class="qchip on">提亮光泽</button><button class="qchip">去反光</button><button class="qchip">统一色温</button></div>
+            <textarea class="textarea" rows="2" placeholder="额外需求，一句话写清楚，比如：珍珠表面的划痕去掉"></textarea>
+          </div>
+          <div class="inspector-section">
+            <div class="head"><span class="eyebrow">预设</span><button class="btn btn-ghost btn-sm"><i data-lucide="plus"></i>存为预设</button></div>
+            <div class="item-card tinted"><span class="icon-tile sm tint-green"><i data-lucide="bookmark"></i></span><div class="grow"><div class="title">淘宝主图标准</div><div class="desc">高清 2048 · 去灰尘 · 白底</div></div></div>
+            <div class="item-card tinted"><span class="icon-tile sm tint-purple"><i data-lucide="bookmark"></i></span><div class="grow"><div class="title">虾皮暖光</div><div class="desc">调色 · 暖 200K · 1:1</div></div></div>
+          </div>
+          <div class="usage">
+            <div class="row between"><span class="t1">本月 AI 出图</span><a class="fs-12">明细</a></div>
+            <div><span class="t1 mono" style="font-size:20px;font-weight:600">128</span> <span class="t3 fs-12">/ 500 张</span></div>
+            <div class="progress"><span style="width:26%"></span></div>
+          </div>
+        </div>
+        <div class="inspector-foot"><button class="btn btn-primary btn-lg btn-block"><i data-lucide="wand-2"></i>处理选中的 3 张</button></div>
+      </aside>
+    </div>
+  </div>
+</div></div>
+</div>
+
+<!-- =====================================================================
+     方案 C：流水线看板（clean）—— 按环节分列，点卡片右侧出详情
+     ===================================================================== -->
+<div class="mock mock-c" data-k="c" hidden>
+<div class="app"><div class="shell">
+  <nav class="rail">
+    <div class="rail-logo"><i data-lucide="gem"></i></div>
+    <a class="rail-item active"><i data-lucide="kanban-square"></i>流水线</a>
+    <a class="rail-item"><i data-lucide="package"></i>商品</a>
+    <a class="rail-item"><i data-lucide="images"></i>素材</a>
+    <a class="rail-item"><i data-lucide="wand-2"></i>处理</a>
+    <a class="rail-item"><i data-lucide="pen-line"></i>文案</a>
+    <a class="rail-item"><i data-lucide="layout-template"></i>模板</a>
+    <span class="rail-spacer"></span>
+    <a class="rail-item"><i data-lucide="settings"></i>设置</a>
+    <span class="avatar lg c1" style="margin-top:6px">X</span>
+  </nav>
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs"><span class="t1">上架流水线</span></div>
+      <span class="grow"></span>
+      <label class="field soft" style="width:240px"><i data-lucide="search"></i><input placeholder="搜款名或编号"><span class="kbd">⌘K</span></label>
+      <button class="btn btn-ghost btn-icon has-dot"><i data-lucide="bell"></i></button>
+    </header>
+    <div class="row" style="flex:1;min-height:0;align-items:stretch;gap:0">
+      <div class="scroll" style="min-width:0"><main class="content" style="gap:12px">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">上架流水线</h1>
+            <p class="page-sub">64 款在途<span class="sep"></span>3 款卡住超过 1 天<span class="sep"></span>本周上架 9 款</p>
+          </div>
+          <div class="toolbar">
+            <span class="avatar-stack"><span class="avatar sm c1">X</span><span class="avatar sm c2">林</span><span class="avatar sm c3">周</span><span class="avatar sm avatar-more">+2</span></span>
+            <button class="btn btn-primary"><i data-lucide="plus"></i>新建商品</button>
+          </div>
+        </div>
+        <div class="tabs">
+          <a class="tab active">全部 <span class="count">64</span></a><a class="tab">我的 <span class="count">12</span></a><a class="tab">卡住的 <span class="count">3</span></a><a class="tab">已上架 <span class="count">87</span></a>
+        </div>
+        <div class="row between">
+          <div class="segmented"><button class="active">全部店铺</button><button>淘宝</button><button>虾皮台湾</button><button>X</button></div>
+          <div class="toolbar">
+            <div class="viewswitch"><button class="active"><i data-lucide="columns-3"></i>看板</button><button><i data-lucide="table-2"></i>表格</button></div>
+            <span class="field">品类 <span class="hint">不限</span><i data-lucide="chevron-down"></i></span>
+            <button class="btn btn-ghost"><i data-lucide="sliders-horizontal"></i>筛选</button>
+          </div>
+        </div>
+        <div class="kanban pipe" id="c-board"></div>
+      </main></div>
+      <aside class="inspector">
+        <div class="inspector-head row between" style="padding-bottom:4px">
+          <div style="min-width:0"><div class="crumbs mono">AK-0715 · 虾皮台湾</div><div class="t1 ellipsis" style="font-weight:600;font-size:14px">Akoya 海水珍珠耳钉 7-7.5mm</div></div>
+          <button class="close-btn"><i data-lucide="x"></i></button>
+        </div>
+        <div class="inspector-body">
+          <div class="inspector-section">
+            <div class="head"><span class="eyebrow">成品 · 待审核</span><span class="pill pill-info">待审核</span></div>
+            <div class="outs">
+              <img src="../测试照片/效果预览/2_主图3比4.jpg" alt="">
+              <img src="../测试照片/效果预览/3_主图1比1.jpg" alt="">
+              <img src="../测试照片/效果预览/5_详情页长图.jpg" alt="">
+            </div>
+            <div class="fs-12 t3">模板 珠光极简 · 主图 3:4 × 5 · 1:1 × 5 · 详情页 1 张</div>
+          </div>
+          <div class="inspector-section">
+            <div class="eyebrow">自动检查</div>
+            <div class="checks">
+              <div class="ok"><i data-lucide="check-circle-2"></i>主图 10 张尺寸都对</div>
+              <div class="ok"><i data-lucide="check-circle-2"></i>文案没有违禁词</div>
+              <div class="wn"><i data-lucide="alert-triangle"></i>第 3 张是 AI 改图</div>
+            </div>
+          </div>
+          <div class="inspector-section">
+            <div class="eyebrow">动态</div>
+            <div class="list">
+              <div class="list-item"><span class="avatar xs c2">林</span><div class="grow fs-12"><span class="t1">林</span> 提交审核</div><span class="end fs-12 t3">2 小时前</span></div>
+              <div class="list-item"><span class="avatar xs c3">周</span><div class="grow fs-12"><span class="t1">周</span> 改了标题和卖点</div><span class="end fs-12 t3">昨天</span></div>
+            </div>
+          </div>
+          <div class="inspector-section">
+            <span class="label" style="margin:0">审核意见</span>
+            <textarea class="textarea" rows="2" placeholder="退回时写一下要改什么"></textarea>
+          </div>
+        </div>
+        <div class="inspector-foot row"><button class="btn btn-secondary">退回</button><button class="btn btn-primary grow"><i data-lucide="check"></i>通过，移到已上架</button></div>
+      </aside>
+    </div>
+  </div>
+</div></div>
+</div>
+
+<!-- =====================================================================
+     方案 D：AI 助手（soft）—— 首页是今天的待办，右侧常驻助手
+     ===================================================================== -->
+<div class="mock mock-d" data-k="d" hidden>
+<div class="app"><div class="shell">
+  <nav class="rail">
+    <div class="rail-logo"><i data-lucide="gem"></i></div>
+    <a class="rail-item active"><i data-lucide="home"></i>今天</a>
+    <a class="rail-item"><i data-lucide="package"></i>商品</a>
+    <a class="rail-item"><i data-lucide="images"></i>素材</a>
+    <a class="rail-item"><i data-lucide="wand-2"></i>处理</a>
+    <a class="rail-item"><i data-lucide="pen-line"></i>文案</a>
+    <a class="rail-item"><i data-lucide="clipboard-check"></i>审核<span class="badge">4</span></a>
+    <span class="rail-spacer"></span>
+    <a class="rail-item"><i data-lucide="settings"></i>设置</a>
+    <span class="avatar lg c1" style="margin-top:6px">X</span>
+  </nav>
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs"><span class="t1">今天</span></div>
+      <span class="grow"></span>
+      <span class="field soft"><i data-lucide="store"></i>全部店铺<i data-lucide="chevron-down"></i></span>
+      <button class="btn btn-ghost btn-icon has-dot"><i data-lucide="bell"></i></button>
+    </header>
+    <div class="row" style="flex:1;min-height:0;align-items:stretch;gap:0">
+      <div class="scroll" style="min-width:0"><main class="content">
+        <section class="hero">
+          <div class="grow" style="position:relative;z-index:1">
+            <div class="eyebrow">10 月 18 日 · 周日</div>
+            <h2>早上好，今天有 7 件事要处理</h2>
+            <p>2 款出图失败要重跑，4 款等你审核，AI 已经帮你把 3 款的文案写好了。</p>
+          </div>
+          <div class="row" style="gap:16px;position:relative;z-index:1">
+            <div class="ring" style="--v:64;--c:#fff;--t:rgba(255,255,255,.25);--w:6px;width:60px"><div><b style="font-size:14px">64%</b></div></div>
+            <div><b class="mono" style="font-size:18px">9 / 14</b><div style="opacity:.8;font-size:12px">本周上架目标</div></div>
+          </div>
+        </section>
+        <section class="kpi-grid">
+          <div class="kpi"><div class="kpi-top"><span class="kpi-label">在途商品</span><span class="icon-tile sm round tint-blue"><i data-lucide="package"></i></span></div><div class="kpi-value mono">64</div><div class="kpi-foot"><span class="delta up"><i data-lucide="arrow-up"></i>8</span>较上周</div></div>
+          <div class="kpi"><div class="kpi-top"><span class="kpi-label">待审核</span><span class="icon-tile sm round tint-purple"><i data-lucide="clipboard-check"></i></span></div><div class="kpi-value mono">4</div><div class="kpi-foot">最早 2 小时前提交</div></div>
+          <div class="kpi"><div class="kpi-top"><span class="kpi-label">出图失败</span><span class="icon-tile sm round tint-red"><i data-lucide="alert-triangle"></i></span></div><div class="kpi-value mono">2</div><div class="kpi-foot">AI 分拣超时 · 照片太暗</div></div>
+          <div class="kpi"><div class="kpi-top"><span class="kpi-label">本月 AI 出图</span><span class="icon-tile sm round tint-green"><i data-lucide="sparkles"></i></span></div><div class="kpi-value mono">128<span class="unit">/ 500</span></div><div class="kpi-foot">约 ¥38.40</div></div>
+        </section>
+        <div class="d-grid">
+          <section class="panel">
+            <div class="panel-head"><div class="titles"><div class="panel-title">下一步</div><div class="panel-sub">按紧急程度排好了</div></div><span class="chip">7 件</span></div>
+            <div class="panel-body"><div class="panel-section"><div class="next">
+              <div class="next-item first"><span class="icon-tile sm tint-red"><i data-lucide="alert-triangle"></i></span><div class="grow" style="min-width:0"><div class="title ellipsis">南洋金珠吊坠 11mm · 出图失败</div><div class="meta">虾皮台湾 · AI 分拣超时，照片已经齐了</div></div><button class="btn btn-primary btn-sm">重跑</button></div>
+              <div class="next-item"><span class="icon-tile sm tint-purple"><i data-lucide="clipboard-check"></i></span><div class="grow" style="min-width:0"><div class="title ellipsis">审核 4 款成品图</div><div class="meta">Akoya 耳钉、巴洛克项链 等</div></div><span class="pill pill-purple">待审核</span></div>
+              <div class="next-item"><span class="icon-tile sm tint-blue"><i data-lucide="pen-line"></i></span><div class="grow" style="min-width:0"><div class="title ellipsis">确认 AI 写好的 3 份文案</div><div class="meta">爱迪生开口戒指 · 繁体版需要人看一眼寓意词</div></div><span class="pill pill-info">AI 已写好</span></div>
+              <div class="next-item"><span class="icon-tile sm tint-orange"><i data-lucide="camera"></i></span><div class="grow" style="min-width:0"><div class="title ellipsis">5 款还没传照片</div><div class="meta">米珠多层手链 等，拍样中超过 3 天</div></div><span class="pill pill-warning">拍样中</span></div>
+            </div></div></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div class="titles"><div class="panel-title">最近产出</div><div class="panel-sub">今天 · 23 张</div></div><a class="fs-12">素材库 ›</a></div>
+            <div class="panel-body"><div class="panel-section"><div class="gallery">
+              <figure><img src="../测试照片/效果预览/2_主图3比4.jpg" alt=""><figcaption>ZD-1017 主图</figcaption></figure>
+              <figure><img src="../测试照片/效果预览/4_AI白底图.jpg" alt=""><figcaption>AI 白底图</figcaption></figure>
+              <figure><img src="../测试照片/效果预览/1_高清化对比.jpg" alt=""><figcaption>高清化</figcaption></figure>
+              <figure><img src="../测试照片/效果预览/3_主图1比1.jpg" alt=""><figcaption>主图 1:1</figcaption></figure>
+              <figure><img src="../测试照片/10-11mm强光爱迪生蝴蝶结耳钉/微信图片_2026-10-17_235619_579.jpg" alt=""><figcaption>实拍 01</figcaption></figure>
+              <figure><img src="../测试照片/10-11mm强光爱迪生蝴蝶结耳钉/微信图片_2026-10-17_235629_229.jpg" alt=""><figcaption>实拍 02</figcaption></figure>
+              <figure><img src="../测试照片/10-11mm强光爱迪生蝴蝶结耳钉/微信图片_2026-10-17_235633_899.jpg" alt=""><figcaption>实拍 03</figcaption></figure>
+              <figure><img src="../测试照片/效果预览/5_详情页长图.jpg" alt=""><figcaption>详情页</figcaption></figure>
+            </div></div></div>
+          </section>
+        </div>
+      </main></div>
+      <aside class="ai-panel">
+        <div class="row" style="padding:12px 16px;border-bottom:1px solid var(--divider)">
+          <span class="orb" style="width:24px;height:24px"></span><span class="t1" style="font-weight:600">助手</span><span class="grow"></span>
+          <button class="btn btn-ghost btn-icon btn-sm"><i data-lucide="history"></i></button>
+        </div>
+        <div class="body">
+          <div class="ai-ctx"><i data-lucide="mouse-pointer-click" style="width:14px;height:14px;color:var(--text-3)"></i>知道你在看：<b class="t1">今天</b> · 选中 0 项</div>
+          <div class="bubble me">把珠蝶耳钉 12 张实拍统一一下色温，然后出虾皮的主图</div>
+          <div class="bubble">好的，我准备这样做，确认后开始：</div>
+          <div class="act-card">
+            <div class="row"><span class="icon-tile sm tint-blue"><i data-lucide="palette"></i></span><div class="grow"><div class="t1" style="font-weight:500">统一色温 · 12 张</div><div class="fs-12 t3">以第 1 张为准，结果存为新版本</div></div></div>
+            <div class="row"><span class="icon-tile sm tint-purple"><i data-lucide="layout-template"></i></span><div class="grow"><div class="t1" style="font-weight:500">出图 · 虾皮台湾</div><div class="fs-12 t3">模板 珠光极简 · 文案 v3 繁体</div></div></div>
+            <div class="row"><button class="btn btn-secondary btn-sm">改一下</button><span class="grow"></span><button class="btn btn-primary btn-sm">开始，约用 10 张额度</button></div>
+          </div>
+          <div class="col" style="gap:6px">
+            <div class="eyebrow">你可能想</div>
+            <div class="suggest"><i data-lucide="sparkles"></i>为什么南洋金珠出图失败了？<i data-lucide="chevron-right" class="end"></i></div>
+            <div class="suggest"><i data-lucide="sparkles"></i>把待审核的 4 款按店铺列出来<i data-lucide="chevron-right" class="end"></i></div>
+            <div class="suggest"><i data-lucide="sparkles"></i>这周哪些款还没有繁体文案？<i data-lucide="chevron-right" class="end"></i></div>
+          </div>
+        </div>
+        <div class="ai-input">
+          <span class="ph">一句话告诉我要做什么…</span>
+          <div class="row"><button class="btn btn-ghost btn-icon btn-sm"><i data-lucide="paperclip"></i></button><button class="btn btn-ghost btn-icon btn-sm"><i data-lucide="image"></i></button><span class="grow"></span><button class="btn btn-primary btn-icon btn-sm"><i data-lucide="arrow-up"></i></button></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div></div>
+</div>
+
+<script>
+const P1 = '../测试照片/10-11mm强光爱迪生蝴蝶结耳钉/'
+const PV = '../测试照片/效果预览/'
+const IMG = {
+  a: P1 + '微信图片_2026-10-17_235619_579.jpg', b: P1 + '微信图片_2026-10-17_235629_229.jpg', c: P1 + '微信图片_2026-10-17_235633_899.jpg',
+  raw: PV + '0_上传的原图.jpg', hd: PV + '1_高清化对比.jpg', m34: PV + '2_主图3比4.jpg', m11: PV + '3_主图1比1.jpg', white: PV + '4_AI白底图.jpg', detail: PV + '5_详情页长图.jpg'
+}
+
+// 示例数据：每个店铺版本 [已完成步数, 状态]，状态 ok=已上架 run=进行中 bad=失败 none=没有版本
+const PRODUCTS = [
+  { code: 'ZD-1017', name: '10-11mm 强光爱迪生蝴蝶结耳钉', cat: '耳饰', st: ['已上架', 'pill-success'], img: IMG.a, n: 12, who: ['X', 'c1'], at: '10 分钟前', lanes: [[6, 'ok', '已上架'], [3, 'run', '处理中'], [1, 'run', '草稿']], sel: true },
+  { code: 'AK-0715', name: 'Akoya 海水珍珠耳钉 7-7.5mm', cat: '耳饰', st: ['待上架', 'pill-info'], img: IMG.m11, n: 9, who: ['林', 'c2'], at: '2 小时前', lanes: [[6, 'run', '待审核'], [6, 'run', '待审核'], [0, 'none', '—']], sel: true },
+  { code: 'NY-1102', name: '南洋金珠吊坠 11mm', cat: '吊坠', st: ['待上架', 'pill-info'], img: IMG.white, n: 8, who: ['周', 'c3'], at: '3 小时前', lanes: [[5, 'ok', '待出图'], [2, 'bad', '失败'], [0, 'none', '—']] },
+  { code: 'BL-0932', name: '巴洛克淡水珍珠项链 45cm', cat: '项链', st: ['待上架', 'pill-info'], img: IMG.b, n: 15, who: ['林', 'c2'], at: '昨天', lanes: [[5, 'run', '写文案'], [4, 'run', '修图'], [4, 'run', '修图']] },
+  { code: 'AD-1010', name: '爱迪生珍珠开口戒指', cat: '戒指', st: ['待上架', 'pill-info'], img: IMG.hd, n: 6, who: ['X', 'c1'], at: '昨天', lanes: [[4, 'run', '文案'], [4, 'run', '文案'], [0, 'none', '—']] },
+  { code: 'MZ-0408', name: '淡水米珠多层手链', cat: '手链', st: ['拍样中', 'pill-warning'], img: '', n: 0, who: ['周', 'c3'], at: '3 天前', lanes: [[0, 'run', '缺照片'], [0, 'none', '—'], [0, 'none', '—']] },
+  { code: 'BM-0221', name: '贝母蝴蝶发夹', cat: '发饰', st: ['已上架', 'pill-success'], img: IMG.c, n: 11, who: ['林', 'c2'], at: '10月12日', lanes: [[6, 'ok', '已上架'], [6, 'ok', '已上架'], [6, 'ok', '已上架']] },
+  { code: 'LS-0613', name: '珍珠流苏耳线', cat: '耳饰', st: ['已上架', 'pill-success'], img: IMG.m34, n: 10, who: ['X', 'c1'], at: '10月9日', lanes: [[6, 'ok', '已上架'], [6, 'ok', '已上架'], [0, 'none', '—']] }
+]
+const SHOPS = ['淘宝', '虾皮', 'X']
+const thumb = (src, cls = 'thumb') => src ? `<img class="${cls}" src="${src}" alt="">` : `<span class="${cls} ph"><i data-lucide="gem"></i></span>`
+
+// ---------- A：表格 ----------
+document.getElementById('a-rows').innerHTML = PRODUCTS.map(p => `
+  <tr class="${p.sel ? 'selected' : ''}">
+    <td class="w-check"><input type="checkbox" class="check" ${p.sel ? 'checked' : ''}></td>
+    <td><div class="name-cell">${thumb(p.img)}<div style="min-width:0"><div class="cell-title ellipsis">${p.name}</div><div class="cell-sub mono">${p.code} · ${p.cat}</div></div></div></td>
+    <td><span class="pill ${p.st[1]}">${p.st[0]}</span></td>
+    <td><div class="lanes">${p.lanes.map(([d, s, t], i) => `
+      <div class="lane ${s}"><div class="top"><b>${SHOPS[i]}</b><em>${t}</em></div>
+      <div class="segs">${[0, 1, 2, 3, 4, 5].map(k => `<i class="${s === 'none' ? '' : k < d ? 'on' : k === d ? (s === 'bad' ? 'bad' : s === 'ok' ? '' : 'run') : ''}"></i>`).join('')}</div></div>`).join('')}
+    </div></td>
+    <td class="num mono">${p.n || '<span class="t4">0</span>'}</td>
+    <td><div class="cell-person"><span class="avatar sm ${p.who[1]}">${p.who[0]}</span>${p.who[0]}</div></td>
+    <td class="t3">${p.at}</td>
+    <td><button class="btn btn-ghost btn-icon btn-sm"><i data-lucide="more-horizontal"></i></button></td>
+  </tr>`).join('')
+
+// ---------- B：左侧商品列表 + 底部素材条 ----------
+const group = (title, n, items) => `<div class="group-head">${title}<span class="end">${n}<i data-lucide="chevron-up"></i></span></div>` + items.map((p, i) => `
+  <div class="pl-item ${p.code === 'ZD-1017' ? 'active' : ''}">${thumb(p.img)}<div style="min-width:0"><div class="t ellipsis">${p.name}</div><div class="d ellipsis"><span class="mono">${p.code}</span> · ${p.lanes.map(l => l[2]).filter(t => t !== '—').join(' / ')}</div></div></div>`).join('')
+document.getElementById('b-list').innerHTML =
+  group('进行中', 6, PRODUCTS.filter(p => p.st[0] !== '已上架' || p.code === 'ZD-1017')) +
+  `<div style="height:6px"></div>` + group('已上架', 87, PRODUCTS.filter(p => p.st[0] === '已上架' && p.code !== 'ZD-1017'))
+const FILM = [[IMG.raw, '实拍', 'pill-neutral', 'v2', true], [IMG.a, '实拍', 'pill-neutral', '', true], [IMG.b, '实拍', 'pill-neutral', '', true], [IMG.c, 'AI 增强', 'pill-info', 'v3'], [IMG.hd, 'AI 增强', 'pill-info', 'v2'], [IMG.white, 'AI 改图', 'pill-purple', ''], [IMG.m11, '实拍', 'pill-neutral', ''], [IMG.m34, 'AI 增强', 'pill-info', ''], [IMG.a, '实拍', 'pill-neutral', ''], [IMG.b, '实拍', 'pill-neutral', '']]
+document.getElementById('b-film').innerHTML = FILM.map(([src, s, k, v, sel], i) => `
+  <div class="fr ${i === 0 ? 'sel' : ''}"><img src="${src}" alt="">${sel ? '<input type="checkbox" class="check c" checked>' : ''}${v ? `<span class="v">${v}</span>` : ''}
+  <div class="s"><span class="mono">${String(i + 1).padStart(2, '0')}</span><span class="pill ${k}" style="height:16px;padding:0 4px;font-size:10px">${s}</span></div></div>`).join('') +
+  `<div class="fr"><span class="ph" style="display:grid;place-items:center;border-style:dashed;color:var(--text-3)"><i data-lucide="plus"></i></span><div class="s">上传 / 粘贴</div></div>`
+
+// ---------- C：看板 ----------
+const COLS = [
+  ['拍样', 'var(--text-4)', 5, [{ p: 5, desc: '拍样中 3 天，还没传照片', ph: true }]],
+  ['素材处理', 'var(--warning)', 9, [{ p: 3, warn: '虾皮版本：AI 分拣超时' }, { p: 0, desc: '高清化 8/12 · 抠图 0/12' }]],
+  ['文案', 'var(--info)', 6, [{ p: 4, desc: 'AI 已写好繁体版，等人确认' }]],
+  ['出图', 'var(--purple)', 14, [{ p: 3, desc: '淘宝 · 模板 珠光极简 · 排队中' }]],
+  ['待审核', 'var(--primary)', 4, [{ p: 1, sel: true, desc: '林 提交 · 2 小时前' }]]
+]
+const shopTags = p => p.lanes.map((l, i) => l[1] === 'none' ? '' : `<span class="tag ${l[1] === 'ok' ? 'tag-green' : l[1] === 'bad' ? 'tag-red' : 'tag-gray'}">${SHOPS[i]}</span>`).join('')
+document.getElementById('c-board').innerHTML = COLS.map(([name, color, n, cards]) => `
+  <div class="kcol">
+    <div class="kcol-head"><span class="dot" style="background:${color}"></span><span class="name">${name}</span><span class="count">${n}</span><span class="end"><i data-lucide="more-horizontal"></i></span></div>
+    ${cards.map(c => { const p = PRODUCTS[c.p]; return `
+    <div class="kcard ${c.sel ? 'sel' : ''}">
+      <div class="cov">${c.ph ? '<span class="ph">拖照片到这里</span>' : `<img src="${p.img || IMG.a}" alt=""><img src="${c.p % 2 ? IMG.b : IMG.c}" alt=""><img src="${c.p % 2 ? IMG.hd : IMG.white}" alt="">`}</div>
+      <div class="tags"><span class="pill pill-solid-gray">${p.code}</span>${shopTags(p)}</div>
+      <div class="title">${p.name}</div>
+      ${c.warn ? `<div class="warn"><i data-lucide="alert-triangle"></i>${c.warn}</div>` : `<div class="desc">${c.desc}</div>`}
+      <div class="foot"><span class="avatar xs ${p.who[1]}">${p.who[0]}</span><span class="counters"><span><i data-lucide="image"></i>${p.n}</span><span><i data-lucide="clock"></i>${p.at}</span></span></div>
+    </div>`}).join('')}
+    <div class="kmore">再显示 ${Math.max(n - cards.length, 0)} 款 <i data-lucide="chevron-down"></i></div>
+  </div>`).join('')
+
+// ---------- 方案切换 ----------
+const NOTES = {
+  a: { style: 'clean', idea: '保留现在按模块分页的结构，换成带分组的侧边栏；商品库一行就能看到每个店铺版本走到第几步', fit: '模块多、角色多、权限细，大家各管一段', cost: '小：主要改外壳和列表页，各页面逻辑不动', risk: '做一款商品还是要在 商品 → 处理 → 文案 → 审核 之间来回跳' },
+  b: { style: 'workspace', idea: '以商品为中心：左边选款，中间是这款当前所在的环节（素材 → 处理 → 文案 → 出图 → 审核 → 上架），右边是这个环节的配置', fit: '一个人从拍完照片一路做到上架，美工和运营的日常', cost: '大：处理、文案、出图要从独立页面改成商品里的环节，路由要重排', risk: '跨商品的批量操作（批量出图、批量审核）要另外留入口' },
+  c: { style: 'clean', idea: '首页就是一张上架看板，每一列是一个环节，卡住的款直接标红；点卡片在右边看成品、自动检查结果并审核', fit: '管理员和组长看全局、盯进度、做审核', cost: '中：新增看板页和右侧详情，其他页面保持现状', risk: '一款在 3 个店进度不同时，卡片只能按最慢的那个店放列' },
+  d: { style: 'soft', idea: '首页是「今天要做的事」，按紧急程度排好；右侧常驻 AI 助手，知道你在看什么，一句话就能批量处理和出图', fit: '想把重复操作交给 AI，对应规划里第二期的「AI 助手」', cost: '中到大：界面不难，但助手要后端支持调用各模块接口', risk: '要先把各模块接口整理成助手能调用的工具；做之前要定好额度和确认机制' }
+}
+function show(k) {
+  document.querySelectorAll('.mock').forEach(m => m.hidden = m.dataset.k !== k)
+  document.querySelectorAll('#opts button').forEach(b => b.classList.toggle('active', b.dataset.k === k))
+  const n = NOTES[k]
+  document.documentElement.dataset.style = n.style
+  document.getElementById('note').innerHTML =
+    `<span><span class="k">思路</span><span class="t1">${n.idea}</span></span>` +
+    `<span><span class="k">适合</span>${n.fit}</span><span><span class="k">改动</span>${n.cost}</span><span><span class="k">代价</span>${n.risk}</span>` +
+    `<span><span class="k">预设</span><span class="mono">${n.style}</span></span>`
+  try { history.replaceState(null, '', '#' + k) } catch (e) {}
+}
+document.querySelectorAll('#opts button').forEach(b => b.onclick = () => show(b.dataset.k))
+show((location.hash || '#a').slice(1) in NOTES ? location.hash.slice(1) || 'a' : 'a')
+lucide.createIcons({ attrs: { 'stroke-width': 1.75 } })
+</script>
+</body>
+</html>
