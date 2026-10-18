@@ -320,3 +320,15 @@ go test ./... -count=1 -v
 
 `/api/slots`、`/api/codes` 支持 `product_id` / `category_id`，无参数时兼容返回 pearl。`/api/templates?category=<key>` 按适用品类筛选；模板清单的 categories 省略或为空表示通用。出图依次尝试上架版本、店铺默认、品类默认、清单默认、首个适用模板，全部不可用时记录 render_note 并使用清单默认。
 
+## 任务和通知
+
+任务和通知在 `internal/modules/tasks`。接口以仓库根目录的《接口约定-任务和通知》为准。
+
+- 权限：`task.view` 看任务、管自己的任务；`task.manage` 派给别人、改别人的任务、看负载。内置角色里运营两个都有，美工和摄影只有 `task.view`，外部协作者没有。管理员不用写进角色，本来就能做所有事。
+- 任务可挂商品、上架版本或素材。谁能看见：负责人、创建人、协作人；另外有 `task.manage` 并且看得到所挂对象的人。没挂对象的，有 `task.manage` 的人都看得到；所挂对象已经删除的，只有管理员和原参与人看得到（按对象创建时间识别，编号被新对象复用也不会串）。
+- 不提供删除，用状态 `canceled`。从 `done` 改成其他状态，`reopen_count` 加 1。
+- 自动派活不改其他模块。后台大约每 3 秒扫新的 `audit_log` 和刚变成 `done` / `failed` 的 `jobs`。第一次迁移把游标放到当时的最大 id，已经结束的后台任务记成处理过，不补历史。同一条规则、同一个对象，同时只留一条未完成任务。
+- 四条默认规则都是停着的：拍样、修图、处理出图失败、审核被退回。管理员在 `/api/task-rules` 打开。派不出去时任务仍会建，负责人为空，并通知看得到这条任务的 `task.manage` 用户（类型 `task_unassigned`）。
+- 通知用 SSE：`GET /api/notifications/stream`。连上先发 `unread`，新通知发 `notification`，里面带 `desktop`。收件箱关掉就不写表；免打扰或桌面关掉时照样写表，但 `desktop` 为 false。到期、逾期、额度 80% 每种只发一次。
+- 负载是 `GET /api/tasks/load`（`task.manage`）。完成统计是 `GET /api/tasks/stats`，路由挂在 `task.manage` 上，实际只允许管理员。
+
