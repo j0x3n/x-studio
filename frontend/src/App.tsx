@@ -10,13 +10,16 @@ import { Admin } from './pages/Admin'
 import { SettingsPage } from './pages/Settings'
 import { Assets } from './pages/Assets'
 import { Workbench } from './pages/Workbench'
+import { CopyCenter } from './pages/CopyCenter'
+import { TemplateCenter } from './pages/TemplateCenter'
+import { Review } from './pages/Review'
 
-// 还在开发的模块：后端由并行的 AI 在做，合并后再接页面
+// 占位页（目前只用于地址不存在）
 function Soon({ title, desc }: { title: string; desc: string }) {
   return (
     <>
       <Topbar crumbs={[title]} />
-      <div className="scroll"><main className="content"><Empty title={`${title}正在开发`} desc={desc} /></main></div>
+      <div className="scroll"><main className="content"><Empty title={title} desc={desc} /></main></div>
     </>
   )
 }
@@ -35,9 +38,9 @@ export function App() {
         <Route path="products/:id" element={<ProductDetail />} />
         <Route path="assets" element={<Assets />} />
         <Route path="process" element={<Workbench />} />
-        <Route path="copy" element={<Soon title="文案中心" desc="文案版本、AI 改写、合规检查、关键词库正在开发。" />} />
-        <Route path="templates" element={<Soon title="模板中心" desc="5 套详情页模板已就绪，选模板和预览的后端正在开发。" />} />
-        <Route path="review" element={<Soon title="出图审核" desc="出图审核和导出的后端正在开发。" />} />
+        <Route path="copy" element={<CopyCenter />} />
+        <Route path="templates" element={<TemplateCenter />} />
+        <Route path="review" element={<Review />} />
         <Route path="admin" element={<Admin />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Soon title="页面不存在" desc="检查一下地址，或者从左侧导航进入。" />} />

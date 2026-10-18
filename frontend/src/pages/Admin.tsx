@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/auth'
-import { Topbar, PageHead, Tabs } from '../components/ui'
+import { Topbar, Tabs } from '../components/ui'
 import { UsersTab } from './admin/Users'
 import { RolesTab } from './admin/Roles'
 import { ShopsTab } from './admin/Shops'
@@ -21,9 +21,8 @@ export function Admin() {
   const [tab, setTab] = useState<Key>(items[0]?.key || 'users')
   return (
     <>
-      <Topbar crumbs={['账号与权限', items.find(i => i.key === tab)?.label || '']} />
+      <Topbar title="账号与权限" sub="管账号、角色、店铺分配、AI 额度和操作记录" />
       <div className="scroll"><main className="content">
-        <PageHead title="账号与权限" sub="管账号、角色、店铺分配、AI 额度和操作记录" />
         <Tabs value={tab} onChange={setTab} items={items} />
         {tab === 'users' && <UsersTab />}
         {tab === 'roles' && <RolesTab />}

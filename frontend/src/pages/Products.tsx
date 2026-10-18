@@ -5,7 +5,7 @@ import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import type { Product } from '../lib/types'
-import { Topbar, PageHead, Pill, Loading, Empty, Tabs, Drawer, Field } from '../components/ui'
+import { Topbar, Pill, Loading, Empty, Tabs, Drawer, Field } from '../components/ui'
 import { fmtAgo, productStatus, pipelineStatus, platformName } from '../lib/format'
 
 type Tab = 'all' | 'sampling' | 'pending' | 'listed' | 'archived'
@@ -37,11 +37,10 @@ export function Products() {
 
   return (
     <>
-      <Topbar crumbs={['商品']} />
+      <Topbar title="商品" sub={<>{counts.all ?? 0} 款在用<span className="sep" />{counts.pending ?? 0} 款待上架<span className="sep" />{counts.sampling ?? 0} 款拍样中</>}>
+        {can('product.edit') && <button className="btn btn-primary" onClick={() => setCreating(true)}><Plus />新建商品</button>}
+      </Topbar>
       <div className="scroll"><main className="content">
-        <PageHead title="商品" sub={<>{counts.all ?? 0} 款在用<span className="sep" />{counts.pending ?? 0} 款待上架<span className="sep" />{counts.sampling ?? 0} 款拍样中</>}>
-          {can('product.edit') && <button className="btn btn-primary" onClick={() => setCreating(true)}><Plus />新建商品</button>}
-        </PageHead>
         <Tabs value={tab} onChange={setTab} items={[
           { key: 'all', label: '全部', count: counts.all ?? 0 },
           { key: 'sampling', label: '拍样中', count: counts.sampling ?? 0 },

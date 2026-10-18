@@ -1,33 +1,31 @@
 import { useEffect, type ReactNode } from 'react'
-import { X, Inbox } from 'lucide-react'
+import { X, Inbox, Sparkles } from 'lucide-react'
+import { useAssistant } from '../lib/assistant'
 
-// 顶栏：面包屑 + 右侧操作
-export function Topbar({ crumbs, children }: { crumbs: ReactNode[]; children?: ReactNode }) {
+// 顶栏 = 页头：上级面包屑 + 页面标题 + 一行摘要 + 本页操作 + 助手开关。
+// 只传 crumbs 时最后一项当标题；传了 title 时 crumbs 全部当上级。
+export function Topbar({ crumbs = [], title, sub, children }: { crumbs?: ReactNode[]; title?: ReactNode; sub?: ReactNode; children?: ReactNode }) {
+  const assist = useAssistant()
+  const parents = title === undefined ? crumbs.slice(0, -1) : crumbs
+  const head = title === undefined ? crumbs[crumbs.length - 1] : title
   return (
     <header className="topbar">
-      <div className="crumbs">
-        {crumbs.map((c, i) => (
-          <span key={i} className={i === crumbs.length - 1 ? 't1' : undefined}>
-            {i > 0 && <span className="sep" />}{c}
+      <div className="tb-head">
+        {parents.length > 0 && (
+          <span className="crumbs">
+            {parents.map((c, i) => <span key={i} className="inline">{i > 0 && <span className="sep" />}{c}</span>)}
+            <span className="sep" />
           </span>
-        ))}
+        )}
+        <h1 className="tb-title">{head}</h1>
+        {sub && <span className="tb-sub">{sub}</span>}
       </div>
       <span className="grow" />
       {children}
+      {assist && !assist.open && (
+        <button className="btn btn-secondary assist-toggle" onClick={() => assist.setOpen(true)} title="打开 AI 助手"><Sparkles />助手</button>
+      )}
     </header>
-  )
-}
-
-// 页头：标题 + 摘要 + 右侧工具
-export function PageHead({ title, sub, children }: { title: ReactNode; sub?: ReactNode; children?: ReactNode }) {
-  return (
-    <div className="page-head">
-      <div>
-        <h1 className="page-title">{title}</h1>
-        {sub && <p className="page-sub">{sub}</p>}
-      </div>
-      {children && <div className="toolbar">{children}</div>}
-    </div>
   )
 }
 

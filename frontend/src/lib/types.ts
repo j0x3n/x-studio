@@ -54,3 +54,39 @@ export type Job = {
 export type UserRow = { id: number; username: string; display_name: string; role_id: number; created_at: string; disabled: boolean; shop_ids?: number[]; quota?: { month_images: number | null; month_text: number | null } | null }
 export type Permission = { key: string; name: string; group: string }
 export type AuditRow = { id: number; at: string; user_id: number; action: string; target_type: string; target_id: number; detail: unknown; ip: string }
+
+// 文案中心
+export type CopyVersion = {
+  id: number; listing_id: number; title: string; source: string; note: string; created_by: number; created_at: string; applied_at: string
+  content?: Record<string, unknown>; main?: Record<string, unknown>; meta?: Record<string, unknown>
+}
+export type Keyword = { id: number; shop_id: number | null; word: string; grp: string; weight: number; note: string; created_by: number; created_at: string }
+// field 是 JSON 路径，如 content.oneLiner、content.details[0].text
+export type Issue = { level: 'error' | 'warn'; field: string; text: string; reason: string; suggest: string }
+
+// 模板中心和出图审核
+export type DetailTemplate = { key: string; name: string; file: string; fit: string; optional: Record<string, string>; thumb_url: string; disabled: boolean; is_default: boolean }
+export type Outputs = { main34: string[]; main11: string[]; detail: string[]; white: string; zip: string }
+export type ReviewStatus = 'none' | 'pending' | 'approved' | 'rejected'
+export type RenderState = {
+  listing_id: number
+  settings: { detail_template: string; effective_detail_template: string; main_template: string; rendered_job_id: number | null; rendered_template: string; render_note: string; updated_at: string }
+  review: { status: ReviewStatus; note: string; by: number | null; at: string }
+  outputs: Outputs; preview_url: string
+}
+export type QueueItem = {
+  listing_id: number; product_id: number; product_name: string; shop_id: number; shop_name: string
+  detail_template: string; rendered_template: string; rendered_job_id: number | null; updated_at: string
+  outputs: Outputs; preview_url: string
+}
+
+// 首页和 AI 助手（接口约定-AI助手.md）
+export type AssistAction = { type: 'open' | 'run_listing' | 'render_listing' | 'render_batch' | 'process_assets' | 'generate_copy' | 'review'; label: string; summary: string; params: Record<string, unknown>; cost_hint?: string }
+export type AssistRef = { type: 'product' | 'listing' | 'asset' | 'job'; id: number; label: string; path?: string }
+export type AssistReply = { reply: string; actions: AssistAction[]; refs: AssistRef[]; dropped: number; rounds: number }
+export type Todo = { kind: 'render_failed' | 'review_pending' | 'copy_unapplied' | 'no_photo'; level: 'danger' | 'warning' | 'info'; title: string; detail: string; count: number; product_id?: number; listing_id?: number; action: AssistAction | null }
+export type Home = {
+  counts: { in_progress: number; review_pending: number | null; failed: number; no_photo: number; copy_unapplied: number | null }
+  todos: Todo[]
+  recent_assets: { id: number; product_id: number; product_name: string; title: string; source: string; thumb_url: string; created_at: string }[]
+}

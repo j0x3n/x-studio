@@ -1,11 +1,11 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package } from 'lucide-react'
+import { Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import type { Asset, Job, Listing, Product } from '../lib/types'
-import { Topbar, PageHead, Pill, Loading, Empty, Tabs } from '../components/ui'
+import { Topbar, Pill, Loading, Empty, Tabs } from '../components/ui'
 import { fmtAgo, money, productStatus, pipelineStatus, listingStatus, sourceName, platformName } from '../lib/format'
 
 type Detail = { product: Product; assets: Asset[] }
@@ -43,20 +43,16 @@ export function ProductDetail() {
 
   return (
     <>
-      <Topbar crumbs={[<a onClick={() => nav('/products')} className="link">商品</a>, p.name]}>
-        <button className="btn btn-ghost btn-sm" onClick={() => nav('/products')}><ArrowLeft />返回</button>
+      <Topbar crumbs={[<a onClick={() => nav('/products')} className="link">商品</a>]} title={<span className="inline">{p.name}<Pill kind={ps?.pill || 'pill-neutral'}>{ps?.label}</Pill></span>} sub={<><span className="mono">#{p.id}</span><span className="sep" />{photos.length} 张素材<span className="sep" />{p.listings.length} 个店铺版本<span className="sep" />更新于 {fmtAgo(p.updated_at)}</>}>
+        {can('product.edit') && (
+          <select className="input" style={{ width: 120 }} value={p.status} onChange={e => setStatus(e.target.value)}>
+            {Object.entries(productStatus).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+        )}
+        {(can('product.delete_any') || (can('product.delete_own') && p.created_by === me?.user.id)) &&
+          <button className="btn btn-secondary" onClick={remove}><Trash2 />删除</button>}
       </Topbar>
       <div className="scroll"><main className="content">
-        <PageHead title={<span className="inline">{p.name}<Pill kind={ps?.pill || 'pill-neutral'}>{ps?.label}</Pill></span>}
-          sub={<><span className="mono">#{p.id}</span><span className="sep" />{photos.length} 张素材<span className="sep" />{p.listings.length} 个店铺版本<span className="sep" />更新于 {fmtAgo(p.updated_at)}</>}>
-          {can('product.edit') && (
-            <select className="input" style={{ width: 120 }} value={p.status} onChange={e => setStatus(e.target.value)}>
-              {Object.entries(productStatus).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-          )}
-          {(can('product.delete_any') || (can('product.delete_own') && p.created_by === me?.user.id)) &&
-            <button className="btn btn-secondary" onClick={remove}><Trash2 />删除</button>}
-        </PageHead>
         <Tabs value={tab} onChange={setTab} items={[
           { key: 'assets', label: '素材', count: photos.length },
           { key: 'listings', label: '店铺版本', count: p.listings.length },
