@@ -250,7 +250,18 @@ func (a *Module) executeWorkbench(ctx context.Context, j core.Job) error {
 			row["error"] = err.Error()
 			continue
 		}
-		v, e := a.processImage(ctx, im, ex, source, code, ProcessRequest{Ops: in.Ops, PresetID: in.PresetID}, prompts, ref, func(im image.Image, format string) (string, error) {
+		var category *core.Category
+		if s.input.AssetID != nil {
+			category, err = a.ProductCategory(s.asset.ProductID)
+			if err != nil {
+				row["error"] = "读取品类失败"
+				continue
+			}
+		}
+		filled := prompts
+		filled.upscale = core.FillPrompt(prompts.upscale, category)
+		filled.ai = core.FillPrompt(prompts.ai, category)
+		v, e := a.processImage(ctx, im, ex, source, code, ProcessRequest{Ops: in.Ops, PresetID: in.PresetID}, filled, ref, func(im image.Image, format string) (string, error) {
 			file := "results/" + rand.Text() + "." + format
 			b, e := encodeWorkbench(im, format)
 			if e != nil {

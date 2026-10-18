@@ -163,7 +163,8 @@ func (a *Module) runGenerate(ctx context.Context, j core.Job) error {
 		"{{banned}}", strings.Join(bannedWords, "、"),
 		"{{instructions}}", instructions,
 	)
-	renderedExtra := replacer.Replace(extraPrompt)
+	renderedExtra := core.FillPrompt(replacer.Replace(extraPrompt), p.Category)
+	basePrompt = core.FillPrompt(basePrompt, p.Category)
 
 	samples := core.Object{}
 	for _, name := range []string{"内容.js", "主图.js"} {
@@ -189,8 +190,11 @@ func (a *Module) runGenerate(ctx context.Context, j core.Job) error {
 		}
 	}
 	var cov core.Object
-	if a.AssetCoverage != nil {
-		cov = a.AssetCoverage(photos)
+	if a.ProductCoverage != nil {
+		cov, e = a.ProductCoverage(p.ID, photos)
+		if e != nil {
+			return e
+		}
 	}
 	input := core.Object{
 		"platform":        p.Platform,
@@ -200,7 +204,8 @@ func (a *Module) runGenerate(ctx context.Context, j core.Job) error {
 		"photos":          notes,
 		"files":           files,
 		"coverage":        cov,
-		"slots":           json.RawMessage(a.Slots),
+		"slots":           p.Category.Slots,
+		"category":        p.Category.Brief(),
 		"samples":         samples,
 		"voice":           core.Object{"text": voiceText, "examples": voiceExamples},
 		"keywords":        topKeywords,
@@ -238,7 +243,7 @@ func (a *Module) runGenerate(ctx context.Context, j core.Job) error {
 	if len(bannedWords) > 0 {
 		bannedText += "\n" + strings.Join(bannedWords, "\n")
 	}
-	meta["compliance"] = appendCompliance(result.Content, result.Main, meta, bannedText)
+	meta["compliance"] = appendCompliance(result.Content, result.Main, meta, core.CategoryBannedLines(bannedText, p.Category))
 
 	title, _ := meta["title"].(string)
 	if title == "" {
@@ -300,7 +305,7 @@ func (a *Module) runRewrite(ctx context.Context, j core.Job) error {
 		"banned":       bannedWords,
 	}
 	var rawAI core.Object
-	if e = a.AIJSON(core.WithFeature(ctx, "copy_rewrite"), a.Cfg.TextModel, prompt, core.JS(input), &rawAI); e != nil {
+	if e = a.AIJSON(core.WithFeature(ctx, "copy_rewrite"), a.Cfg.TextModel, core.FillPrompt(prompt, p.Category), core.JS(input), &rawAI); e != nil {
 		return e
 	}
 	if rawAI == nil {
@@ -317,7 +322,7 @@ func (a *Module) runRewrite(ctx context.Context, j core.Job) error {
 	if len(bannedWords) > 0 {
 		bannedText += "\n" + strings.Join(bannedWords, "\n")
 	}
-	newMeta["compliance"] = appendCompliance(newContent, newMain, newMeta, bannedText)
+	newMeta["compliance"] = appendCompliance(newContent, newMain, newMeta, core.CategoryBannedLines(bannedText, p.Category))
 
 	title, _ := newMeta["title"].(string)
 	if title == "" {
@@ -678,7 +683,18 @@ func (a *Module) checkCopy(w http.ResponseWriter, r *http.Request) {
 	var shopID int64
 	_ = a.DB.QueryRow("SELECT shop_id FROM listings WHERE id=?", v.ListingID).Scan(&shopID)
 
-	rules := a.loadBannedRules(shopID)
+	p, e := a.PipelineProduct(v.ListingID)
+	if e != nil {
+		core.Fail(w, 500, "读取品类失败")
+		return
+	}
+	rules := []ruleItem{}
+	for _, word := range p.Category.Banned {
+		if strings.TrimSpace(word) != "" {
+			rules = append(rules, ruleItem{level: "error", word: word, reason: p.Category.Name + "违禁词"})
+		}
+	}
+	rules = append(rules, a.loadBannedRules(shopID)...)
 	issues := []core.Object{}
 	seenHit := map[string]bool{}
 
@@ -752,6 +768,10 @@ func (a *Module) aiCheckCopy(r *http.Request, v CopyVersion) ([]core.Object, err
 	if e != nil {
 		return nil, e
 	}
+	p, e := a.PipelineProduct(v.ListingID)
+	if e != nil {
+		return nil, e
+	}
 	ctx := core.WithFeature(core.WithAIActor(r.Context(), core.AIActor{UserID: core.CurrentUser(r).ID, Feature: "copy_check"}), "copy_check")
 	input := core.Object{
 		"title":   v.Title,
@@ -760,7 +780,7 @@ func (a *Module) aiCheckCopy(r *http.Request, v CopyVersion) ([]core.Object, err
 		"meta":    v.Meta,
 	}
 	var raw json.RawMessage
-	if e := a.AIJSON(ctx, a.Cfg.TextModel, prompt, core.JS(input), &raw); e != nil {
+	if e := a.AIJSON(ctx, a.Cfg.TextModel, core.FillPrompt(prompt, p.Category), core.JS(input), &raw); e != nil {
 		return nil, e
 	}
 	var list []core.Object

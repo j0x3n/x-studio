@@ -28,22 +28,24 @@ type User struct {
 
 // Product is the pipeline's aggregate: shared product data plus one listing.
 type Product struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	OwnerID   int64  `json:"created_by"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-	Info      Object `json:"info"`
-	Status    string `json:"status"`
-	Step      string `json:"pipeline_step"`
-	Error     string `json:"pipeline_error"`
-	Content   Object `json:"content"`
-	Main      Object `json:"main"`
-	Listing   Object `json:"meta"`
-	ListingID int64  `json:"listing_id"`
-	ShopID    int64  `json:"shop_id"`
-	Platform  string `json:"platform"`
-	Language  string `json:"language"`
+	CategoryID int64     `json:"category_id"`
+	Category   *Category `json:"category"`
+	ID         int64     `json:"id"`
+	Name       string    `json:"name"`
+	OwnerID    int64     `json:"created_by"`
+	CreatedAt  string    `json:"created_at"`
+	UpdatedAt  string    `json:"updated_at"`
+	Info       Object    `json:"info"`
+	Status     string    `json:"status"`
+	Step       string    `json:"pipeline_step"`
+	Error      string    `json:"pipeline_error"`
+	Content    Object    `json:"content"`
+	Main       Object    `json:"main"`
+	Listing    Object    `json:"meta"`
+	ListingID  int64     `json:"listing_id"`
+	ShopID     int64     `json:"shop_id"`
+	Platform   string    `json:"platform"`
+	Language   string    `json:"language"`
 }
 type Photo struct {
 	ID             int64     `json:"id"`
@@ -152,6 +154,14 @@ func (a *Core) readPhotos(id int64, all bool) ([]Photo, error) {
 func (a *Core) Product(id int64) (p Product, e error) {
 	var info string
 	e = a.DB.QueryRow("SELECT id,name,created_by,created_at,updated_at,info,status FROM products WHERE id=?", id).Scan(&p.ID, &p.Name, &p.OwnerID, &p.CreatedAt, &p.UpdatedAt, &info, &p.Status)
+	if e != nil {
+		return
+	}
+	p.Category, e = a.ProductCategory(id)
+	if e != nil {
+		return
+	}
+	p.CategoryID = p.Category.ID
 	p.Info = JSONObj(info)
 	p.Content = Object{}
 	p.Main = Object{}

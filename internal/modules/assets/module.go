@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"sync"
 	"xstudio/internal/core"
-	"xstudio/internal/media"
 )
 
 type Module struct {
@@ -55,8 +54,6 @@ var currentUser = core.CurrentUser
 var scanPhoto = core.ScanPhoto
 
 const photoColumns = core.PhotoColumns
-
-var validatePhoto = media.ValidatePhoto
 
 func (a *Module) authorizedProduct(w http.ResponseWriter, r *http.Request, id int64, write bool) (core.Product, bool) {
 	if !a.RequireProduct(w, r, id, write) {

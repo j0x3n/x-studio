@@ -29,30 +29,31 @@ type Module interface {
 }
 
 type Core struct {
-	PrepareListing func(Product) (Product, error)
-	AssetCoverage  func([]Photo) Object
-	Cfg            Config
-	DB             *sql.DB
-	Slots          []byte
-	Mu             sync.Mutex
-	ThumbMu        sync.Mutex
-	Client         *http.Client
-	web            fs.FS
-	mux            *http.ServeMux
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
-	wake           chan struct{}
-	baseMu         sync.RWMutex
-	baseURL        string
-	limitMu        sync.Mutex
-	failures       map[string][]time.Time
-	dummyHash      []byte
-	aiMu           sync.Mutex
-	inflight       map[string]int
-	jobHandlers    map[string]JobHandler
-	closers        []func()
-	moves          [][2]string
+	PrepareListing  func(Product) (Product, error)
+	AssetCoverage   func([]Photo) Object
+	ProductCoverage func(int64, []Photo) (Object, error)
+	Cfg             Config
+	DB              *sql.DB
+	Slots           []byte
+	Mu              sync.Mutex
+	ThumbMu         sync.Mutex
+	Client          *http.Client
+	web             fs.FS
+	mux             *http.ServeMux
+	ctx             context.Context
+	cancel          context.CancelFunc
+	wg              sync.WaitGroup
+	wake            chan struct{}
+	baseMu          sync.RWMutex
+	baseURL         string
+	limitMu         sync.Mutex
+	failures        map[string][]time.Time
+	dummyHash       []byte
+	aiMu            sync.Mutex
+	inflight        map[string]int
+	jobHandlers     map[string]JobHandler
+	closers         []func()
+	moves           [][2]string
 }
 
 func New(c Config, web fs.FS, slots []byte) (*Core, error) {
@@ -96,6 +97,13 @@ func New(c Config, web fs.FS, slots []byte) (*Core, error) {
 func (a *Core) Start(modules ...Module) error {
 	if e := a.Migrate(modules); e != nil {
 		return fmt.Errorf("数据库迁移失败：%w", e)
+	}
+	for _, m := range modules {
+		if hook, ok := m.(interface{ AfterMigrate() error }); ok {
+			if e := hook.AfterMigrate(); e != nil {
+				return e
+			}
+		}
 	}
 	var n int
 	if e := a.DB.QueryRow("SELECT count(*) FROM users").Scan(&n); e != nil {

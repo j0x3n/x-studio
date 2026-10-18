@@ -200,6 +200,20 @@ func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 				core.Fail(w, 400, "模板不存在或对该店铺已停用")
 				return
 			}
+			if tpl != "" {
+				p, e := a.PipelineProduct(id)
+				if e != nil {
+					core.Fail(w, 500, "读取商品品类失败")
+					return
+				}
+				list, _ := a.readManifest()
+				for _, t := range list {
+					if t.Key == tpl && !t.Applies(p.Category.Key) {
+						core.Fail(w, 400, t.Name+"不适用于"+p.Category.Name)
+						return
+					}
+				}
+			}
 			lr.DetailTemplate = tpl
 		case "main_template":
 			var tpl string
@@ -342,6 +356,19 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 		if in.DetailTemplate != "" && !a.validateShopDetailTemplate(p.ShopID, in.DetailTemplate) {
 			results = append(results, core.Object{"listing_id": lid, "skipped_reason": "模板不存在或对该店铺已停用"})
 			continue
+		}
+		if in.DetailTemplate != "" {
+			list, _ := a.readManifest()
+			invalid := ""
+			for _, t := range list {
+				if t.Key == in.DetailTemplate && !t.Applies(p.Category.Key) {
+					invalid = t.Name + "不适用于" + p.Category.Name
+				}
+			}
+			if invalid != "" {
+				results = append(results, core.Object{"listing_id": lid, "skipped_reason": invalid})
+				continue
+			}
 		}
 		tx, e := a.DB.Begin()
 		if e != nil {

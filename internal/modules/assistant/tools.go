@@ -134,6 +134,11 @@ func (a *Module) tool(u core.User, name string, raw json.RawMessage) (any, error
 			if e != nil {
 				return nil, e
 			}
+			c, e := a.ProductCategory(number(v["id"]))
+			if e != nil {
+				return nil, e
+			}
+			v["category_name"] = c.Name
 			v["listings"] = listings
 		}
 		return items, nil
@@ -159,6 +164,11 @@ func (a *Module) tool(u core.User, name string, raw json.RawMessage) (any, error
 			return nil, fmt.Errorf("商品不存在或无权限")
 		}
 		out := items[0]
+		c, e := a.ProductCategory(in.ID)
+		if e != nil {
+			return nil, e
+		}
+		out["category_name"] = c.Name
 		out["listings"], err = a.productListings(u, in.ID, true)
 		if err != nil {
 			return nil, err

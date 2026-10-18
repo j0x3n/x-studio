@@ -18,6 +18,9 @@ func New(c *core.Core) *Module                   { return &Module{c} }
 func (*Module) Name() string                     { return "products" }
 func (*Module) Jobs() map[string]core.JobHandler { return nil }
 func (a *Module) Routes(r *core.Router) {
+	r.Handle("GET /api/categories", core.LoggedIn, a.listCategories)
+	r.Handle("POST /api/categories", core.AdminSettings, a.createCategory)
+	r.Handle("PATCH /api/categories/{id}", core.AdminSettings, a.patchCategory)
 	r.Handle("GET /api/products", core.ProductView, a.list)
 	r.Handle("POST /api/products", core.ProductEdit, a.create)
 	r.Handle("GET /api/products/{id}", core.ProductView, a.get)
@@ -37,6 +40,15 @@ func (a *Module) productJSON(id int64, u core.User) (core.Object, error) {
 		return nil, sql.ErrNoRows
 	}
 	o := rows[0]
+	c, e := a.ProductCategory(id)
+	if e != nil {
+		return nil, e
+	}
+	o["category_id"] = c.ID
+	o["category"] = core.Object{"id": c.ID, "key": c.Key, "name": c.Name}
+	var owner string
+	_ = a.DB.QueryRow("SELECT coalesce(nullif(display_name,''),username) FROM users WHERE id=?", o["created_by"]).Scan(&owner)
+	o["created_by_name"] = owner
 	if !u.Has(core.ProductCost) {
 		delete(o, "cost")
 		delete(o, "supplier")
@@ -87,6 +99,10 @@ func (a *Module) list(w http.ResponseWriter, r *http.Request) {
 			query += " AND " + key + "=?"
 			args = append(args, s)
 		}
+	}
+	if s := q.Get("category"); s != "" {
+		query += " AND category_id=?"
+		args = append(args, s)
 	}
 	if s := q.Get("q"); s != "" {
 		query += " AND instr(name,?)>0"
@@ -148,13 +164,18 @@ func (a *Module) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response := core.Object{"product": o, "assets": photos}
-	if a.AssetCoverage != nil {
+	if a.ProductCoverage != nil {
 		current, e := a.Photos(id)
 		if e != nil {
 			core.Fail(w, 500, "读取素材覆盖情况失败")
 			return
 		}
-		response["coverage"] = a.AssetCoverage(current)
+		cov, e := a.ProductCoverage(id, current)
+		if e != nil {
+			core.Fail(w, 500, "读取品类覆盖情况失败")
+			return
+		}
+		response["coverage"] = cov
 	}
 	core.WriteJSON(w, 200, response)
 }
@@ -171,11 +192,12 @@ func (a *Module) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Name     string      `json:"name"`
-		Info     core.Object `json:"info"`
-		Cost     core.Object `json:"cost"`
-		Supplier core.Object `json:"supplier"`
-		ShopIDs  []int64     `json:"shop_ids"`
+		CategoryID *int64      `json:"category_id"`
+		Name       string      `json:"name"`
+		Info       core.Object `json:"info"`
+		Cost       core.Object `json:"cost"`
+		Supplier   core.Object `json:"supplier"`
+		ShopIDs    []int64     `json:"shop_ids"`
 	}
 	b, _ := json.Marshal(raw)
 	if json.Unmarshal(b, &in) != nil || strings.TrimSpace(in.Name) == "" || utf8.RuneCountInString(in.Name) > 120 {
@@ -192,6 +214,19 @@ func (a *Module) create(w http.ResponseWriter, r *http.Request) {
 		in.Supplier = core.Object{}
 	}
 	if e := media.ValidateInfo(in.Info); e != nil {
+		core.Fail(w, 400, e.Error())
+		return
+	}
+	if raw["category_id"] != nil && in.CategoryID == nil {
+		core.Fail(w, 400, "category_id 格式不正确")
+		return
+	}
+	c, e := a.productCategoryInput(in.CategoryID, true)
+	if e != nil {
+		core.Fail(w, 400, e.Error())
+		return
+	}
+	if e = validateCategoryInfo(in.Info, c); e != nil {
 		core.Fail(w, 400, e.Error())
 		return
 	}
@@ -214,7 +249,7 @@ func (a *Module) create(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	t := core.Now()
-	res, e := tx.Exec("INSERT INTO products(name,created_by,created_at,updated_at,info,cost,supplier) VALUES(?,?,?,?,?,?,?)", strings.TrimSpace(in.Name), u.ID, t, t, core.JS(in.Info), core.JS(in.Cost), core.JS(in.Supplier))
+	res, e := tx.Exec("INSERT INTO products(name,created_by,created_at,updated_at,info,cost,supplier,category_id) VALUES(?,?,?,?,?,?,?,?)", strings.TrimSpace(in.Name), u.ID, t, t, core.JS(in.Info), core.JS(in.Cost), core.JS(in.Supplier), c.ID)
 	if e != nil {
 		core.Fail(w, 500, "创建商品失败")
 		return
@@ -266,11 +301,30 @@ func (a *Module) patch(w http.ResponseWriter, r *http.Request) {
 		core.Fail(w, 400, "没有要更新的字段")
 		return
 	}
+	c, e := a.ProductCategory(id)
+	if e != nil {
+		core.Fail(w, 500, "读取品类失败")
+		return
+	}
+	if raw, ok := in["category_id"]; ok {
+		var cid int64
+		if string(raw) == "null" || json.Unmarshal(raw, &cid) != nil || cid < 1 {
+			core.Fail(w, 400, "category_id 格式不正确")
+			return
+		}
+		c, e = a.productCategoryInput(&cid, cid != c.ID)
+		if e != nil {
+			core.Fail(w, 400, e.Error())
+			return
+		}
+	}
 	sets := []string{}
 	args := []any{}
 	for k, v := range in {
 		var value any
 		switch k {
+		case "category_id":
+			value = c.ID
 		case "name", "status":
 			var s string
 			if json.Unmarshal(v, &s) != nil {
@@ -293,6 +347,10 @@ func (a *Module) patch(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if k == "info" {
+				if e := validateCategoryInfo(o, c); e != nil {
+					core.Fail(w, 400, e.Error())
+					return
+				}
 				if e := media.ValidateInfo(o); e != nil {
 					core.Fail(w, 400, e.Error())
 					return
@@ -371,4 +429,30 @@ func (a *Module) delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	core.WriteJSON(w, 200, core.Object{})
+}
+func (a *Module) productCategoryInput(id *int64, rejectDisabled bool) (*core.Category, error) {
+	var c *core.Category
+	var e error
+	if id == nil {
+		list, err := a.Categories(false)
+		if err != nil {
+			return nil, err
+		}
+		if len(list) == 0 {
+			return nil, fmt.Errorf("没有启用的品类")
+		}
+		c = &list[0]
+	} else {
+		if *id < 1 {
+			return nil, fmt.Errorf("品类不存在")
+		}
+		c, e = a.Category(*id)
+		if e != nil {
+			return nil, fmt.Errorf("品类不存在")
+		}
+	}
+	if rejectDisabled && c.Disabled {
+		return nil, fmt.Errorf("这个品类已停用")
+	}
+	return c, nil
 }

@@ -26,9 +26,13 @@ func codeMatches(code, candidate string) bool {
 	return code != "" && (code == candidate || strings.HasPrefix(code, candidate+"_"))
 }
 
-func (a *Module) slotsList() []slot {
+func (a *Module) slotsList(categories ...*core.Category) []slot {
 	var input map[string]json.RawMessage
-	_ = json.Unmarshal(a.Slots, &input)
+	raw := a.Slots
+	if len(categories) > 0 && categories[0] != nil {
+		raw = categories[0].Slots
+	}
+	_ = json.Unmarshal(raw, &input)
 	out := []slot{}
 	for _, key := range []string{"主图", "详情页"} {
 		var group []slot
@@ -59,8 +63,8 @@ func slotAllowsFill(s slot) bool {
 	}
 	return false
 }
-func (a *Module) usedCode(code string) bool {
-	for _, s := range a.slotsList() {
+func (a *Module) usedCode(code string, categories ...*core.Category) bool {
+	for _, s := range a.slotsList(categories...) {
 		for _, candidate := range s.Candidates {
 			if codeMatches(code, candidate) {
 				return true
@@ -86,9 +90,9 @@ func validateInfo(info Object) error {
 	return nil
 }
 
-func (a *Module) fillTargets(photos []Photo) []string {
+func (a *Module) fillTargets(photos []Photo, categories ...*core.Category) []string {
 	white, hero := false, false
-	for _, s := range a.slotsList() {
+	for _, s := range a.slotsList(categories...) {
 		if !s.Required || len(slotHits(s, photos)) > 0 {
 			continue
 		}
@@ -114,7 +118,16 @@ func (a *Module) fillTargets(photos []Photo) []string {
 			hasD = true
 		}
 	}
-	if !hasD {
+	hasD4 := true
+	if len(categories) > 0 && categories[0] != nil {
+		hasD4 = false
+		for _, code := range categories[0].Codes {
+			if code.Code == "D4" {
+				hasD4 = true
+			}
+		}
+	}
+	if !hasD && hasD4 {
 		out = append(out, "D4")
 	}
 	return out
@@ -193,7 +206,7 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 			if ctx.Err() != nil {
 				return warnings, ctx.Err()
 			}
-			if ph.AIGenerated || !a.usedCode(ph.Code) {
+			if ph.AIGenerated || !a.usedCode(ph.Code, p.Category) {
 				continue
 			}
 			if ph.EnhancedFile != "" {
@@ -261,7 +274,7 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 	if err != nil {
 		return warnings, err
 	}
-	targets := a.fillTargets(photos)
+	targets := a.fillTargets(photos, p.Category)
 	for _, code := range targets {
 		if ctx.Err() != nil {
 			return warnings, ctx.Err()
