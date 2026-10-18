@@ -62,5 +62,39 @@ CREATE TABLE IF NOT EXISTS shares(id INTEGER PRIMARY KEY,product_id INTEGER NOT 
 		}
 		_, e := tx.Exec("UPDATE roles SET perms=? WHERE key='operator' AND builtin=1", core.JS(append(perms, core.RenderReview)))
 		return e
+	}}, {Version: 3, Up: func(tx *sql.Tx) error {
+		if e := appendBuiltinPerms(tx, "operator", core.TaskView, core.TaskManage); e != nil {
+			return e
+		}
+		if e := appendBuiltinPerms(tx, "designer", core.TaskView); e != nil {
+			return e
+		}
+		return appendBuiltinPerms(tx, "photographer", core.TaskView)
 	}}}
+}
+
+func appendBuiltinPerms(tx *sql.Tx, role string, add ...string) error {
+	var raw string
+	if e := tx.QueryRow("SELECT perms FROM roles WHERE key=? AND builtin=1", role).Scan(&raw); e != nil {
+		return nil
+	}
+	var perms []string
+	_ = json.Unmarshal([]byte(raw), &perms)
+	have := map[string]bool{}
+	for _, p := range perms {
+		have[p] = true
+	}
+	changed := false
+	for _, p := range add {
+		if !have[p] {
+			perms = append(perms, p)
+			have[p] = true
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	_, e := tx.Exec("UPDATE roles SET perms=? WHERE key=? AND builtin=1", core.JS(perms), role)
+	return e
 }

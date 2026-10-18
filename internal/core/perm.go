@@ -30,6 +30,8 @@ const (
 	AdminSettings    = "admin.settings"
 	AdminAudit       = "admin.audit"
 	ShareManage      = "share.manage"
+	TaskView         = "task.view"
+	TaskManage       = "task.manage"
 )
 
 var Permissions = []Permission{
@@ -37,6 +39,7 @@ var Permissions = []Permission{
 	{AssetUpload, "上传照片", "素材"}, {AssetUpscale, "AI 高清化", "素材"}, {AssetProcess, "图片处理", "素材"}, {AssetDeleteOwn, "删除自己的素材", "素材"}, {AssetDeleteAny, "删除任何素材", "素材"},
 	{CopyView, "看文案", "文案"}, {CopyEdit, "编辑文案", "文案"}, {TemplateManage, "管理模板", "模板"}, {RenderRun, "跑出图任务", "出图"}, {ExportRun, "导出、下载成品", "出图"}, {RenderReview, "审核出图结果", "出图"},
 	{AdminUsers, "管理账号、角色、分店和额度", "管理"}, {AdminShops, "管理店铺", "管理"}, {AdminSettings, "修改系统设置", "管理"}, {AdminAudit, "看操作日志", "管理"}, {ShareManage, "分享商品给外部协作者", "管理"},
+	{TaskView, "看任务、管自己的任务", "任务"}, {TaskManage, "给别人派活、改别人的任务、看负载", "任务"},
 }
 
 func KnownPermission(p string) bool {
