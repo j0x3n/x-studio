@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -318,64 +317,8 @@ func (a *Module) render(ctx context.Context, p Product) error {
 	return a.updateListingRenderAfterRun(ctx, p.ListingID, actualKey, warn)
 }
 
-func (a *Module) resolveDetailTemplate(listingID, shopID int64) (file, key, warning string, err error) {
-	var detailTpl string
-	if e := a.DB.QueryRow("SELECT detail_template FROM listing_render WHERE listing_id=?", listingID).Scan(&detailTpl); e != nil && !errors.Is(e, sql.ErrNoRows) {
-		return "", "", "", e
-	}
-	var defaultDetail, disabledRaw string
-	if e := a.DB.QueryRow("SELECT default_detail, disabled FROM template_prefs WHERE shop_id=?", shopID).Scan(&defaultDetail, &disabledRaw); e != nil && !errors.Is(e, sql.ErrNoRows) {
-		return "", "", "", e
-	}
-	var disabledList []string
-	_ = json.Unmarshal([]byte(disabledRaw), &disabledList)
-	disabled := map[string]bool{}
-	for _, k := range disabledList {
-		disabled[k] = true
-	}
-	reqKey := strings.TrimSpace(detailTpl)
-	if reqKey == "" {
-		reqKey = strings.TrimSpace(defaultDetail)
-	}
-	if reqKey == "" {
-		reqKey = "navy"
-	}
-	type manifestEntry struct {
-		Key  string `json:"key"`
-		File string `json:"file"`
-	}
-	var manifest struct {
-		DefaultCN   string          `json:"默认"`
-		DefaultEN   string          `json:"default"`
-		TemplatesCN []manifestEntry `json:"模板"`
-		TemplatesEN []manifestEntry `json:"templates"`
-		Detail      []manifestEntry `json:"detail"`
-	}
-	raw, readErr := os.ReadFile(filepath.Join(a.Cfg.TemplateDir, "详情页模板", "模板清单.json"))
-	if readErr != nil || json.Unmarshal(raw, &manifest) != nil {
-		if reqKey != "navy" {
-			return "模板.html", "navy", fmt.Sprintf("详情页模板 %s 不可用，已回退到 模板.html", reqKey), nil
-		}
-		return "模板.html", "navy", "", nil
-	}
-	entries := manifest.TemplatesCN
-	if len(entries) == 0 {
-		entries = manifest.TemplatesEN
-	}
-	if len(entries) == 0 {
-		entries = manifest.Detail
-	}
-	if disabled[reqKey] {
-		return "模板.html", "navy", fmt.Sprintf("详情页模板 %s 已禁用，已回退到 模板.html", reqKey), nil
-	}
-	for _, item := range entries {
-		if item.Key == reqKey && item.File != "" && validFilePath(item.File) && !strings.Contains(item.File, "..") {
-			if st, e := os.Stat(filepath.Join(a.Cfg.TemplateDir, "详情页模板", item.File)); e == nil && !st.IsDir() {
-				return item.File, item.Key, "", nil
-			}
-		}
-	}
-	return "模板.html", "navy", fmt.Sprintf("详情页模板 %s 不存在，已回退到 模板.html", reqKey), nil
+func (a *Module) resolveDetailTemplate(listingID, shopID int64) (string, string, string, error) {
+	return a.ResolveDetailTemplate(listingID, shopID)
 }
 
 func (a *Module) updateListingRenderAfterRun(ctx context.Context, listingID int64, renderedTemplate, renderNote string) error {

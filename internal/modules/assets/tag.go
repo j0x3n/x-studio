@@ -113,6 +113,11 @@ func (a *Module) executeTag(ctx context.Context, j core.Job) error {
 	if err != nil {
 		return err
 	}
+	c, err := a.ProductCategory(j.TargetID)
+	if err != nil {
+		return err
+	}
+	prompt = core.FillPrompt(prompt, c)
 	if a.Cfg.AIKey == "" {
 		return fmt.Errorf("未配置 AI_API_KEY，无法开始整批打标签")
 	}

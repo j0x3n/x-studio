@@ -3,96 +3,16 @@ package studio
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"xstudio/internal/core"
 )
 
-type DetailTemplate struct {
-	Key       string      `json:"key"`
-	Name      string      `json:"name"`
-	File      string      `json:"file"`
-	Fit       string      `json:"fit"`
-	Optional  core.Object `json:"optional"`
-	ThumbURL  string      `json:"thumb_url"`
-	Disabled  bool        `json:"disabled"`
-	IsDefault bool        `json:"is_default"`
-}
+type DetailTemplate = core.DetailTemplate
 
-func isValidDetailHTML(templateDir, file string) bool {
-	if file == "" || filepath.Base(file) != file || strings.ContainsAny(file, "/\\:") || strings.Contains(file, "..") {
-		return false
-	}
-	if !strings.EqualFold(filepath.Ext(file), ".html") {
-		return false
-	}
-	st, e := os.Stat(filepath.Join(templateDir, "详情页模板", file))
-	return e == nil && st.Mode().IsRegular()
-}
-
-func (a *Module) readManifest() (list []DetailTemplate, defaultKey string) {
-	defaultKey = "navy"
-	manifestPath := filepath.Join(a.Cfg.TemplateDir, "详情页模板", "模板清单.json")
-	b, e := os.ReadFile(manifestPath)
-	if e != nil {
-		if isValidDetailHTML(a.Cfg.TemplateDir, "模板.html") {
-			list = append(list, DetailTemplate{
-				Key:      "navy",
-				Name:     "深蓝烫金",
-				File:     "模板.html",
-				Optional: core.Object{},
-			})
-		}
-		return
-	}
-	var raw struct {
-		DefaultCN   string           `json:"默认"`
-		DefaultEN   string           `json:"default"`
-		TemplatesCN []DetailTemplate `json:"模板"`
-		TemplatesEN []DetailTemplate `json:"templates"`
-		Detail      []DetailTemplate `json:"detail"`
-	}
-	if e := json.Unmarshal(b, &raw); e != nil {
-		log.Printf("解析模板清单失败：%v", e)
-		return
-	}
-	if raw.DefaultCN != "" {
-		defaultKey = raw.DefaultCN
-	} else if raw.DefaultEN != "" {
-		defaultKey = raw.DefaultEN
-	}
-	entries := raw.TemplatesCN
-	if len(entries) == 0 {
-		entries = raw.TemplatesEN
-	}
-	if len(entries) == 0 {
-		entries = raw.Detail
-	}
-	seen := map[string]bool{}
-	for _, item := range entries {
-		item.Key = strings.TrimSpace(item.Key)
-		item.File = strings.TrimSpace(item.File)
-		if item.Key == "" || item.Name == "" || seen[item.Key] || !isValidDetailHTML(a.Cfg.TemplateDir, item.File) {
-			log.Printf("跳过不合法的详情页模板条目：key=%q file=%q", item.Key, item.File)
-			continue
-		}
-		seen[item.Key] = true
-		if item.Optional == nil {
-			item.Optional = core.Object{}
-		}
-		thumbPath := filepath.Join(a.Cfg.TemplateDir, "详情页模板", "缩略图", item.Key+".jpg")
-		if st, err := os.Stat(thumbPath); err == nil && st.Mode().IsRegular() {
-			item.ThumbURL = "/render/详情页模板/缩略图/" + item.Key + ".jpg"
-		}
-		list = append(list, item)
-	}
-	return
-}
+func (a *Module) readManifest() ([]DetailTemplate, string) { return a.DetailTemplates() }
 
 func (a *Module) shopTemplatePrefs(shopID int64, manifestDefault string) (defaultDetail string, disabled []string) {
 	defaultDetail = manifestDefault
@@ -116,24 +36,9 @@ func (a *Module) shopTemplatePrefs(shopID int64, manifestDefault string) (defaul
 	return
 }
 
-func (a *Module) resolveListingDetailFile(listingID, shopID int64) (effectiveKey, file string) {
-	var detailTpl string
-	_ = a.DB.QueryRow("SELECT detail_template FROM listing_render WHERE listing_id=?", listingID).Scan(&detailTpl)
-	list, manifestDef := a.readManifest()
-	shopDef, disabled := a.shopTemplatePrefs(shopID, manifestDef)
-	chosen := strings.TrimSpace(detailTpl)
-	if chosen == "" {
-		chosen = shopDef
-	}
-	if chosen == "" {
-		chosen = "navy"
-	}
-	for _, t := range list {
-		if t.Key == chosen && !slices.Contains(disabled, t.Key) {
-			return t.Key, t.File
-		}
-	}
-	return "navy", "模板.html"
+func (a *Module) resolveListingDetailFile(listingID, shopID int64) (string, string) {
+	file, key, _, _ := a.ResolveDetailTemplate(listingID, shopID)
+	return key, file
 }
 
 func (a *Module) listTemplates(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +57,13 @@ func (a *Module) listTemplates(w http.ResponseWriter, r *http.Request) {
 		list[i].Disabled = slices.Contains(disabled, list[i].Key)
 		list[i].IsDefault = list[i].Key == defaultKey
 	}
+	filtered := []DetailTemplate{}
+	for _, t := range list {
+		if key := r.URL.Query().Get("category"); key == "" || t.Applies(key) {
+			filtered = append(filtered, t)
+		}
+	}
+	list = filtered
 	mainTemplates := []core.Object{
 		{"key": "default", "name": "默认主图", "file": "模板.html"},
 	}

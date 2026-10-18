@@ -52,7 +52,7 @@ func (a *Module) classify(ctx context.Context, p Product) error {
 	if len(photos) == 0 {
 		return fmt.Errorf("请先上传照片")
 	}
-	parts := []Object{{"type": "text", "text": js(Object{"name": p.Name, "info": p.Info, "slots": json.RawMessage(a.Slots), "说明": "照片已按 EXIF 转正。crop 是手动 rotate 顺时针旋转后的 [x,y,w,h] 比例。返回 [{photo_id,code,crop,rotate,white_bg,note}]；JSON 对象模式可用 {photos:[...]}。"})}}
+	parts := []Object{{"type": "text", "text": js(Object{"name": p.Name, "info": p.Info, "slots": p.Category.Slots, "category": p.Category.Brief(), "说明": "照片已按 EXIF 转正。crop 是手动 rotate 顺时针旋转后的 [x,y,w,h] 比例。返回 [{photo_id,code,crop,rotate,white_bg,note}]；JSON 对象模式可用 {photos:[...]}。"})}}
 	for _, ph := range photos {
 		im, ex, e := loadPhoto(filepath.Join(a.Dir(p.ID), filepath.FromSlash(ph.File)))
 		if e != nil {
@@ -64,7 +64,7 @@ func (a *Module) classify(ctx context.Context, p Product) error {
 		parts = append(parts, Object{"type": "text", "text": fmt.Sprintf("photo_id=%d，员工已手动指定=%t，编号=%s，检查结果=%s", ph.ID, ph.Manual, ph.Code, js(ph.Metrics))}, Object{"type": "image_url", "image_url": Object{"url": "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())}})
 	}
 	var raw json.RawMessage
-	if e = a.aiJSON(core.WithFeature(ctx, "classify"), a.Cfg.VisionModel, prompt, parts, &raw); e != nil {
+	if e = a.aiJSON(core.WithFeature(ctx, "classify"), a.Cfg.VisionModel, core.FillPrompt(prompt, p.Category), parts, &raw); e != nil {
 		return e
 	}
 	var result []classification
@@ -100,7 +100,17 @@ func (a *Module) classify(ctx context.Context, p Product) error {
 		ph.Rotate = v.Rotate
 		ph.WhiteBG = v.WhiteBG
 		ph.AINote = v.Note
-		if e := validatePhoto(ph); e != nil {
+		codeValid := ph.Code == ""
+		for _, code := range p.Category.Codes {
+			if ph.Code == code.Code || (code.Suffix != "" && strings.HasPrefix(ph.Code, code.Code+"_")) {
+				codeValid = true
+			}
+		}
+		validationError := validatePhoto(ph)
+		if !codeValid {
+			validationError = fmt.Errorf("编号不属于当前品类")
+		}
+		if e := validationError; e != nil {
 			ph.Code = ""
 			ph.Crop = nil
 			ph.Rotate = 0
@@ -203,13 +213,13 @@ func (a *Module) copyText(ctx context.Context, p Product) error {
 			files = append(files, f.Name())
 		}
 	}
-	input := Object{"platform": p.Platform, "language": p.Language, "name": p.Name, "info": p.Info, "photos": notes, "files": files, "coverage": a.coverage(photos), "slots": json.RawMessage(a.Slots), "samples": samples, "要求": "返回 {content,main,listing} 三个 JSON 对象，按样例字段类型。不得虚构材质、承诺或照片。"}
+	input := Object{"platform": p.Platform, "language": p.Language, "name": p.Name, "info": p.Info, "photos": notes, "files": files, "coverage": coverageSlots(photos, p.Category.Slots), "slots": p.Category.Slots, "category": p.Category.Brief(), "samples": samples, "要求": "返回 {content,main,listing} 三个 JSON 对象，按样例字段类型。不得虚构材质、承诺或照片。"}
 	var result struct {
 		Content Object `json:"content"`
 		Main    Object `json:"main"`
 		Listing Object `json:"listing"`
 	}
-	if e = a.aiJSON(core.WithFeature(ctx, "copy"), a.Cfg.TextModel, prompt, js(input), &result); e != nil {
+	if e = a.aiJSON(core.WithFeature(ctx, "copy"), a.Cfg.TextModel, core.FillPrompt(prompt, p.Category), js(input), &result); e != nil {
 		return e
 	}
 	if result.Content == nil || result.Main == nil || result.Listing == nil {
@@ -224,7 +234,7 @@ func (a *Module) copyText(ctx context.Context, p Product) error {
 	}
 	normalizeCopy(result.Content, result.Main, result.Listing)
 	result.Content = cleanObject(result.Content, filepath.Join(a.Dir(p.ID), "照片"))
-	result.Listing["compliance"] = appendCompliance(result.Content, result.Main, result.Listing, banned)
+	result.Listing["compliance"] = appendCompliance(result.Content, result.Main, result.Listing, core.CategoryBannedLines(banned, p.Category))
 	_, e = a.DB.Exec("UPDATE listings SET content=?,main=?,meta=?,updated_at=? WHERE id=?", js(result.Content), js(result.Main), js(result.Listing), now(), p.ListingID)
 	return e
 }
@@ -326,7 +336,7 @@ func appendCompliance(content, main, listing Object, words string) []any {
 			if description != "" {
 				text += "（" + description + "）"
 			}
-			items = append(items, Object{"level": level, "text": text, "source": "local"})
+			items = append(items, Object{"level": level, "text": text, "source": "local", "reason": description})
 			seen[word] = true
 		}
 	}

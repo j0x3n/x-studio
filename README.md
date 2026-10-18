@@ -310,3 +310,13 @@ go test ./... -count=1 -v
 - `POST /api/assistant/chat`：只读查询、回复和动作卡提议；由前端经用户确认后调用现有接口执行。
 - AI 功能名为 `assistant`，使用文本模型并计入文本额度；提示词文件为 `prompts/助手.md`，每次请求读取。
 
+### 多品类
+
+品类由 products 模块的 v2 迁移建立。旧商品归入 `pearl`；原 `info.category` 在没有 `info.style` 时迁为 `style`。启动时读取 `<PROMPT_DIR>/品类/*.json`：新 key 插入，已有 key 只补空的 attrs、codes、slots、rules、banned、default_template，坏文件记录日志并跳过。
+
+登录后可读 `GET /api/categories`（`?all=1` 含停用品类）；管理员通过 POST / PATCH 维护。商品接口支持 `category_id`，列表支持 `?category=<id>`。新商品默认使用启用品类中 sort、id 最前的一项；停用品类已有商品仍可使用。info 按当前品类 attrs 校验，模板外字段保留，required 只作提示。
+
+分拣、文案、合规、打标签、素材处理和补图使用商品品类配置。提示词可用 `{{category_name}}`、`{{category_rules}}`、`{{codes}}`、`{{banned_words}}`；无商品的处理台图片将这四个占位符替换为空。补图占位符应放在通用要求或实际使用的生成段落内。全局违禁词与品类违禁词合并检查。
+
+`/api/slots`、`/api/codes` 支持 `product_id` / `category_id`，无参数时兼容返回 pearl。`/api/templates?category=<key>` 按适用品类筛选；模板清单的 categories 省略或为空表示通用。出图依次尝试上架版本、店铺默认、品类默认、清单默认、首个适用模板，全部不可用时记录 render_note 并使用清单默认。
+

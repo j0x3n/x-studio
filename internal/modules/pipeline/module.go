@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"image"
-	"net/http"
 	"xstudio/internal/core"
 )
 
@@ -17,6 +16,7 @@ func New(c *core.Core) *Module {
 	a := &Module{Core: c, browser: NewBrowser(c.Cfg.ChromePath)}
 	c.PrepareListing = func(p core.Product) (core.Product, error) { return CleanListing(c, p) }
 	c.AssetCoverage = a.coverage
+	c.ProductCoverage = a.productCoverage
 	c.OnClose(a.browser.Close)
 	return a
 }
@@ -29,11 +29,8 @@ func (a *Module) Routes(r *core.Router) {
 	r.Handle("POST /api/listings/{id}/run", core.RenderRun, a.run)
 	r.Handle("GET /api/listings/{id}/download", core.ExportRun, a.download)
 	r.Handle("GET /api/jobs/{jid}", core.Scoped, a.getJob)
-	r.Handle("GET /api/slots", core.LoggedIn, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		_, _ = w.Write(a.Slots)
-	})
-	r.Handle("GET /api/codes", core.LoggedIn, func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, Object{"codes": codes}) })
+	r.Handle("GET /api/slots", core.LoggedIn, a.getSlots)
+	r.Handle("GET /api/codes", core.LoggedIn, a.getCodes)
 	r.Raw("GET /files/products/{id}/{path...}", a.files)
 	r.Raw("GET /files/listings/{id}/{path...}", a.listingFiles)
 	r.Raw("GET /render/{path...}", a.renderRoute)
@@ -79,8 +76,8 @@ func CleanListing(c *core.Core, p Product) (Product, error) {
 		return p, e
 	}
 	p.Content = cleanObject(p.Content, c.Dir(p.ID)+"/照片")
-	if words, e := a.prompt("违禁词.txt"); e == nil {
-		p.Listing["compliance"] = appendCompliance(p.Content, p.Main, p.Listing, words)
+	if words, e := a.prompt("违禁词.txt"); e == nil || (p.Category != nil && len(p.Category.Banned) > 0) {
+		p.Listing["compliance"] = appendCompliance(p.Content, p.Main, p.Listing, core.CategoryBannedLines(words, p.Category))
 	}
 	return p, nil
 }

@@ -263,6 +263,12 @@ func (a *Module) executeProcess(ctx context.Context, j core.Job) error {
 }
 func (a *Module) processOne(ctx context.Context, p Asset, in ProcessRequest, prompts processPrompts, ref *image.NRGBA) (*stagedProcess, error) {
 	started := time.Now()
+	c, e := a.ProductCategory(p.ProductID)
+	if e != nil {
+		return nil, e
+	}
+	prompts.upscale = core.FillPrompt(prompts.upscale, c)
+	prompts.ai = core.FillPrompt(prompts.ai, c)
 	raw, ex, err := a.load(p)
 	if err != nil {
 		return nil, err

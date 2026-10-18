@@ -240,8 +240,8 @@ func (a *Module) createCopy(w http.ResponseWriter, r *http.Request) {
 	}
 	normalizeCopy(in.Content, in.Main, in.Meta)
 	in.Content = a.cleanObjectForProduct(p.ID, in.Content)
-	if words, e := a.prompt("违禁词.txt"); e == nil {
-		in.Meta["compliance"] = appendCompliance(in.Content, in.Main, in.Meta, words)
+	if words, e := a.prompt("违禁词.txt"); e == nil || len(p.Category.Banned) > 0 {
+		in.Meta["compliance"] = appendCompliance(in.Content, in.Main, in.Meta, core.CategoryBannedLines(words, p.Category))
 	}
 	title := strings.TrimSpace(in.Title)
 	if title == "" {

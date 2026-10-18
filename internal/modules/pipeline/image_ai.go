@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"xstudio/internal/core"
 )
 
 // Write beside the destination first so interrupted requests never leave a
@@ -57,7 +58,10 @@ func enhancementPrompt(parts map[string]string, kind string, p Product) (string,
 		return "", fmt.Errorf("补图.md 缺少通用要求或 %s 段落", kind)
 	}
 	fields := []string{"款名=" + p.Name}
-	for _, key := range []string{"category", "size", "colors", "highlights"} {
+	if p.Category != nil && p.Category.Name != "" {
+		fields = append(fields, "品类="+p.Category.Name)
+	}
+	for _, key := range []string{"style", "variety", "pearl_type", "size", "colors", "highlights"} {
 		if v, ok := p.Info[key]; ok {
 			fields = append(fields, key+"="+strings.ReplaceAll(fmt.Sprint(v), "\n", " "))
 		}
@@ -67,5 +71,6 @@ func enhancementPrompt(parts map[string]string, kind string, p Product) (string,
 		size = "【待定】"
 	}
 	replacer := strings.NewReplacer("{info}", strings.Join(fields, "；"), "{size}", size)
-	return replacer.Replace(common + "\n\n" + section), nil
+	// 生图模型只吃这段文字，槽位等结构化信息不拼进来
+	return core.FillPrompt(replacer.Replace(common+"\n\n"+section), p.Category), nil
 }

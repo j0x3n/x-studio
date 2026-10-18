@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"xstudio/internal/core"
-	"xstudio/internal/media"
 )
 
 func (a *Module) photoForWrite(w http.ResponseWriter, r *http.Request) (Asset, bool) {
@@ -133,7 +132,7 @@ func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, Object{"asset": p})
 }
 func (a *Module) removePhotoOutputs(id int64, code string) {
-	if code == "" || !media.CodePattern.MatchString(code) {
+	if code == "" || !categoryPhotoCode.MatchString(code) {
 		return
 	}
 	for _, ext := range []string{".jpg", "_白底.jpg", "_透明.png"} {

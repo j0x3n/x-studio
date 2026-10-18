@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-var codePattern = regexp.MustCompile(`^[A-Z][1-9][0-9]?(?:_[\p{L}\p{N}_-]+)?$`)
+var codePattern = regexp.MustCompile(`^[A-Z][0-9]{1,2}(?:_[\p{L}\p{N}_-]+)?$`)
 
 func validatePhoto(p Photo) error {
 	if p.AIGenerated && p.Code != "" && !allowedFillCode(p.Code) {

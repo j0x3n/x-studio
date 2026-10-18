@@ -2,7 +2,9 @@ package pipeline
 
 import (
 	"encoding/json"
-	"fmt"
+	"net/http"
+	"strconv"
+	"xstudio/internal/core"
 )
 
 type slot struct {
@@ -16,8 +18,30 @@ type slot struct {
 }
 
 func (a *Module) coverage(photos []Photo) Object {
+	id := int64(0)
+	if len(photos) > 0 {
+		id = photos[0].ProductID
+	}
+	if id > 0 {
+		if c, e := a.ProductCategory(id); e == nil {
+			return coverageSlots(photos, c.Slots)
+		}
+	}
+	if c, e := a.CategoryByKey("pearl"); e == nil {
+		return coverageSlots(photos, c.Slots)
+	}
+	return coverageSlots(photos, a.Slots)
+}
+func (a *Module) productCoverage(id int64, photos []Photo) (Object, error) {
+	c, e := a.ProductCategory(id)
+	if e != nil {
+		return nil, e
+	}
+	return coverageSlots(photos, c.Slots), nil
+}
+func coverageSlots(photos []Photo, raw []byte) Object {
 	var input map[string]json.RawMessage
-	_ = json.Unmarshal(a.Slots, &input)
+	_ = json.Unmarshal(raw, &input)
 	out := Object{}
 	need := []Object{}
 	for key, cn := range map[string]string{"main": "主图", "detail": "详情页"} {
@@ -57,17 +81,55 @@ func (a *Module) coverage(photos []Photo) Object {
 	out["need_reshoot"] = need
 	return out
 }
-
-var codes = func() []Object {
-	groups := []struct {
-		g     string
-		names []string
-	}{{"A 白底", []string{"一对平放正面", "一对立起 45°", "每个颜色或规格"}}, {"B 微距", []string{"珍珠表面生长纹", "珍珠光泽和反光", "配件做工", "925 印记", "耳针或耳夹结构", "珍珠微瑕"}}, {"C 尺寸", []string{"钢尺参照", "一元硬币参照", "指尖或手心", "同一只耳朵各尺寸上耳"}}, {"D 上耳", []string{"侧脸正对耳朵", "微侧 45°", "正脸半脸", "生活感上耳", "耳饰配颈链"}}, {"E 场景", []string{"深蓝丝绒", "米白亚麻布", "大理石纹场景", "打开的包装盒", "手托托盘批量实拍（不校色）"}}, {"F 包装", []string{"礼盒和品牌卡", "打开的礼盒", "打包好的快递"}}}
-	out := []Object{}
-	for _, g := range groups {
-		for i, n := range g.names {
-			out = append(out, Object{"code": fmt.Sprintf("%c%d", g.g[0], i+1), "group": g.g, "name": n})
+func (a *Module) requestCategory(w http.ResponseWriter, r *http.Request) *core.Category {
+	q := r.URL.Query()
+	if raw := q.Get("product_id"); raw != "" {
+		id, e := strconv.ParseInt(raw, 10, 64)
+		if e != nil || id < 1 {
+			fail(w, 400, "product_id 格式不正确")
+			return nil
 		}
+		if !a.RequireProduct(w, r, id, false) {
+			return nil
+		}
+		c, e := a.ProductCategory(id)
+		if e != nil {
+			fail(w, 404, "品类不存在")
+			return nil
+		}
+		return c
 	}
-	return out
-}()
+	if raw := q.Get("category_id"); raw != "" {
+		id, e := strconv.ParseInt(raw, 10, 64)
+		if e != nil || id < 1 {
+			fail(w, 400, "category_id 格式不正确")
+			return nil
+		}
+		c, e := a.Category(id)
+		if e != nil {
+			fail(w, 404, "品类不存在")
+			return nil
+		}
+		return c
+	}
+	c, e := a.CategoryByKey("pearl")
+	if e != nil {
+		fail(w, 404, "品类不存在")
+		return nil
+	}
+	return c
+}
+func (a *Module) getSlots(w http.ResponseWriter, r *http.Request) {
+	c := a.requestCategory(w, r)
+	if c == nil {
+		return
+	}
+	writeJSON(w, 200, c.Slots)
+}
+func (a *Module) getCodes(w http.ResponseWriter, r *http.Request) {
+	c := a.requestCategory(w, r)
+	if c == nil {
+		return
+	}
+	writeJSON(w, 200, Object{"codes": c.Codes})
+}

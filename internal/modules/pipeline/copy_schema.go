@@ -45,10 +45,10 @@ type fieldSpec map[string]any
 var photoSpec = fieldSpec{"f": "file", "need": "string", "pos": "string", "pos11": "string", "ai": "ai", "stamp": "string", "cap": "string", "mm": "string", "t": "string", "s": "string"}
 var contentSpec = fieldSpec{
 	"series": "string", "name": "string", "nameEn": "string", "oneLiner": "string", "tags": []any{"string"},
-	"photos": fieldSpec{"*": photoSpec}, "real": fieldSpec{"title": "string", "lead": "string", "cols": []any{"string"}, "rows": []any{[]any{"string"}}, "note": "string"},
+	"photos": fieldSpec{"*": photoSpec}, "real": fieldSpec{"kicker": "string", "title": "string", "lead": "string", "cols": []any{"string"}, "rows": []any{[]any{"string"}}, "note": "string"},
 	"detailsLead": "string", "details": []any{fieldSpec{"photo": photoSpec, "title": "string", "text": "string"}},
 	"wear": fieldSpec{"lead": "string", "big": photoSpec, "a": photoSpec, "b": photoSpec}, "sizeWear": []any{photoSpec}, "sizeLead": "string", "params": []any{[]any{"string"}}, "sizeTip": "string",
-	"relatedLead": "string", "related": []any{fieldSpec{"photo": photoSpec, "name": "string", "text": "string"}}, "pack": fieldSpec{"lead": "string", "items": []any{"string"}}, "care": []any{"string"}, "service": []any{"string"}, "about": []any{"string"},
+	"relatedLead": "string", "related": []any{fieldSpec{"photo": photoSpec, "name": "string", "text": "string"}}, "pack": fieldSpec{"lead": "string", "items": []any{"string"}}, "care": []any{"string"}, "careTitle": "string", "service": []any{"string"}, "about": []any{"string"},
 }
 var mainSpec = fieldSpec{"name": "string", "imgs": []any{fieldSpec{"n": "number", "layout": "string", "f": "file", "need": "string", "pos": "string", "pos11": "string", "ai": "ai", "mark": "bool", "darkMark": "bool", "lightLabel": "bool", "label": "string", "text": "text", "small": "string", "size": "string", "sizeNote": "string", "items": []any{photoSpec}}}}
 var listingSpec = fieldSpec{"title": "string", "title_alts": []any{"string"}, "attrs": []any{[]any{"string"}}, "sku": []any{fieldSpec{"name": "string", "price": "nullable_number"}}, "compliance": []any{fieldSpec{"level": "string", "text": "string"}}}
