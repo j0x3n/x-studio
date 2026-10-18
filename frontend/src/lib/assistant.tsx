@@ -99,6 +99,7 @@ export async function runAction(a: AssistAction): Promise<ActionResult> {
       const keys = ['title', 'body', 'assignee_id', 'priority', 'due_at', 'target_type', 'target_id', 'checklist', 'watcher_ids']
       const body = Object.fromEntries(keys.filter(k => p[k] !== undefined).map(k => [k, p[k]]))
       const r = await api<{ task: Task }>('/api/tasks', { body })
+      window.dispatchEvent(new Event('xs:tasks-changed'))
       return { path: `/tasks/${r.task.id}` }
     }
     default: throw new Error('不认识的操作：' + a.type)

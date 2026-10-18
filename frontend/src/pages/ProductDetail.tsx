@@ -33,6 +33,8 @@ export function ProductDetail() {
       .then(r => setTasks(r.items || [])).catch(() => setTasks([]))
   }, [canTasks, id])
   useEffect(() => { loadTasks() }, [loadTasks])
+  // 助手建了任务后刷新计数
+  useEffect(() => { window.addEventListener('xs:tasks-changed', loadTasks); return () => window.removeEventListener('xs:tasks-changed', loadTasks) }, [loadTasks])
   const load = useCallback(() => api<Detail>(`/api/products/${id}`).then(setD).catch(e => { toast(errText(e), 'error'); nav('/products') }), [id, nav, toast])
   useEffect(() => { load() }, [load])
   if (!d) return <><Topbar crumbs={['商品', '…']} /><Loading /></>
