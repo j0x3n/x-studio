@@ -26,7 +26,7 @@ type Ref struct {
 
 var actionCatalog = []capability{
 	{"open", "", "打开前端页面；参数 {path: /、/products、/assets、/process、/copy、/templates、/review、/admin、/settings 及其子路由}"},
-	{"run_listing", core.RenderRun, "从头一键出图；参数 {listing_id,ai_label?:默认true，取消需要export.no_ai_label}"},
+	{"run_listing", core.RenderRun, "从头一键出图；参数 {listing_id}"},
 	{"render_listing", core.RenderRun, "按当前模板出图；参数 {listing_id}"},
 	{"render_batch", core.RenderRun, "批量出图；参数 {listing_ids:最多50个}"},
 	{"process_assets", core.AssetUpload, "图片处理；参数 {asset_ids:同一商品最多20个,ops:处理参数,preset_id?:预设编号}；基础操作需要asset.upload，upscale需要asset.upscale，ai需要asset.process（含ai时优先按ai判断）"},
@@ -131,7 +131,6 @@ func (a *Module) validateAction(u core.User, raw json.RawMessage) (Action, bool)
 	default:
 		var in struct {
 			ListingID    int64   `json:"listing_id"`
-			AILabel      *bool   `json:"ai_label"`
 			Instructions *string `json:"instructions"`
 			Status       *string `json:"status"`
 			Note         *string `json:"note"`
@@ -142,10 +141,6 @@ func (a *Module) validateAction(u core.User, raw json.RawMessage) (Action, bool)
 		// Only forward parameters accepted by the specific existing endpoint.
 		allowed := map[string]bool{"listing_id": true}
 		switch card.Type {
-		case "run_listing":
-			allowed["ai_label"] = true
-			label := in.AILabel == nil || *in.AILabel || !u.Has(core.ExportNoAILabel)
-			card.Params["ai_label"] = label
 		case "generate_copy":
 			allowed["instructions"] = true
 		case "review":

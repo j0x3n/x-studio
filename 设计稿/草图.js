@@ -16,7 +16,7 @@ const P = {
   params: [['珍珠', '淡水养殖珍珠（爱迪生）'], ['珠径', '约 10–11 mm'], ['颜色', '白色'], ['配件', '锆石蝴蝶结'], ['重量', '一对约 4 g']],
   pack: ['品牌礼盒', '保养卡', '擦拭布']
 };
-const img = (src, ai) => `<div class="ph"><img src="${src}" alt="">${ai ? '<span class="ai">AI 生成</span>' : ''}</div>`;
+const img = (src) => `<div class="ph"><img src="${src}" alt=""></div>`;
 const dl = rows => rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
 
 const STYLES = [

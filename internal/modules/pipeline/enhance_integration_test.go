@@ -1,13 +1,10 @@
 package pipeline
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -18,8 +15,6 @@ import (
 	"testing"
 	"time"
 	"xstudio"
-
-	"github.com/chromedp/chromedp"
 )
 
 func TestConfigImageDefaultsAndReasoning(t *testing.T) {
@@ -237,14 +232,14 @@ func TestCopyAndPatchForceAILabels(t *testing.T) {
 		hero := p.Content["photos"].(Object)["hero"].(Object)
 		detail := p.Content["details"].([]any)[0].(Object)["photo"].(Object)
 		real := p.Content["wear"].(Object)["a"].(Object)
-		if hero["ai"] != "AI 生成" || detail["ai"] != nil { // 高清化不打标
+		if hero["ai"] != nil || detail["ai"] != nil {
 			t.Fatal(p.Content)
 		}
 		if _, exists := real["ai"]; exists {
 			t.Fatal("real photo kept false AI label")
 		}
 		imgs := p.Main["imgs"].([]any)
-		if imgs[0].(Object)["ai"] != "AI 生成" {
+		if _, exists := imgs[0].(Object)["ai"]; exists {
 			t.Fatal(p.Main)
 		}
 		items := imgs[1].(Object)["items"].([]any)
@@ -357,8 +352,11 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 		t.Fatal("expected 3 upscales and 3 fills", imageCalls.Load())
 	}
 	p, _ := f.a.product(id)
-	if p.Status != "ready" || p.Step != "render" || p.Main["imgs"].([]any)[0].(Object)["ai"] != "AI 生成" {
+	if p.Status != "ready" || p.Step != "render" {
 		t.Fatal(p)
+	}
+	if _, exists := p.Main["imgs"].([]any)[0].(Object)["ai"]; exists {
+		t.Fatal(p.Main)
 	}
 	if p.Content["photos"].(Object)["pack"].(Object)["ai"] != nil {
 		t.Fatal(p.Content)
@@ -374,86 +372,5 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(f.a.ListingDir(id), "导出.zip")); err != nil {
 		t.Fatal("enhance pipeline did not produce ZIP", err)
-	}
-	// Inspect the actual template DOM, not just JSON provenance fields.
-	for _, page := range []struct{ path, label string }{{"主图模板/模板.html?p=" + intString(id) + "&n=1&r=34", "AI 生成"}} {
-		tab, cancel := chromedp.NewContext(f.a.browser.ctx)
-		ctx, timeout := context.WithTimeout(tab, 20*time.Second)
-		var label string
-		err := chromedp.Run(ctx, chromedp.Navigate(f.s.URL+"/render/"+page.path+"&_t="+f.a.renderToken()), chromedp.Poll(`document.querySelector('.ai-tag') !== null`, nil), chromedp.Text(".ai-tag", &label))
-		timeout()
-		cancel()
-		if err != nil || label != page.label {
-			t.Fatal("wrong visible AI label", label, page.label, err)
-		}
-	}
-	assertMetadata := func(enabled bool) {
-		t.Helper()
-		z, e := zip.OpenReader(filepath.Join(f.a.ListingDir(id), "导出.zip"))
-		if e != nil {
-			t.Fatal(e)
-		}
-		defer z.Close()
-		checked := 0
-		for _, entry := range z.File {
-			if entry.Name != "主图3x4/01.jpg" && entry.Name != "主图1x1/01.jpg" && !strings.HasPrefix(entry.Name, "详情页/03") {
-				continue
-			}
-			r, e := entry.Open()
-			if e != nil {
-				t.Fatal(e)
-			}
-			b, _ := io.ReadAll(r)
-			r.Close()
-			want := enabled && strings.HasPrefix(entry.Name, "主图")
-			if bytes.Contains(b, []byte("AI 生成或合成")) != want {
-				t.Fatalf("导出隐式标识不正确：%s", entry.Name)
-			}
-			checked++
-		}
-		if checked < 3 {
-			t.Fatal("缺少主图或实拍详情页切片")
-		}
-	}
-	assertMetadata(true)
-	// An administrator's effective-source override also drives rendered metadata.
-	f.req(t, "PATCH", "/api/assets/"+intString(ids[0]), Object{"source_override": "ai_edited"}, 200)
-	editedJob := f.req(t, "POST", "/api/listings/"+intString(id)+"/run?step=render", nil, 202)["job"].(Object)
-	if done := waitJob(t, f.a, int64(editedJob["id"].(float64))); done.Status != "done" {
-		t.Fatal(done)
-	}
-	editedSlices, err := filepath.Glob(filepath.Join(f.a.ListingDir(id), "导出", "详情页", "03*.jpg"))
-	if err != nil || len(editedSlices) == 0 {
-		t.Fatal("缺少 AI 改图详情页切片", err)
-	}
-	for _, file := range editedSlices {
-		editedBytes, err := os.ReadFile(file)
-		if err != nil || !bytes.Contains(editedBytes, []byte("AI 生成或合成")) {
-			t.Fatal("AI 改图切片未写隐式标识", file, err)
-		}
-	}
-	// The operator can render, but cannot disable labels until granted that point.
-	f.newUser(t, "exporter", 2, 1)
-	f.freshClient()
-	f.login(t, "exporter")
-	f.req(t, "POST", "/api/listings/"+intString(id)+"/run?step=render&ai_label=0", nil, 403)
-	f.freshClient()
-	f.login(t, "admin")
-	j := f.req(t, "POST", "/api/listings/"+intString(id)+"/run?step=render&ai_label=0", nil, 202)["job"].(Object)
-	if done := waitJob(t, f.a, int64(j["id"].(float64))); done.Status != "done" {
-		t.Fatal(done)
-	}
-	assertMetadata(false)
-	res, e := f.client.Get(f.s.URL + "/api/listings/" + intString(id) + "/download")
-	if e != nil {
-		t.Fatal(e)
-	}
-	res.Body.Close()
-	if res.Header.Get("X-AI-Label") != "0" {
-		t.Fatal("下载未返回出图时的标识参数")
-	}
-	var count int
-	if e = f.a.DB.QueryRow("SELECT count(*) FROM audit_log WHERE action='export.no_ai_label'").Scan(&count); e != nil || count < 2 {
-		t.Fatal("取消标识未记录审计", e, count)
 	}
 }

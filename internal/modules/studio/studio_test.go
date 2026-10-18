@@ -270,14 +270,14 @@ func TestStudioPermissionsTemplatesAndShopScope(t *testing.T) {
 	_ = thumbRes.Body.Close()
 
 	// Create users:
-	// - operator on shop 1 (has render.run, render.review, no template.manage, no export.no_ai_label)
+	// - operator on shop 1 (has render.run, render.review, no template.manage)
 	env.req(t, "POST", "/api/users", Object{
 		"username": "op1",
 		"password": "Password123!",
 		"role_id":  env.roleIDByKey(t, "operator"),
 		"shop_ids": []int64{1},
 	}, 201)
-	// - designer on shop 1 (has template.manage, render.run, no render.review, no export.no_ai_label)
+	// - designer on shop 1 (has template.manage, render.run, no render.review)
 	env.req(t, "POST", "/api/users", Object{
 		"username": "des1",
 		"password": "Password123!",
@@ -285,15 +285,12 @@ func TestStudioPermissionsTemplatesAndShopScope(t *testing.T) {
 		"shop_ids": []int64{1},
 	}, 201)
 
-	// 1. Operator cannot manage template prefs (403), cannot access shop 2 (404), cannot set ai_label=false (403)
+	// 1. Operator cannot manage template prefs (403), cannot access shop 2 (404)
 	env.login(t, "op1", "Password123!")
 	env.req(t, "PUT", "/api/shops/1/template-prefs", Object{"default_detail": "cream", "disabled": []string{}}, 403)
 	env.req(t, "GET", fmt.Sprintf("/api/templates?shop_id=%d", shop2ID), nil, 404)
 	env.req(t, "GET", fmt.Sprintf("/api/listings/%d/render", l2ID), nil, 404)
 	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", l2ID), Object{"detail_template": "cream"}, 404)
-	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", l1ID), Object{"ai_label": false}, 403)
-	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", l1ID), Object{"ai_label": 0}, 403)
-	env.req(t, "POST", fmt.Sprintf("/api/listings/%d/render/run?ai_label=0", l1ID), nil, 403)
 	env.req(t, "POST", fmt.Sprintf("/api/listings/%d/review", l2ID), Object{"status": "approved"}, 404)
 	// Reviewing unrendered listing -> 409
 	env.req(t, "POST", fmt.Sprintf("/api/listings/%d/review", l1ID), Object{"status": "approved"}, 409)
@@ -489,43 +486,11 @@ func TestRenderCreamFallbackBatchAndReviewWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = dlNoRev.Body.Close()
-	if dlNoRev.StatusCode != 200 || dlNoRev.Header.Get("X-AI-Label") != "1" {
-		t.Fatalf("expected 200 download with X-AI-Label=1, got status=%d header=%q", dlNoRev.StatusCode, dlNoRev.Header.Get("X-AI-Label"))
+	if dlNoRev.StatusCode != 200 {
+		t.Fatalf("expected 200 download, got status=%d", dlNoRev.StatusCode)
 	}
 
-	// 6. PUT /api/listings/{id}/render changing ai_label=false must NOT overwrite listings.render_ai_label until re-rendered
-	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", l1ID), Object{"ai_label": false}, 200)
-	listingBeforeRerender := env.req(t, "GET", fmt.Sprintf("/api/listings/%d", l1ID), nil, 200)["listing"].(Object)
-	if int(listingBeforeRerender["render_ai_label"].(float64)) != 1 {
-		t.Fatalf("expected render_ai_label to remain 1 before re-render, got %v", listingBeforeRerender["render_ai_label"])
-	}
-	dlBeforeRerender, err := env.client.Get(fmt.Sprintf("%s/api/listings/%d/download", env.s.URL, l1ID))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = dlBeforeRerender.Body.Close()
-	if dlBeforeRerender.StatusCode != 200 || dlBeforeRerender.Header.Get("X-AI-Label") != "1" {
-		t.Fatalf("expected download before re-render to still have X-AI-Label=1, got status=%d header=%q", dlBeforeRerender.StatusCode, dlBeforeRerender.Header.Get("X-AI-Label"))
-	}
-	noLabelJob := env.req(t, "POST", fmt.Sprintf("/api/listings/%d/render/run", l1ID), nil, 202)["job"].(Object)
-	if j := env.waitJob(t, int64(noLabelJob["id"].(float64))); j["status"] != "done" {
-		t.Fatalf("no-label render failed: %v", j)
-	}
-	listingAfterRerender := env.req(t, "GET", fmt.Sprintf("/api/listings/%d", l1ID), nil, 200)["listing"].(Object)
-	if int(listingAfterRerender["render_ai_label"].(float64)) != 0 {
-		t.Fatalf("expected render_ai_label=0 after re-render, got %v", listingAfterRerender["render_ai_label"])
-	}
-	dlAfterRerender, err := env.client.Get(fmt.Sprintf("%s/api/listings/%d/download", env.s.URL, l1ID))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = dlAfterRerender.Body.Close()
-	if dlAfterRerender.StatusCode != 200 || dlAfterRerender.Header.Get("X-AI-Label") != "0" {
-		t.Fatalf("expected download after re-render to have X-AI-Label=0, got status=%d header=%q", dlAfterRerender.StatusCode, dlAfterRerender.Header.Get("X-AI-Label"))
-	}
-	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", l1ID), Object{"ai_label": true}, 200)
-
-	// 7. Batch render:
+	// 6. Batch render:
 	// (a) Admin batch with detail_template="cream" (disabled in shop 1, enabled in shop 2):
 	//     l1ID (shop 1) is skipped due to disabled template; l2ID (shop 2) is enqueued;
 	//     enqueued job has identical kind/steps/params structure as single render.

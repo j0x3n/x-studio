@@ -139,7 +139,7 @@ AI 调用失败（没配置 key、额度不够、超时）时返回 502，`error
   "type": "run_listing",
   "label": "重跑出图",                       // 按钮文字，≤12 字
   "summary": "南洋金珠吊坠 · 虾皮台湾 · 从头跑一键出图",  // 卡片说明，≤60 字
-  "params": {"listing_id": 12, "ai_label": true},
+  "params": {"listing_id": 12},
   "cost_hint": "约用 6 张图额度"              // 可选，后端估算，见下
 }
 ```
@@ -147,7 +147,7 @@ AI 调用失败（没配置 key、额度不够、超时）时返回 502，`error
 | type | 需要权限 | params | 前端调用 |
 |---|---|---|---|
 | `open` | 登录 | `{path}`，必须以 `/` 开头、只能是前端路由（`/`、`/products…`、`/assets…`、`/process…`、`/copy…`、`/templates…`、`/review…`、`/admin…`、`/settings…`），不能带 `//` 或协议 | 跳转，不用确认 |
-| `run_listing` | render.run + 看得到该版本 | `{listing_id, ai_label?}`（默认 true；false 需要 export.no_ai_label，否则改成 true） | `POST /api/listings/{id}/run?ai_label=1` |
+| `run_listing` | render.run + 看得到该版本 | `{listing_id}` | `POST /api/listings/{id}/run` |
 | `render_listing` | render.run | `{listing_id}` | `POST /api/listings/{id}/render/run` |
 | `render_batch` | render.run | `{listing_ids}` ≤50 | `POST /api/render/batch` |
 | `process_assets` | 按 ops 判断，规则同 `POST /api/assets/process` | `{asset_ids, ops, preset_id?}`，asset_ids 必须同一商品、≤20 | `POST /api/assets/process` |

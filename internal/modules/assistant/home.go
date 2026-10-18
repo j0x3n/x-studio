@@ -69,7 +69,7 @@ func (a *Module) today(u core.User, recent bool) (object, error) {
 	for _, v := range failed {
 		t := todo{Kind: "render_failed", Level: "danger", Title: v["product_name"].(string) + " · 出图失败", Detail: v["shop_name"].(string) + " · " + clip(v["pipeline_error"].(string), 40), Count: 1, ProductID: number(v["product_id"]), ListingID: number(v["id"]), at: v["updated_at"].(string)}
 		if u.Has(core.RenderRun) {
-			t.Action = &Action{Type: "run_listing", Label: "重跑出图", Summary: clip(t.Title, 60), Params: object{"listing_id": t.ListingID, "ai_label": true}}
+			t.Action = &Action{Type: "run_listing", Label: "重跑出图", Summary: clip(t.Title, 60), Params: object{"listing_id": t.ListingID}}
 		}
 		items = append(items, t)
 	}
@@ -125,7 +125,7 @@ func (a *Module) today(u core.User, recent bool) (object, error) {
 
 func (a *Module) reviewRows(u core.User, shop int64, limit int) ([]object, error) {
 	scope, args := listingScope(u)
-	q := `SELECT l.id,l.id listing_id,l.product_id,p.name product_name,l.shop_id,s.name shop_name,lr.detail_template,lr.main_template,lr.ai_label,lr.review_status,lr.rendered_job_id,lr.rendered_template,lr.updated_at` + listingJoin + " WHERE lr.review_status='pending' AND " + scope
+	q := `SELECT l.id,l.id listing_id,l.product_id,p.name product_name,l.shop_id,s.name shop_name,lr.detail_template,lr.main_template,lr.review_status,lr.rendered_job_id,lr.rendered_template,lr.updated_at` + listingJoin + " WHERE lr.review_status='pending' AND " + scope
 	if shop > 0 {
 		q += " AND l.shop_id=?"
 		args = append(args, shop)

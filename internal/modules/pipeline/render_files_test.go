@@ -99,9 +99,9 @@ func TestRenderTemplatePublicFilesAndStyles(t *testing.T) {
 		get(f.client, style, 404, "", "")
 		get(anonymous, style+"?_t="+token, 404, "", "")
 		get(anonymous, style+fmt.Sprintf("?p=%d", pid), 401, "", "")
-		get(f.client, style+fmt.Sprintf("?p=%d", pid), 200, "text/html; charset=utf-8", "<style>.ai-tag{")
-		get(anonymous, style+fmt.Sprintf("?p=%d&_t=%s", pid, token), 200, "text/html; charset=utf-8", "<style>.ai-tag{")
-		get(tokenClient, style+fmt.Sprintf("?p=%d&_t=%s", pid, token), 200, "text/html; charset=utf-8", "<style>.ai-tag{")
+		get(f.client, style+fmt.Sprintf("?p=%d", pid), 200, "text/html; charset=utf-8", "另一套风格")
+		get(anonymous, style+fmt.Sprintf("?p=%d&_t=%s", pid, token), 200, "text/html; charset=utf-8", "另一套风格")
+		get(tokenClient, style+fmt.Sprintf("?p=%d&_t=%s", pid, token), 200, "text/html; charset=utf-8", "另一套风格")
 		get(tokenClient, base+"引擎.js", 200, "application/javascript; charset=utf-8", "window.renderEngine")
 		get(tokenClient, base+"公共.css", 200, "text/css; charset=utf-8", ".screen")
 		for _, name := range []string{"../详情页模板/引擎.js", "%2e%2e%2f详情页模板%2f引擎.js", "子目录/引擎.js", "子目录/另一套.html", "子目录%2f引擎.js", `子目录%5c引擎.js`, "私有.txt", "两个..点.js", "不存在.js"} {

@@ -89,7 +89,6 @@ func (a *Module) renderStateJSON(listingID, shopID int64) (core.Object, error) {
 		"detail_template":           lr.DetailTemplate,
 		"effective_detail_template": effectiveKey,
 		"main_template":             lr.MainTemplate,
-		"ai_label":                  lr.AILabel,
 		"rendered_job_id":           renderedJobID,
 		"rendered_template":         lr.RenderedTemplate,
 		"render_note":               lr.RenderNote,
@@ -110,7 +109,6 @@ func (a *Module) renderStateJSON(listingID, shopID int64) (core.Object, error) {
 		"preview_url":       previewURL,
 		"detail_template":   lr.DetailTemplate,
 		"main_template":     lr.MainTemplate,
-		"ai_label":          lr.AILabel,
 		"review_status":     lr.ReviewStatus,
 		"review_note":       lr.ReviewNote,
 		"reviewed_by":       reviewedBy,
@@ -148,7 +146,7 @@ func parseAILabelValue(raw json.RawMessage) (bool, error) {
 	if json.Unmarshal(raw, &n) == nil && (n == 0 || n == 1) {
 		return n == 1, nil
 	}
-	return false, fmt.Errorf("ai_label 只能是 0/1 或布尔值")
+	return false, fmt.Errorf("值只能是 0/1 或布尔值")
 }
 
 func (a *Module) validateShopDetailTemplate(shopID int64, tpl string) bool {
@@ -189,7 +187,6 @@ func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 	if !core.Decode(w, r, &in) {
 		return
 	}
-	u := core.CurrentUser(r)
 	for k, v := range in {
 		switch k {
 		case "detail_template":
@@ -214,27 +211,12 @@ func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 				tpl = "default"
 			}
 			lr.MainTemplate = tpl
-		case "ai_label":
-			label, err := parseAILabelValue(v)
-			if err != nil {
-				core.Fail(w, 400, err.Error())
-				return
-			}
-			if !label && !u.Has(core.ExportNoAILabel) {
-				core.Fail(w, 403, "没有取消 AI 标识的权限")
-				return
-			}
-			lr.AILabel = label
 		default:
 			core.Fail(w, 400, "不支持的出图设置字段："+k)
 			return
 		}
 	}
 	ts := core.Now()
-	aiInt := 0
-	if lr.AILabel {
-		aiInt = 1
-	}
 	tx, e := a.DB.Begin()
 	if e != nil {
 		core.Fail(w, 500, "保存出图设置失败")
@@ -242,13 +224,12 @@ func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	if _, e = tx.Exec(
-		"UPDATE listing_render SET detail_template=?,main_template=?,ai_label=?,updated_at=? WHERE listing_id=?",
-		lr.DetailTemplate, lr.MainTemplate, aiInt, ts, id,
+		"UPDATE listing_render SET detail_template=?,main_template=?,updated_at=? WHERE listing_id=?",
+		lr.DetailTemplate, lr.MainTemplate, ts, id,
 	); e == nil {
 		e = core.AuditTx(tx, r, "studio.render_settings", "listing", id, core.Object{
 			"detail_template": lr.DetailTemplate,
 			"main_template":   lr.MainTemplate,
-			"ai_label":        lr.AILabel,
 		})
 	}
 	if e != nil || tx.Commit() != nil {
@@ -287,23 +268,6 @@ func (a *Module) runListingRender(w http.ResponseWriter, r *http.Request) {
 		core.Fail(w, 409, "此商品已有使用共用素材的任务")
 		return
 	}
-	lr, e := a.ensureListingRender(id)
-	if e != nil {
-		core.Fail(w, 500, "读取出图设置失败")
-		return
-	}
-	label := lr.AILabel
-	if qv := r.URL.Query().Get("ai_label"); qv != "" {
-		if qv != "0" && qv != "1" {
-			core.Fail(w, 400, "ai_label 只能是 0 或 1")
-			return
-		}
-		label = qv == "1"
-	}
-	if !label && !core.CurrentUser(r).Has(core.ExportNoAILabel) {
-		core.Fail(w, 403, "没有取消 AI 标识的权限")
-		return
-	}
 	tx, e := a.DB.Begin()
 	if e != nil {
 		core.Fail(w, 500, "创建任务失败")
@@ -313,7 +277,7 @@ func (a *Module) runListingRender(w http.ResponseWriter, r *http.Request) {
 	ts := core.Now()
 	res, e := tx.Exec(
 		"INSERT INTO jobs(kind,target_type,target_id,user_id,params,status,created_at,steps) VALUES('pipeline','listing',?,?,?,'queued',?,'render')",
-		id, core.CurrentUser(r).ID, core.JS(core.Object{"ai_label": label}), ts,
+		id, core.CurrentUser(r).ID, core.JS(core.Object{}), ts,
 	)
 	if e != nil {
 		core.Fail(w, 409, "此上架版本已有正在排队或运行的任务")
@@ -321,11 +285,8 @@ func (a *Module) runListingRender(w http.ResponseWriter, r *http.Request) {
 	}
 	jid, _ := res.LastInsertId()
 	_, e = tx.Exec("UPDATE listings SET pipeline_status='processing',pipeline_error='',updated_at=? WHERE id=?", ts, id)
-	if e == nil && !label {
-		e = core.AuditTx(tx, r, "export.no_ai_label", "listing", id, core.Object{"job_id": jid, "stage": "run"})
-	}
 	if e == nil {
-		e = core.AuditTx(tx, r, "studio.render", "listing", id, core.Object{"job_id": jid, "ai_label": label})
+		e = core.AuditTx(tx, r, "studio.render", "listing", id, core.Object{"job_id": jid})
 	}
 	if e != nil || tx.Commit() != nil {
 		core.Fail(w, 500, "保存任务失败")
@@ -378,10 +339,6 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 			results = append(results, core.Object{"listing_id": lid, "skipped_reason": "读取出图设置失败"})
 			continue
 		}
-		if !lr.AILabel && !u.Has(core.ExportNoAILabel) {
-			results = append(results, core.Object{"listing_id": lid, "skipped_reason": "没有取消 AI 标识的权限"})
-			continue
-		}
 		if in.DetailTemplate != "" && !a.validateShopDetailTemplate(p.ShopID, in.DetailTemplate) {
 			results = append(results, core.Object{"listing_id": lid, "skipped_reason": "模板不存在或对该店铺已停用"})
 			continue
@@ -401,7 +358,7 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 		}
 		res, e := tx.Exec(
 			"INSERT INTO jobs(kind,target_type,target_id,user_id,params,status,created_at,steps) VALUES('pipeline','listing',?,?,?,'queued',?,'render')",
-			lid, u.ID, core.JS(core.Object{"ai_label": lr.AILabel}), ts,
+			lid, u.ID, core.JS(core.Object{}), ts,
 		)
 		if e != nil {
 			_ = tx.Rollback()
@@ -414,14 +371,10 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 			e = core.AuditTx(tx, r, "studio.render_settings", "listing", lid, core.Object{
 				"detail_template": in.DetailTemplate,
 				"main_template":   lr.MainTemplate,
-				"ai_label":        lr.AILabel,
 			})
 		}
-		if e == nil && !lr.AILabel {
-			e = core.AuditTx(tx, r, "export.no_ai_label", "listing", lid, core.Object{"job_id": jid, "stage": "run"})
-		}
 		if e == nil {
-			e = core.AuditTx(tx, r, "studio.render", "listing", lid, core.Object{"job_id": jid, "ai_label": lr.AILabel})
+			e = core.AuditTx(tx, r, "studio.render", "listing", lid, core.Object{"job_id": jid})
 		}
 		if e != nil || tx.Commit() != nil {
 			_ = tx.Rollback()
@@ -514,7 +467,7 @@ func (a *Module) reviewQueue(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, e := a.DB.Query(`
 		SELECT lr.listing_id, l.product_id, p.name, l.shop_id, s.name,
-		       lr.detail_template, lr.main_template, lr.ai_label, lr.review_status,
+		       lr.detail_template, lr.main_template, lr.review_status,
 		       lr.rendered_job_id, lr.rendered_template, lr.updated_at
 		FROM listing_render lr
 		JOIN listings l ON l.id = lr.listing_id
@@ -533,7 +486,6 @@ func (a *Module) reviewQueue(w http.ResponseWriter, r *http.Request) {
 		listingID, productID, shopID int64
 		productName, shopName        string
 		detailTpl, mainTpl           string
-		aiLabel                      int
 		reviewStatus, renderedTpl    string
 		renderedJobID                sql.NullInt64
 		updatedAt                    string
@@ -543,7 +495,7 @@ func (a *Module) reviewQueue(w http.ResponseWriter, r *http.Request) {
 		var it rowItem
 		if rows.Scan(
 			&it.listingID, &it.productID, &it.productName, &it.shopID, &it.shopName,
-			&it.detailTpl, &it.mainTpl, &it.aiLabel, &it.reviewStatus,
+			&it.detailTpl, &it.mainTpl, &it.reviewStatus,
 			&it.renderedJobID, &it.renderedTpl, &it.updatedAt,
 		) == nil {
 			rawList = append(rawList, it)
@@ -573,7 +525,6 @@ func (a *Module) reviewQueue(w http.ResponseWriter, r *http.Request) {
 			"shop_name":         it.shopName,
 			"detail_template":   it.detailTpl,
 			"main_template":     it.mainTpl,
-			"ai_label":          it.aiLabel != 0,
 			"review_status":     it.reviewStatus,
 			"rendered_job_id":   rjid,
 			"rendered_template": it.renderedTpl,

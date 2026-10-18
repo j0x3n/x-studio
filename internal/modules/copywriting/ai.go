@@ -214,7 +214,7 @@ func (a *Module) runGenerate(ctx context.Context, j core.Job) error {
 		Listing core.Object `json:"listing"`
 		Meta    core.Object `json:"meta"`
 	}
-	fullPrompt := basePrompt + "\n" + renderedExtra + "\nAI 生成或增强的照片不得称为实拍、原相机、无滤镜或作为材质真伪的证据。"
+	fullPrompt := basePrompt + "\n" + renderedExtra
 	if e = a.AIJSON(core.WithFeature(ctx, "copy"), a.Cfg.TextModel, fullPrompt, core.JS(input), &result); e != nil {
 		return e
 	}

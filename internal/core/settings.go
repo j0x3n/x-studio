@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"regexp"
 )
 
 func (a *Core) Setting(key string) Object {
@@ -50,37 +49,6 @@ func ValidateSetting(key string, v json.RawMessage) error {
 				if !ok || n < 0 || n != math.Trunc(n) || n > 1e9 {
 					return fmt.Errorf("额度必须是非负整数或 null")
 				}
-			}
-		}
-	case "ai_label":
-		for k, v := range o {
-			switch k {
-			case "text":
-				s, ok := v.(string)
-				if !ok || len([]rune(s)) < 1 || len([]rune(s)) > 50 {
-					return fmt.Errorf("AI 标识文字需为 1–50 字")
-				}
-			case "position":
-				if v != "bottom-right" && v != "bottom-left" && v != "top-right" && v != "top-left" {
-					return fmt.Errorf("AI 标识位置不正确")
-				}
-			case "color":
-				s, ok := v.(string)
-				if !ok || !regexp.MustCompile(`^#[0-9a-fA-F]{6}$`).MatchString(s) {
-					return fmt.Errorf("AI 标识颜色必须是十六进制颜色")
-				}
-			case "size":
-				n, ok := v.(float64)
-				if !ok || n < 8 || n > 72 {
-					return fmt.Errorf("AI 标识字号必须在 8–72 之间")
-				}
-			case "opacity":
-				n, ok := v.(float64)
-				if !ok || n < 0 || n > 1 {
-					return fmt.Errorf("AI 标识透明度必须在 0–1 之间")
-				}
-			default:
-				return fmt.Errorf("不支持的 AI 标识样式")
 			}
 		}
 	default:

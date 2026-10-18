@@ -258,13 +258,6 @@ func (a *Module) patchSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if raw, ok := in["ai_label"]; ok {
-		base := a.Setting("ai_label")
-		for k, v := range core.JSONObj(string(raw)) {
-			base[k] = v
-		}
-		in["ai_label"] = json.RawMessage(core.JS(base))
-	}
 	tx, e := a.DB.Begin()
 	if e != nil {
 		core.Fail(w, 500, "保存设置失败")

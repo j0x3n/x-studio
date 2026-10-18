@@ -368,34 +368,21 @@ func (a *Module) annotateAI(productID int64, content, main core.Object) error {
 	if e != nil {
 		return e
 	}
-	labels := map[string]string{}
-	text, _ := a.Setting("ai_label")["text"].(string)
-	if text == "" {
-		text = "AI 生成"
-	}
+	files := map[string]bool{}
 	for _, p := range photos {
 		if p.Code == "" {
 			continue
 		}
-		label := ""
-		s := p.EffectiveSource()
-		if s == "ai_generated" || s == "ai_edited" {
-			label = text
-		}
 		for _, ext := range []string{".jpg", "_白底.jpg", "_透明.png"} {
-			labels[p.Code+ext] = label
+			files[p.Code+ext] = true
 		}
 	}
 	var walk func(any)
 	walk = func(v any) {
 		switch x := v.(type) {
 		case map[string]any:
-			if f, exists := x["f"]; exists {
-				if label := labels[fmt.Sprint(f)]; label != "" {
-					x["ai"] = label
-				} else {
-					delete(x, "ai")
-				}
+			if f, exists := x["f"]; exists && files[fmt.Sprint(f)] {
+				delete(x, "ai")
 			}
 			for _, child := range x {
 				walk(child)

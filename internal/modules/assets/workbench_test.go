@@ -314,76 +314,45 @@ func TestWorkbenchDownloadLabelsAndAssetDownload(t *testing.T) {
 	edited := wbResult(t, wbJob(t, f, []obj{{"asset_id": aid}}, obj{"format": "png"}))
 	input := wbInput(t, f)
 	original := wbResult(t, wbJob(t, f, []obj{{"input_id": input}}, obj{}))
-	assertLabel := func(b []byte, want bool) {
-		t.Helper()
-		if bytes.Contains(b, []byte("X Studio")) != want || bytes.Contains(b, []byte("AI 生成或合成")) != want {
-			t.Fatalf("AI 标识 want %v", want)
+	for _, id := range []int64{edited, original, input} {
+		b, h := wbBinary(t, f, "GET", fmt.Sprintf("/api/workbench/items/%d/file?download=1", id), nil, 200)
+		if bytes.Contains(b, []byte("AI 生成或合成")) || bytes.Contains(b, []byte("X Studio")) {
+			t.Fatal("下载仍写入了 AI 标识")
 		}
-	}
-	for _, tc := range []struct {
-		id    int64
-		query string
-		label bool
-	}{{edited, "", true}, {edited, "&ai_label=0", false}, {original, "", false}, {input, "", false}} {
-		b, h := wbBinary(t, f, "GET", fmt.Sprintf("/api/workbench/items/%d/file?download=1%s", tc.id, tc.query), nil, 200)
-		assertLabel(b, tc.label)
 		_, params, err := mime.ParseMediaType(h.Get("Content-Disposition"))
 		if err != nil || !strings.Contains(params["filename"], "_") {
 			t.Fatal(h)
 		}
 		if _, _, err = image.DecodeConfig(bytes.NewReader(b)); err != nil {
-			t.Fatal("标识破坏图片", err)
+			t.Fatal("下载破坏图片", err)
 		}
 	}
-	// JPEG and PNG both receive the label; a generated source also inherits it.
-	for _, source := range []string{"ai_edited", "ai_generated", "ai_enhanced", "original"} {
-		f.req(t, "PATCH", fmt.Sprintf("/api/assets/%d", aid), obj{"source_override": source}, 200)
-		wbExec(t, f, "UPDATE workbench_items SET source=? WHERE id=?", source, edited)
-		for _, label := range []int{0, 1} {
-			want := label == 1 && (source == "ai_edited" || source == "ai_generated")
-			for _, endpoint := range []string{"/api/workbench/download", "/api/assets/download"} {
-				body := obj{"ids": []int64{edited}, "ai_label": label}
-				if endpoint == "/api/assets/download" {
-					body = obj{"asset_ids": []int64{aid}, "ai_label": label}
-				}
-				b, _ := wbBinary(t, f, "POST", endpoint, body, 200)
-				z, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
-				if err != nil || len(z.File) != 1 {
-					t.Fatal(err)
-				}
-				r, err := z.File[0].Open()
-				if err != nil {
-					t.Fatal(err)
-				}
-				imageData, _ := io.ReadAll(r)
-				r.Close()
-				assertLabel(imageData, want)
-			}
+	for _, endpoint := range []string{"/api/workbench/download", "/api/assets/download"} {
+		body := obj{"ids": []int64{edited}}
+		if endpoint == "/api/assets/download" {
+			body = obj{"asset_ids": []int64{aid}}
+		}
+		b, _ := wbBinary(t, f, "POST", endpoint, body, 200)
+		z, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+		if err != nil || len(z.File) != 1 {
+			t.Fatal(err)
+		}
+		r, err := z.File[0].Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		imageData, _ := io.ReadAll(r)
+		r.Close()
+		if bytes.Contains(imageData, []byte("AI 生成或合成")) {
+			t.Fatal("打包下载仍写入了 AI 标识")
 		}
 	}
-	// Default JSON option is labelled too.
-	wbExec(t, f, "UPDATE workbench_items SET source='ai_edited' WHERE id=?", edited)
-	b, _ := wbBinary(t, f, "POST", "/api/workbench/download", obj{"ids": []int64{edited}}, 200)
-	z, _ := zip.NewReader(bytes.NewReader(b), int64(len(b)))
-	r, _ := z.File[0].Open()
-	data, _ := io.ReadAll(r)
-	r.Close()
-	assertLabel(data, true)
-	f.req(t, "PATCH", fmt.Sprintf("/api/assets/%d", aid), obj{"source_override": "ai_edited"}, 200)
-	b, _ = wbBinary(t, f, "POST", "/api/assets/download", obj{"asset_ids": []int64{aid}}, 200)
-	z, _ = zip.NewReader(bytes.NewReader(b), int64(len(b)))
-	r, _ = z.File[0].Open()
-	data, _ = io.ReadAll(r)
-	r.Close()
-	assertLabel(data, true)
 	f.user(t, "operator", 2, 1)
 	f.login(t, "operator")
 	owned := wbInput(t, f)
-	f.req(t, "GET", fmt.Sprintf("/api/workbench/items/%d/file?download=1&ai_label=0", owned), nil, 403)
-	f.req(t, "POST", "/api/workbench/download", obj{"ids": []int64{owned}, "ai_label": 0}, 403)
-	f.req(t, "POST", "/api/assets/download", obj{"asset_ids": []int64{aid}, "ai_label": 0}, 403)
-	f.req(t, "POST", "/api/workbench/download", obj{"ids": []int64{owned}, "ai_label": 2}, 400)
-	f.assertAudit(t, "assets.workbench.download", "export.no_ai_label", "assets.download")
+	wbBinary(t, f, "GET", fmt.Sprintf("/api/workbench/items/%d/file?download=1", owned), nil, 200)
+	wbBinary(t, f, "POST", "/api/workbench/download", obj{"ids": []int64{owned}}, 200)
+	f.assertAudit(t, "assets.workbench.download", "assets.download")
 }
 func TestWorkbenchOneActiveTaskPerUser(t *testing.T) {
 	start := make(chan struct{}, 1)

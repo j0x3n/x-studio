@@ -24,26 +24,22 @@ func TestListingActionPermissionsParametersAndAILabel(t *testing.T) {
 		if !ok {
 			t.Fatal(kind)
 		}
-		if kind == "run_listing" && c.Params["ai_label"] != true {
-			t.Fatal(c)
+		if kind == "run_listing" {
+			if _, exists := c.Params["ai_label"]; exists {
+				t.Fatal(c)
+			}
 		}
 	}
-	c, ok := validate("run_listing", object{"listing_id": lid, "ai_label": false})
-	if !ok || c.Params["ai_label"] != true {
-		t.Fatal(c, ok)
+	if _, ok := validate("run_listing", object{"listing_id": lid, "ai_label": false}); ok {
+		t.Fatal("run_listing should not accept ai_label")
 	}
-	u.Role.Perms = append(u.Role.Perms, core.ExportNoAILabel)
-	c, ok = validate("run_listing", object{"listing_id": lid, "ai_label": false})
-	if !ok || c.Params["ai_label"] != false {
-		t.Fatal(c, ok)
-	}
-	if _, ok = validate("render_batch", object{"listing_ids": []int64{lid}}); !ok {
+	if _, ok := validate("render_batch", object{"listing_ids": []int64{lid}}); !ok {
 		t.Fatal("valid batch rejected")
 	}
-	if _, ok = validate("review", object{"listing_id": lid, "status": "approved"}); !ok {
+	if _, ok := validate("review", object{"listing_id": lid, "status": "approved"}); !ok {
 		t.Fatal("approval rejected")
 	}
-	if _, ok = validate("review", object{"listing_id": lid, "status": "rejected", "note": "图像有瑕疵"}); !ok {
+	if _, ok := validate("review", object{"listing_id": lid, "status": "rejected", "note": "图像有瑕疵"}); !ok {
 		t.Fatal("rejection rejected")
 	}
 	for _, tc := range []struct {

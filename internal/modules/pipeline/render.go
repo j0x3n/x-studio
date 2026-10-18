@@ -23,9 +23,10 @@ import (
 	"sync"
 	"time"
 
+	"xstudio/internal/core"
+
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
-	"xstudio/internal/core"
 )
 
 type Browser struct {
@@ -109,7 +110,6 @@ func (b *Browser) Shot(parent context.Context, address string, w, h int64, scale
 	stop := context.AfterFunc(parent, tc)
 	defer stop()
 	var buf []byte
-	var hasAI bool
 	ready := `(window.PRODUCT || window.MAIN) && (document.querySelector('.cv') || document.querySelector('#page'))`
 	if main {
 		ready = `window.MAIN && document.querySelector('.cv')`
@@ -123,12 +123,9 @@ func (b *Browser) Shot(parent context.Context, address string, w, h int64, scale
 			return fmt.Errorf("字体或图片等待失败")
 		}
 		return nil
-	}), chromedp.Evaluate(`Array.from(document.querySelectorAll(".ai-tag")).some(el=>el.getClientRects().length>0)`, &hasAI), chromedp.CaptureScreenshot(&buf))
+	}), chromedp.CaptureScreenshot(&buf))
 	if e != nil {
 		return nil, fmt.Errorf("Chrome 截图失败：%w", e)
-	}
-	if hasAI {
-		return core.ImplicitLabel(buf)
 	}
 	return buf, nil
 }
@@ -205,7 +202,7 @@ func (a *Module) render(ctx context.Context, p Product) error {
 	}
 	// The render page reads main from SQLite. Persist exactly the same filtered
 	// and numbered list that we are about to screenshot.
-	if _, e := a.DB.Exec("UPDATE listings SET main=?,content=?,render_ai_label=? WHERE id=?", js(p.Main), js(p.Content), p.AILabel, p.ListingID); e != nil {
+	if _, e := a.DB.Exec("UPDATE listings SET main=?,content=? WHERE id=?", js(p.Main), js(p.Content), p.ListingID); e != nil {
 		return fmt.Errorf("保存清理后的主图失败：%w", e)
 	}
 	imgs, _ := p.Main["imgs"].([]any)
@@ -260,11 +257,6 @@ func (a *Module) render(ctx context.Context, p Product) error {
 			if e = saveMain(filename, im); e != nil {
 				return e
 			}
-			if p.AILabel && bytes.Contains(buf, []byte("X Studio")) {
-				if e = core.LabelFile(filename); e != nil {
-					return e
-				}
-			}
 		}
 	}
 	detailFile, actualKey, warn, e := a.resolveDetailTemplate(p.ListingID, p.ShopID)
@@ -291,26 +283,9 @@ func (a *Module) render(ctx context.Context, p Product) error {
 			if e = saveJPEG(filename, part, 88); e != nil {
 				return e
 			}
-			if p.AILabel && bytes.Contains(buf, []byte("X Studio")) {
-				if e = core.LabelFile(filename); e != nil {
-					return e
-				}
-			}
-		}
-	}
-	// 淘宝白底图不能带任何文字，AI 生成的白底图没法打标识，所以只导出实拍的白底图
-	aiCodes := map[string]bool{}
-	if phs, pe := a.photos(p.ID); pe == nil {
-		for _, ph := range phs {
-			if ph.EffectiveSource() == "ai_generated" || ph.EffectiveSource() == "ai_edited" {
-				aiCodes[ph.Code] = true
-			}
 		}
 	}
 	for _, c := range []string{"A1", "A2"} {
-		if aiCodes[c] {
-			continue
-		}
 		b, e := os.ReadFile(filepath.Join(a.Dir(p.ID), "照片", c+"_白底.jpg"))
 		if e == nil {
 			if e = os.WriteFile(filepath.Join(tmp, "白底.jpg"), b, 0600); e != nil {
@@ -338,9 +313,6 @@ func (a *Module) render(ctx context.Context, p Product) error {
 	}
 	_ = os.Remove(filepath.Join(a.ListingDir(p.ListingID), "导出.zip"))
 	if e = os.Rename(zipName, filepath.Join(a.ListingDir(p.ListingID), "导出.zip")); e != nil {
-		return e
-	}
-	if _, e = a.DB.Exec("UPDATE listings SET ai_label=? WHERE id=?", p.AILabel, p.ListingID); e != nil {
 		return e
 	}
 	return a.updateListingRenderAfterRun(ctx, p.ListingID, actualKey, warn)

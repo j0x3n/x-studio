@@ -4,7 +4,6 @@
 // 用法：<风格>.html?p=<款>          预览整页（缺照片显示虚线框，提示要拍什么）
 //       <风格>.html?p=<款>&s=<屏号> 只出一屏（导出用：底色纯绿 #00FF00，裁掉；缺照片的位自动收起，照片全缺的屏不出）
 // 数据：商品/<款>/内容.js 里的 window.PRODUCT，格式见 商品/示例款/内容.js。所有风格吃同一份数据。
-// AI 标识：照片位写 ai: true 或 ai: '文字'。后端可在 内容.js 里加 window.AI_LABEL = {text, position, size, color, opacity} 统一样式。
 var XS = (function () {
   var q = new URLSearchParams(location.search);
   var slug = q.get('p') || '示例款';
@@ -17,16 +16,14 @@ var XS = (function () {
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function br(t) { return esc(t).replace(/\n/g, '<br>'); }
 
-  // 照片位。p: {f:'B1.jpg', need:'要拍什么', ai:true|'文字', stamp:'角落小字'}；overlay 叠在图上（如 mm 标签）
+  // 照片位。p: {f:'B1.jpg', need:'要拍什么', stamp:'角落小字'}；overlay 叠在图上（如 mm 标签）
   function ph(p, cls, overlay) {
     p = p || {};
     if (EXPORT && !p.f) return '';
     var need = (p.f ? p.f.replace(/\.\w+$/, '') + '  ' : '') + (p.need || '');
     var img = p.f ? '<img src="' + esc(base + '照片/' + p.f) + '" onerror="XS.miss(this)">' : '';
-    var label = window.AI_LABEL && window.AI_LABEL.text || 'AI 生成';
-    var tag = p.ai ? '<span class="ai-tag">' + esc(p.ai === true ? label : p.ai) + '</span>' : '';
     var stamp = p.stamp ? '<span class="stamp">' + esc(p.stamp) + '</span>' : '';
-    return '<div class="ph ' + (cls || '') + (p.f ? '' : ' missing') + '" data-need="放照片\n' + esc(need) + '">' + img + tag + stamp + (overlay || '') + '</div>';
+    return '<div class="ph ' + (cls || '') + (p.f ? '' : ' missing') + '" data-need="放照片\n' + esc(need) + '">' + img + stamp + (overlay || '') + '</div>';
   }
   // "照片 + 说明"单元；导出时照片缺了整个单元一起收起
   function unit(phHtml, rest, cls) {
@@ -128,17 +125,8 @@ var XS = (function () {
   };
   var ORDER = ['hero', 'real', 'details', 'wear', 'size', 'related', 'pack', 'care', 'about'];
 
-  function applyLabel() {
-    var L = window.AI_LABEL; if (!L) return;
-    var st = document.documentElement.style;
-    if (L.size) st.setProperty('--ai-size', L.size + 'px');
-    if (L.color) st.setProperty('--ai-color', L.color);
-    if (L.opacity != null) st.setProperty('--ai-bg', 'rgba(0,0,0,' + (0.6 * L.opacity).toFixed(2) + ')');
-    if (L.position) document.documentElement.setAttribute('data-ai-pos', L.position);
-  }
   function render() {
     if (!opts || !data) return;
-    applyLabel();
     var fns = Object.assign({}, screens, opts.screens || {});
     var S = ORDER.map(function (k) { return fns[k](data, H); });
     document.getElementById('page').innerHTML = only ? (S[+only - 1] || '') : S.join('');

@@ -7,7 +7,6 @@ import (
 
 	"fmt"
 	"image"
-	"image/png"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -114,7 +113,6 @@ func TestAuthenticationPermissionsCSRF(t *testing.T) {
 			if tc.role == 1 {
 				want = 404
 			}
-			f.req(t, "GET", fmt.Sprintf("/api/listings/%d/download?ai_label=0", lid), nil, want)
 			want = 403
 			if tc.role <= 3 {
 				want = 404
@@ -260,7 +258,7 @@ func TestSessionsLastAdminRolesAndSettings(t *testing.T) {
 	f.req(t, "PATCH", "/api/users/1", Object{"role_id": 2}, 409)
 	f.req(t, "PATCH", "/api/roles/1", Object{"name": "改名"}, 403)
 	f.req(t, "DELETE", "/api/roles/2", nil, 403)
-	f.req(t, "PATCH", "/api/settings", Object{"ai_prices": Object{"vision": .5}, "quota_default": Object{"month_images": 2, "month_text": 3}, "ai_label": Object{"text": "AI 合成", "position": "top-left", "size": 18, "color": "#00FF00", "opacity": .7}}, 200)
+	f.req(t, "PATCH", "/api/settings", Object{"ai_prices": Object{"vision": .5}, "quota_default": Object{"month_images": 2, "month_text": 3}}, 200)
 	f.freshClient()
 	f.login(t, "staff")
 	if _, ok := f.req(t, "GET", "/api/settings", nil, 200)["ai_prices"]; ok {
@@ -388,21 +386,7 @@ func TestAIUsageFailureReleaseAndJobAttribution(t *testing.T) {
 	f.req(t, "GET", "/api/usage", nil, 403)
 }
 
-func TestImplicitMetadataAndSPA(t *testing.T) {
-	var pngBytes bytes.Buffer
-	if e := png.Encode(&pngBytes, image.NewNRGBA(image.Rect(0, 0, 12, 12))); e != nil {
-		t.Fatal(e)
-	}
-	b, e := core.ImplicitLabel(pngBytes.Bytes())
-	if e != nil {
-		t.Fatal(e)
-	}
-	if !bytes.Contains(b, []byte("iTXt")) || !bytes.Contains(b, []byte("AI 生成或合成")) || !bytes.Contains(b, []byte("X Studio")) {
-		t.Fatal("PNG 隐式标识缺失")
-	}
-	if _, e = png.Decode(bytes.NewReader(b)); e != nil {
-		t.Fatal("标识损坏 PNG", e)
-	}
+func TestSPAAndDownload(t *testing.T) {
 	f := newFixture(t, nil)
 	for _, p := range []string{"/", "/products/123", "/login"} {
 		res, e := f.client.Get(f.s.URL + p)
@@ -418,24 +402,23 @@ func TestImplicitMetadataAndSPA(t *testing.T) {
 	f.login(t, "admin")
 	pid := f.product(t)
 	dir := f.a.ListingDir(pid)
-	if e = os.MkdirAll(dir, 0700); e != nil {
+	if e := os.MkdirAll(dir, 0700); e != nil {
 		t.Fatal(e)
 	}
-	if e = os.WriteFile(filepath.Join(dir, "导出.zip"), []byte("PK测试"), 0600); e != nil {
+	if e := os.WriteFile(filepath.Join(dir, "导出.zip"), []byte("PK测试"), 0600); e != nil {
 		t.Fatal(e)
 	}
-	res, e := f.client.Get(fmt.Sprintf("%s/api/listings/%d/download?ai_label=0", f.s.URL, pid))
+	res, e := f.client.Get(fmt.Sprintf("%s/api/listings/%d/download", f.s.URL, pid))
 	if e != nil {
 		t.Fatal(e)
 	}
 	res.Body.Close()
-	if res.StatusCode != 200 || res.Header.Get("X-AI-Label") != "1" {
-		t.Fatal("下载应返回最近出图参数")
+	if res.StatusCode != 200 {
+		t.Fatal("下载最近成品失败", res.StatusCode)
 	}
 	var n int
-	_ = f.a.DB.QueryRow("SELECT count(*) FROM audit_log WHERE action='export.no_ai_label'").Scan(&n)
+	_ = f.a.DB.QueryRow("SELECT count(*) FROM audit_log WHERE action='export.run'").Scan(&n)
 	if n < 1 {
-		t.Fatal("取消标识下载缺少日志")
+		t.Fatal("下载缺少日志")
 	}
-
 }

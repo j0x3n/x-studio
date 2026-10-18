@@ -44,7 +44,6 @@ type Product struct {
 	ShopID    int64  `json:"shop_id"`
 	Platform  string `json:"platform"`
 	Language  string `json:"language"`
-	AILabel   bool   `json:"ai_label"`
 }
 type Photo struct {
 	ID             int64     `json:"id"`
@@ -157,7 +156,6 @@ func (a *Core) Product(id int64) (p Product, e error) {
 	p.Content = Object{}
 	p.Main = Object{}
 	p.Listing = Object{}
-	p.AILabel = true
 	return
 }
 func (a *Core) PipelineProduct(id int64) (p Product, e error) {
@@ -165,8 +163,7 @@ func (a *Core) PipelineProduct(id int64) (p Product, e error) {
 	var content, main, meta string
 	var status, step, msg, platform, language string
 	var shop int64
-	var label bool
-	e = a.DB.QueryRow("SELECT l.product_id,l.content,l.main,l.meta,l.pipeline_status,l.pipeline_step,l.pipeline_error,l.shop_id,l.ai_label,s.platform,s.language FROM listings l JOIN shops s ON s.id=l.shop_id WHERE l.id=?", id).Scan(&pid, &content, &main, &meta, &status, &step, &msg, &shop, &label, &platform, &language)
+	e = a.DB.QueryRow("SELECT l.product_id,l.content,l.main,l.meta,l.pipeline_status,l.pipeline_step,l.pipeline_error,l.shop_id,s.platform,s.language FROM listings l JOIN shops s ON s.id=l.shop_id WHERE l.id=?", id).Scan(&pid, &content, &main, &meta, &status, &step, &msg, &shop, &platform, &language)
 	if e != nil {
 		return
 	}
@@ -179,7 +176,6 @@ func (a *Core) PipelineProduct(id int64) (p Product, e error) {
 	p.Status = status
 	p.Step = step
 	p.Error = msg
-	p.AILabel = label
 	p.Platform = platform
 	p.Language = language
 	return

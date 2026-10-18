@@ -15,25 +15,6 @@ import (
 	"xstudio/internal/core"
 )
 
-// ai_label is an optional integer, shared by JSON and query-string downloads.
-func downloadLabel(w http.ResponseWriter, r *http.Request, value *int) (bool, bool) {
-	if value != nil && *value != 0 && *value != 1 {
-		fail(w, 400, "ai_label 只能是 0 或 1")
-		return false, false
-	}
-	label := value == nil || *value == 1
-	if !label && !currentUser(r).Has(core.ExportNoAILabel) {
-		fail(w, 403, "没有取消 AI 标识的权限")
-		return false, false
-	}
-	return label, true
-}
-func labelDownload(data []byte, source string, label bool) ([]byte, error) {
-	if label && (source == "ai_edited" || source == "ai_generated") {
-		return core.ImplicitLabel(data)
-	}
-	return data, nil
-}
 func workbenchFilename(v WorkbenchItem) string {
 	source := map[string]string{"original": "实拍", "ai_enhanced": "AI增强", "ai_edited": "AI改图", "ai_generated": "AI生成"}[v.Source]
 	if source == "" {
@@ -48,24 +29,9 @@ func (a *Module) workbenchFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	download := r.URL.Query().Get("download") == "1"
-	label := true
 	if download {
 		if !currentUser(r).Has(core.ExportRun) {
 			fail(w, 403, "没有下载权限")
-			return
-		}
-		var opt *int
-		if q, ok := r.URL.Query()["ai_label"]; ok {
-			if len(q) != 1 || (q[0] != "0" && q[0] != "1") {
-				fail(w, 400, "ai_label 只能是 0 或 1")
-				return
-			}
-			n, _ := strconv.Atoi(q[0])
-			opt = &n
-		}
-		var ok bool
-		label, ok = downloadLabel(w, r, opt)
-		if !ok {
 			return
 		}
 	}
@@ -99,17 +65,9 @@ func (a *Module) workbenchFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, max-age=86400")
 	w.Header().Add("Vary", "Cookie")
 	if download {
-		b, err = labelDownload(b, v.Source, label)
-		if err != nil {
-			fail(w, 400, err.Error())
-			return
-		}
 		name = workbenchFilename(v)
 		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
 		w.Header().Set("Cache-Control", "private, no-store")
-		if !label {
-			a.Audit(r, "export.no_ai_label", "workbench_item", v.ID, nil)
-		}
 		a.Audit(r, "assets.workbench.download", "workbench_item", v.ID, nil)
 	}
 	w.Header().Set("Content-Type", http.DetectContentType(b))
@@ -117,8 +75,7 @@ func (a *Module) workbenchFile(w http.ResponseWriter, r *http.Request) {
 }
 func (a *Module) workbenchDownload(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		IDs     []int64 `json:"ids"`
-		AILabel *int    `json:"ai_label"`
+		IDs []int64 `json:"ids"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -144,10 +101,6 @@ func (a *Module) workbenchDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	if !currentUser(r).Has(core.ExportRun) {
 		fail(w, 403, "没有下载权限")
-		return
-	}
-	label, ok := downloadLabel(w, r, in.AILabel)
-	if !ok {
 		return
 	}
 	root, err := a.workbenchRoot(currentUser(r).ID)
@@ -179,12 +132,6 @@ func (a *Module) workbenchDownload(w http.ResponseWriter, r *http.Request) {
 			fail(w, status, "读取下载图片失败")
 			return
 		}
-		b, e = labelDownload(b, v.Source, label)
-		if e != nil {
-			z.Close()
-			fail(w, 400, "读取下载图片失败："+e.Error())
-			return
-		}
 		name := workbenchFilename(v)
 		if names[name] {
 			name = strings.TrimSuffix(name, filepath.Ext(name)) + fmt.Sprintf("_%d", v.ID) + filepath.Ext(name)
@@ -203,9 +150,6 @@ func (a *Module) workbenchDownload(w http.ResponseWriter, r *http.Request) {
 	if err = z.Close(); err != nil {
 		fail(w, 500, "完成下载包失败")
 		return
-	}
-	if !label {
-		a.Audit(r, "export.no_ai_label", "workbench", 0, Object{"ids": in.IDs})
 	}
 	a.Audit(r, "assets.workbench.download", "workbench", 0, Object{"ids": in.IDs})
 	w.Header().Set("Cache-Control", "private, no-store")

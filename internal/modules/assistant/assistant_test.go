@@ -272,7 +272,7 @@ func TestHomeLatestCopyAndTodoLimits(t *testing.T) {
 }
 
 func TestChatMultiRoundPromptUsageAuditAndReadOnly(t *testing.T) {
-	f := newFixture(t, calls("get_product", object{"id": 1}), object{"reply": "珠蝶出图失败，确认后重跑。", "actions": []object{card("run_listing", object{"listing_id": 1, "ai_label": false})}, "refs": []object{{"type": "product", "id": 1, "path": "//evil.com", "label": "伪造"}}})
+	f := newFixture(t, calls("get_product", object{"id": 1}), object{"reply": "珠蝶出图失败，确认后重跑。", "actions": []object{card("run_listing", object{"listing_id": 1})}, "refs": []object{{"type": "product", "id": 1, "path": "//evil.com", "label": "伪造"}}})
 	pid, lid := f.product(t, "珠蝶", 1)
 	f.asset(t, pid, "ai_edited")
 	f.exec(t, "UPDATE listings SET pipeline_status='failed',pipeline_error='分拣超时' WHERE id=?", lid)

@@ -8,7 +8,7 @@ Go 1.26 + SQLite + chromedp。React 编译结果（`web/dist/`）embed；模板�
 
 商品保存共用基础信息和素材；每个店铺版本独立保存文案、任务状态和导出文件。商品状态为 `sampling/pending/listed/archived`，流水线状态在上架版本的 `pipeline_*` 字段。商品和版本 ID 不能混用。旧的 photos、商品 run/download 和把文案写进商品的接口已移除。
 
-出图时用 `POST /api/listings/{id}/run?ai_label=0/1` 决定标识（默认 1）。有效来源为 AI 生成或改图时才加角标和隐式标识；实拍、AI 增强均不加。取消需要 `export.no_ai_label` 权限并记审计。下载始终返回最近一次成品，`X-AI-Label` 表示那次出图的参数，下载参数不会重新渲染。AI 白底图仍沿用原规则，不单独导出。
+
 
 ## Windows 本机运行
 
@@ -116,7 +116,7 @@ compose 为受限的容器内核设置 `CHROME_NO_SANDBOX=1`，Chrome 因而关�
 
 图像接口使用 multipart `POST /images/edits`，所有参考图字段均叫 `image`，附 `model`、`prompt`、最接近输入比例的三种 size 之一、`quality=high`，读取 `data[0].b64_json`。按实际返回尺寸保存 PNG，不强制拉伸到请求尺寸；后续仍按原有规则导出标准尺寸。
 
-后端在 copy、PATCH、render 和渲染预览读取时按照片记录纠正 `ai`：生成图为 `AI 生成`，高清图为 `AI 增强`，实拍删除该字段。coverage 每项提供 `ai` 布尔值；need_reshoot 只提示不能用 AI 补的必需位，关掉自动补图后可补的位置仍在 coverage 显示缺失。`templates/` 里的模板已兼容字符串 ai，原样显示。
+coverage 每项提供 `ai` 布尔值；need_reshoot 只提示不能用 AI 补的必需位，关掉自动补图后可补的位置仍在 coverage 显示缺失。
 
 旧库启动前会自动生成 `data/app.db.bak-<UTC 时间>`，然后在一个事务里升级用户、角色、店铺、商品、上架版本、素材和任务。默认店铺为“淘宝店”，旧员工分到该店；旧成品移到 `data/listings/<listing_id>/`。迁移失败时数据库回滚，并恢复已经搬移的导出文件。重启不会重复迁移。旧任务原类型保存在 `params.legacy_kind`，步骤继续由 `steps` 决定。
 
@@ -233,8 +233,8 @@ docker build -t xstudio .
 ## 高清化与补图验收（2026-10-18）
 
 - `go build ./...`、`go vet ./...`、`go test ./... -count=1` 通过，共 33 项测试；Compose 配置检查通过。
-- 新增测试涵盖默认配置与空推理强度、多 image 字段的 multipart、请求重试与超时、PNG/base64、阈值和裁剪、旧数据库及部分迁移、每款开关、禁止补图的编号、4 张限制、失败继续、AI 标识纠正、实拍优先和增强输入不重复裁剪。
-- 假 AI 服务器与真实 Chrome 跑通完整六步：3 张实拍高清化、补 3 张图、保守修图、生成文案、导出 ZIP，并检查主图与详情页 DOM 实际显示“AI 生成”和“AI 增强”。测试未访问真实 SubAPI。
+- 新增测试涵盖默认配置与空推理强度、多 image 字段的 multipart、请求重试与超时、PNG/base64、阈值和裁剪、旧数据库及部分迁移、每款开关、禁止补图的编号、4 张限制、失败继续、实拍优先和增强输入不重复裁剪。
+- 假 AI 服务器与真实 Chrome 跑通完整六步：3 张实拍高清化、补 3 张图、保守修图、生成文案、导出 ZIP。测试未访问真实 SubAPI。
 - `web/`、`prompts/`、实际 `.env` 未修改；旧版模板的字符串标识兼容只处理本站副本。
 
 ## 图片库与图片处理后端（phase1/assets，2026-10-18）
@@ -300,7 +300,7 @@ go test ./... -count=1 -v
   - 自动衔接流水线：当 `pipeline` 任务的 `copy` 步骤完成后，自动为上架版本补存一条 `source='pipeline'` 的文案版本（幂等不重复）。
 - 新增 `internal/modules/studio`（模板中心、出图任务、审核与设置）：
   - 动态读取 `templates/详情页模板/模板清单.json` 并校验顶层 `.html` 模板文件及缩略图 `/render/详情页模板/缩略图/<key>.jpg`，支持按店铺配置默认模板和停用模板（`template_prefs`）。
-  - 支持按上架版本配置详情页模板与 AI 标识（`listing_render`），提供单品出图（`POST /api/listings/{id}/render/run`）与批量出图（`POST /api/render/batch`，自动跳过无权限或运行中的上架版本）。
+  - 支持按上架版本配置详情页模板（`listing_render`），提供单品出图（`POST /api/listings/{id}/render/run`）与批量出图（`POST /api/render/batch`，自动跳过无权限或运行中的上架版本）。
   - `pipeline/render.go` 按 `listing_render.detail_template` → 店铺 `default_detail` → `navy` 选择详情页模板渲染截图；模板不存在或停用时自动回退到 `模板.html` 并在任务 `message` 中记录提示；出图完成后自动更新 `rendered_job_id`、`rendered_template` 及审核状态（`require_review=true` 时置 `pending`，`false` 时直接 `approved`）。
   - `pipeline/files.go` 在 `require_review=true` 时拦截未通过审核（`review_status != 'approved'`）的 `GET /api/listings/{id}/download` 下载请求（返回 409）；数据库升级迁移时对已有成品的上架版本自动回填 `review_status='approved'`，保持向后兼容。
 

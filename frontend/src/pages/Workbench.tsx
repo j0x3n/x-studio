@@ -296,7 +296,7 @@ export function Workbench() {
                 <div className="proc-row"><span className="k">长边</span>
                   <div className="segmented">{[2048, 3000, 4096].map(n => <button key={n} className={o.upscale === n ? 'active' : ''} onClick={() => upd({ upscale: n })}>{n}</button>)}</div>
                 </div>
-                <div className="t3 fs-12">AI 先把细节重画清楚，再放大到长边 {o.upscale}px。不是无损放大，细节会有变化，处理完对照一下原图。结果算「AI 增强」，导出不加角标。</div>
+                <div className="t3 fs-12">AI 先把细节重画清楚，再放大到长边 {o.upscale}px。不是无损放大，细节会有变化，处理完对照一下原图。结果算「AI 增强」。</div>
               </>}
               {tool === 'ai' && <>
                 <div className="fs-12 t2">快捷需求</div>
@@ -308,7 +308,7 @@ export function Workbench() {
                   })}
                 </div>
                 <div className="t4 fs-12">前四个是轻度修整，结果算「AI 增强」；后四个会改画面，结果算「AI 改图」。</div>
-                <Field label="额外需求" hint="写了就算「AI 改图」，导出时默认加「AI 生成」角标。">
+                <Field label="额外需求" hint="写了就算「AI 改图」。">
                   <textarea className="textarea" rows={4} maxLength={4000} value={o.extra} placeholder="如：背景换成米白亚麻布，保留珍珠原有光泽" onChange={e => upd({ extra: e.target.value })} />
                 </Field>
               </>}

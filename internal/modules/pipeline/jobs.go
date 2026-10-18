@@ -10,27 +10,11 @@ import (
 
 var steps = []string{"check", "classify", "enhance", "retouch", "copy", "render"}
 
-func labelOption(w http.ResponseWriter, r *http.Request) (bool, bool) {
-	v := r.URL.Query().Get("ai_label")
-	if v != "" && v != "0" && v != "1" {
-		fail(w, 400, "ai_label 只能是 0 或 1")
-		return false, false
-	}
-	if v == "0" && !currentUser(r).Has(core.ExportNoAILabel) {
-		fail(w, 403, "没有取消 AI 标识的权限")
-		return false, false
-	}
-	return v != "0", true
-}
 func (a *Module) run(w http.ResponseWriter, r *http.Request) {
 	a.Mu.Lock()
 	defer a.Mu.Unlock()
 	id := idParam(r, "id")
 	if !a.RequireListing(w, r, id, true) {
-		return
-	}
-	label, ok := labelOption(w, r)
-	if !ok {
 		return
 	}
 	q := r.URL.Query()
@@ -88,16 +72,13 @@ func (a *Module) run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	res, e := tx.Exec("INSERT INTO jobs(kind,target_type,target_id,user_id,params,status,created_at,steps) VALUES('pipeline','listing',?,?,?,'queued',?,?)", id, currentUser(r).ID, js(Object{"ai_label": label}), now(), strings.Join(selected, ","))
+	res, e := tx.Exec("INSERT INTO jobs(kind,target_type,target_id,user_id,params,status,created_at,steps) VALUES('pipeline','listing',?,?,?,'queued',?,?)", id, currentUser(r).ID, js(Object{}), now(), strings.Join(selected, ","))
 	if e != nil {
 		fail(w, 409, "此上架版本已有正在排队或运行的任务")
 		return
 	}
 	jid, _ := res.LastInsertId()
 	_, e = tx.Exec("UPDATE listings SET pipeline_status='processing',pipeline_error='',updated_at=? WHERE id=?", now(), id)
-	if e == nil && !label {
-		e = core.AuditTx(tx, r, "export.no_ai_label", "listing", id, Object{"job_id": jid, "stage": "run"})
-	}
 	if e != nil || tx.Commit() != nil {
 		fail(w, 500, "保存任务失败")
 		return
@@ -115,10 +96,6 @@ func (a *Module) execute(ctx context.Context, j Job) error {
 		return s
 	}
 	selected := strings.Split(j.Steps, ",")
-	label := true
-	if b, ok := j.Params["ai_label"].(bool); ok {
-		label = b
-	}
 	for i, step := range selected {
 		if ctx.Err() != nil {
 			return fmt.Errorf("服务重启中断")
@@ -134,7 +111,6 @@ func (a *Module) execute(ctx context.Context, j Job) error {
 		if e != nil {
 			return e
 		}
-		p.AILabel = label
 		switch step {
 		case "check":
 			e = a.check(ctx, p)
@@ -168,7 +144,7 @@ func (a *Module) execute(ctx context.Context, j Job) error {
 	if _, e := a.DB.Exec("UPDATE listings SET pipeline_status=?,status=?,pipeline_error='',updated_at=? WHERE id=?", status, status, now(), j.TargetID); e != nil {
 		return e
 	}
-	_, e := a.DB.Exec("UPDATE jobs SET message=?,result=? WHERE id=?", message("处理完成"), js(Object{"ai_label": label}), j.ID)
+	_, e := a.DB.Exec("UPDATE jobs SET message=?,result=? WHERE id=?", message("处理完成"), js(Object{}), j.ID)
 	return e
 }
 func (a *Module) getJob(w http.ResponseWriter, r *http.Request) {

@@ -209,7 +209,7 @@ func (a *Module) copyText(ctx context.Context, p Product) error {
 		Main    Object `json:"main"`
 		Listing Object `json:"listing"`
 	}
-	if e = a.aiJSON(core.WithFeature(ctx, "copy"), a.Cfg.TextModel, prompt+"\nAI 生成或增强的照片不得称为实拍、原相机、无滤镜或作为材质真伪的证据。", js(input), &result); e != nil {
+	if e = a.aiJSON(core.WithFeature(ctx, "copy"), a.Cfg.TextModel, prompt, js(input), &result); e != nil {
 		return e
 	}
 	if result.Content == nil || result.Main == nil || result.Listing == nil {

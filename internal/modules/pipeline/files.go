@@ -49,14 +49,6 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 	if !a.RequireListing(w, r, id, false) {
 		return
 	}
-	if _, ok := labelOption(w, r); !ok {
-		return
-	}
-	var label bool
-	if a.DB.QueryRow("SELECT ai_label FROM listings WHERE id=?", id).Scan(&label) != nil {
-		fail(w, 404, "上架版本不存在")
-		return
-	}
 	_, statErr := os.Stat(filepath.Join(a.ListingDir(id), "导出.zip"))
 	if code, msg := a.checkDownloadReview(id, statErr == nil); code != 0 {
 		fail(w, code, msg)
@@ -66,16 +58,7 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "导出文件不存在")
 		return
 	}
-	if label {
-		w.Header().Set("X-AI-Label", "1")
-	} else {
-		w.Header().Set("X-AI-Label", "0")
-	}
-	action := "export.run"
-	if !label || r.URL.Query().Get("ai_label") == "0" {
-		action = "export.no_ai_label"
-	}
-	a.Audit(r, action, "listing", id, Object{"ai_label": label, "stage": "download"})
+	a.Audit(r, "export.run", "listing", id, Object{"stage": "download"})
 	w.Header().Set("Content-Disposition", `attachment; filename="export.zip"; filename*=UTF-8''%E5%AF%BC%E5%87%BA.zip`)
 	serveRoot(w, r, a.ListingDir(id), "导出.zip")
 }
@@ -133,7 +116,6 @@ func (a *Module) renderRoute(w http.ResponseWriter, r *http.Request) {
 				fail(w, 403, "没有查看文案的权限")
 				return
 			}
-			_ = a.DB.QueryRow("SELECT render_ai_label FROM listings WHERE id=?", id).Scan(&p.AILabel)
 			if e = a.annotateForExport(p); e != nil {
 				fail(w, 500, "读取素材来源失败")
 				return

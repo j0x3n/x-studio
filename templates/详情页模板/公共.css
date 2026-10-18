@@ -4,7 +4,6 @@
   --serif: "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", serif;
   --sans: "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
   --latin: "Bodoni MT", "Didot", "Noto Serif", "Noto Serif CJK SC", serif;
-  --ai-size: 18px; --ai-color: #fff; --ai-bg: rgba(0, 0, 0, .38);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: #fff; }
@@ -21,12 +20,6 @@ img { display: block; width: 100%; height: 100%; object-fit: cover; }
   font-size: 24px; line-height: 1.6; color: rgba(0, 0, 0, .45); white-space: pre-line; }
 .dark .ph.missing::after { border-color: rgba(255, 255, 255, .3); color: rgba(255, 255, 255, .55); }
 
-/* AI 标识：位置和样式可由后端 window.AI_LABEL 统一设置 */
-.ai-tag { position: absolute; left: 14px; top: 14px; z-index: 2; font-family: var(--sans); font-size: var(--ai-size); color: var(--ai-color);
-  background: var(--ai-bg); padding: 4px 10px; border-radius: 2px; line-height: 1.4; letter-spacing: 0; }
-[data-ai-pos="top-right"] .ai-tag { left: auto; right: 14px; }
-[data-ai-pos="bottom-left"] .ai-tag { top: auto; bottom: 14px; }
-[data-ai-pos="bottom-right"] .ai-tag { top: auto; bottom: 14px; left: auto; right: 14px; }
 .stamp { position: absolute; right: 16px; bottom: 16px; z-index: 1; font-size: 20px; letter-spacing: .06em; color: #fff; background: rgba(0, 0, 0, .55); padding: 6px 14px; }
 .mm { position: absolute; left: 14px; bottom: 14px; z-index: 1; font-size: 30px; color: #fff; background: rgba(0, 0, 0, .6); padding: 4px 14px; letter-spacing: .04em; }
 
