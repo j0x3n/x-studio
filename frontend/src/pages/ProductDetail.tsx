@@ -1,12 +1,14 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package } from 'lucide-react'
+import { Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package, Pencil } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import type { Asset, Job, Listing, Product } from '../lib/types'
 import { Topbar, Pill, Loading, Empty, Tabs } from '../components/ui'
 import { fmtAgo, money, productStatus, pipelineStatus, listingStatus, sourceName, platformName } from '../lib/format'
+import { useCategories, missingAttrs, emptyValue, attrText } from '../lib/categories'
+import { AttrFields } from '../components/AttrFields'
 
 type Detail = { product: Product; assets: Asset[] }
 type ListingDetail = { listing: Listing; job: Job | null; outputs: { main34: string[]; main11: string[]; detail: string[]; white: string; zip: string } }
@@ -43,7 +45,7 @@ export function ProductDetail() {
 
   return (
     <>
-      <Topbar crumbs={[<a onClick={() => nav('/products')} className="link">商品</a>]} title={<span className="inline">{p.name}<Pill kind={ps?.pill || 'pill-neutral'}>{ps?.label}</Pill></span>} sub={<><span className="mono">#{p.id}</span><span className="sep" />{photos.length} 张素材<span className="sep" />{p.listings.length} 个店铺版本<span className="sep" />更新于 {fmtAgo(p.updated_at)}</>}>
+      <Topbar crumbs={[<a onClick={() => nav('/products')} className="link">商品</a>]} title={<span className="inline">{p.name}<Pill kind={ps?.pill || 'pill-neutral'}>{ps?.label}</Pill></span>} sub={<><span className="mono">#{p.id}</span>{p.category && <><span className="sep" />{p.category.name}</>}<span className="sep" />{photos.length} 张素材<span className="sep" />{p.listings.length} 个店铺版本<span className="sep" />更新于 {fmtAgo(p.updated_at)}</>}>
         {can('product.edit') && (
           <select className="input" style={{ width: 120 }} value={p.status} onChange={e => setStatus(e.target.value)}>
             {Object.entries(productStatus).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -70,7 +72,7 @@ export function ProductDetail() {
             )}
           </div>
         )}
-        {tab === 'info' && <InfoTab product={p} />}
+        {tab === 'info' && <InfoTab product={p} onChange={load} />}
       </main></div>
     </>
   )
@@ -192,19 +194,69 @@ function ListingCard({ listing, shopName, onChange }: { listing: Listing; shopNa
   )
 }
 
-function InfoTab({ product }: { product: Product }) {
+// 老商品里不在品类模板中的字段（如 notes、旧的 category）照样显示
+const LEGACY_LABEL: Record<string, string> = { series: '系列', category: '款式', style: '款式', pearl: '珍珠', shape: '形状', size: '尺寸', metal: '配件', colors: '颜色', price: '售价', highlights: '卖点', notes: '备注' }
+
+function InfoTab({ product, onChange }: { product: Product; onChange: () => void }) {
+  const { can } = useAuth()
+  const toast = useToast()
+  const { items: cats } = useCategories(true)
+  const [editing, setEditing] = useState(false)
+  const [catId, setCatId] = useState(product.category_id || 0)
+  const [draft, setDraft] = useState<Record<string, unknown>>({})
+  const [busy, setBusy] = useState(false)
   const info = product.info || {}
-  const label: Record<string, string> = { series: '系列', category: '品类', pearl: '珍珠', shape: '形状', size: '尺寸', metal: '配件', colors: '颜色', price: '售价', highlights: '卖点', notes: '备注' }
-  const rows = Object.entries(info).filter(([k, v]) => label[k] && v !== '' && v != null && !(Array.isArray(v) && v.length === 0))
+  const cat = cats?.find(c => c.id === product.category_id)
+  const attrs = cat?.attrs || []
+  const known = new Set(attrs.map(a => a.key))
+  const rows: [string, string, unknown][] = [
+    ...attrs.filter(a => !emptyValue(info[a.key])).map(a => [a.key, a.label, info[a.key]] as [string, string, unknown]),
+    ...Object.entries(info).filter(([k, v]) => !known.has(k) && LEGACY_LABEL[k] && !emptyValue(v)).map(([k, v]) => [k, LEGACY_LABEL[k], v] as [string, string, unknown])
+  ]
+  const missing = missingAttrs(attrs, info)
+  const editCat = cats?.find(c => c.id === catId) || cat
+  const start = () => { setCatId(product.category_id || 0); setDraft({ ...info }); setEditing(true) }
+  const save = async () => {
+    setBusy(true)
+    try {
+      const body: Record<string, unknown> = { info: draft }
+      if (catId && catId !== product.category_id) body.category_id = catId
+      await api(`/api/products/${product.id}`, { method: 'PATCH', body })
+      toast('已保存', 'ok'); setEditing(false); onChange()
+    } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+  }
+  const enabled = (cats || []).filter(c => !c.disabled || c.id === product.category_id)
   return (
     <div className="two-col">
       <section className="panel">
-        <div className="panel-head"><div className="panel-title">基础信息</div></div>
-        <div className="panel-pad">
-          {rows.length === 0 ? <div className="t3">还没填，一键出图时 AI 会看照片补全。</div> : (
-            <dl className="kv">{rows.map(([k, v]) => <Fragment key={k}><dt>{label[k]}</dt><dd className={k === 'price' ? 'mono' : ''}>{Array.isArray(v) ? v.join('、') : k === 'price' ? money(v) : String(v)}</dd></Fragment>)}</dl>
-          )}
+        <div className="panel-head">
+          <div className="titles"><div className="panel-title">基础信息</div>{cat && <div className="panel-sub">品类：{cat.name}{cat.disabled ? '（已停用）' : ''}</div>}</div>
+          <span className="grow" />
+          {can('product.edit') && !editing && <button className="btn btn-secondary btn-sm" onClick={start}><Pencil />编辑</button>}
         </div>
+        {editing ? (
+          <div className="panel-pad stack">
+            {enabled.length > 1 && (
+              <div className="form-field">
+                <span className="label">品类</span>
+                <div className="segmented">{enabled.map(c => <button type="button" key={c.id} className={c.id === catId ? 'active' : ''} onClick={() => setCatId(c.id)}>{c.name}</button>)}</div>
+                {catId !== product.category_id && <span className="help">改品类后，以后分拣和出图按新品类的拍摄编号和槽位来，已分拣的素材编号不变。</span>}
+              </div>
+            )}
+            {editCat && <AttrFields attrs={editCat.attrs} value={draft} onChange={setDraft} />}
+            <div className="toolbar" style={{ justifyContent: 'flex-end', margin: 0 }}>
+              <button className="btn btn-secondary" onClick={() => setEditing(false)}>取消</button>
+              <button className="btn btn-primary" disabled={busy} onClick={save}>保存</button>
+            </div>
+          </div>
+        ) : (
+          <div className="panel-pad stack">
+            {rows.length === 0 ? <div className="t3">还没填，一键出图时 AI 会看照片补全。</div> : (
+              <dl className="kv">{rows.map(([k, label, v]) => <Fragment key={k}><dt>{label}</dt><dd className={k === 'price' ? 'mono' : ''}>{k === 'price' ? money(v) : attrText(attrs.find(a => a.key === k), v)}</dd></Fragment>)}</dl>
+            )}
+            {missing.length > 0 && <div className="fs-12 t3">还没填：{missing.join('、')}</div>}
+          </div>
+        )}
       </section>
       {(product.cost || product.supplier) && (
         <section className="panel">

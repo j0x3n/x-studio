@@ -14,6 +14,7 @@ export type Product = {
   status: 'sampling' | 'pending' | 'listed' | 'archived'
   info: Record<string, unknown>; cost?: Record<string, unknown>; supplier?: Record<string, unknown>
   listings: Listing[]; cover_url: string; asset_count?: number
+  category_id?: number; category?: { id: number; key: string; name: string }; created_by_name?: string
 }
 export type Asset = {
   id: number; product_id: number; file: string; orig_name: string; width: number; height: number
@@ -89,4 +90,14 @@ export type Home = {
   counts: { in_progress: number; review_pending: number | null; failed: number; no_photo: number; copy_unapplied: number | null }
   todos: Todo[]
   recent_assets: { id: number; product_id: number; product_name: string; title: string; source: string; thumb_url: string; created_at: string }[]
+}
+
+// 多品类（接口约定-多品类.md）
+export type AttrType = 'text' | 'textarea' | 'number' | 'select' | 'multi' | 'bool'
+export type AttrField = { key: string; label: string; type: AttrType; options?: string[]; free?: boolean; unit?: string; hint?: string; required?: boolean }
+export type ShotCode = { code: string; group: string; name: string; use?: string; desc?: string; suffix?: string }
+export type Category = {
+  id: number; key: string; name: string; sort: number; disabled: boolean
+  attrs: AttrField[]; codes: ShotCode[]; slots: Record<string, unknown>; rules: string; banned: string[]; default_template: string
+  product_count?: number; created_at: string; updated_at: string
 }

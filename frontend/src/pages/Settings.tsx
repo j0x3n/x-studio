@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Save } from 'lucide-react'
 import { api } from '../lib/api'
 import { useToast, errText } from '../lib/toast'
-import { Topbar, Loading, Field } from '../components/ui'
+import { Topbar, Loading, Field, Tabs } from '../components/ui'
+import { CategoriesTab } from './Categories'
 
 type Settings = { ai_models?: Record<string, string>; ai_prices?: Record<string, number>; quota_default?: { month_images: number | null; month_text: number | null } }
 
@@ -20,6 +21,18 @@ const FEATURES: Record<string, string> = {
 }
 
 export function SettingsPage() {
+  const [tab, setTab] = useState<'general' | 'categories'>('general')
+  const tabs = <Tabs value={tab} onChange={setTab} items={[{ key: 'general', label: '通用' }, { key: 'categories', label: '品类' }]} />
+  if (tab === 'categories') return (
+    <>
+      <Topbar title="设置" sub="品类改完立即生效，新的分拣、文案和出图按新设置来" />
+      <div className="scroll"><main className="content" style={{ maxWidth: 1080 }}>{tabs}<CategoriesTab /></main></div>
+    </>
+  )
+  return <GeneralSettings tabs={tabs} />
+}
+
+function GeneralSettings({ tabs }: { tabs: ReactNode }) {
   const toast = useToast()
   const [s, setS] = useState<Settings | null>(null)
   const [models, setModels] = useState<Record<string, string>>({})
@@ -52,6 +65,7 @@ export function SettingsPage() {
     <>
       <Topbar title="设置" sub="改完点右上角保存，新的出图任务才会用到新设置"><button className="btn btn-primary" disabled={busy} onClick={save}><Save />保存设置</button></Topbar>
       <div className="scroll"><main className="content" style={{ maxWidth: 880 }}>
+        {tabs}
         <section className="panel">
           <div className="panel-head"><div className="titles"><div className="panel-title">AI 模型</div><div className="panel-sub">每个功能用哪个模型；留空用服务器环境变量里的默认值</div></div></div>
           <div className="panel-pad stack" style={{ gap: 10 }}>

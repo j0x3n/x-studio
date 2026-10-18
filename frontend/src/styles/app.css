@@ -324,3 +324,45 @@ button.chip.outline:hover { border-color: var(--border-strong); color: var(--tex
 .tb-sub .sep::before { content: "·"; margin: 0 6px; color: var(--text-4); }
 .topbar > .btn, .topbar > select, .topbar > .segmented, .topbar > .field { flex-shrink: 0; }
 @media (max-width: 1024px) { .tb-sub { display: none; } }
+
+/* 品类属性表单 */
+.attr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.attr-grid .wide { grid-column: 1 / -1; }
+.chip-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip-pick .chip { height: 26px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text-2); font-size: var(--fs-12); cursor: pointer; }
+.chip-pick .chip:hover { border-color: var(--primary-200); }
+.chip-pick .chip.on { background: var(--primary-50); border-color: var(--primary-200); color: var(--primary-text); }
+.chip-pick .chip-add { width: 140px; height: 26px; font-size: var(--fs-12); }
+.attr-table td { vertical-align: top; }
+.attr-table .input { height: 28px; }
+.code-area { font-family: var(--font-mono); font-size: var(--fs-12); line-height: 1.6; }
+
+/* 商品库：状态卡、店铺版本 6 步进度、图墙 */
+.stage-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stage-card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); text-align: left; cursor: pointer; min-width: 0; font: inherit; color: inherit; }
+.stage-card:hover { border-color: var(--border-strong); }
+.stage-card.on { border-color: var(--primary); background: var(--primary-50); }
+.stage-label { font-size: var(--fs-12); color: var(--text-2); font-weight: 500; }
+.stage-n { font-size: 20px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.stage-card.danger .stage-n { color: var(--danger-text); }
+.stage-foot { font-size: var(--fs-12); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.lanes { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.lane { display: grid; grid-template-columns: 64px 74px auto; align-items: center; gap: 8px; font-size: var(--fs-12); }
+.lane-shop { color: var(--text-2); }
+.lane-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
+.lane-bar i { height: 6px; border-radius: 2px; background: var(--surface-3); }
+.lane.ok .lane-bar i.d { background: var(--success); }
+.lane.run .lane-bar i.d, .lane.bad .lane-bar i.d { background: var(--primary); }
+.lane.run .lane-bar i.c { background: var(--primary); opacity: .45; animation: lane-pulse 1.2s ease-in-out infinite; }
+.lane.bad .lane-bar i.c { background: var(--danger); }
+.lane-text { color: var(--text-3); white-space: nowrap; }
+.lane.ok .lane-text { color: var(--success-text); }
+.lane.bad .lane-text { color: var(--danger-text); }
+.lane.run .lane-text { color: var(--info-text); }
+@keyframes lane-pulse { 50% { opacity: .15; } }
+.prod-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); padding: 14px; }
+.prod-cover { position: relative; aspect-ratio: 1; background: var(--surface-2); display: grid; place-items: center; color: var(--text-4); }
+.prod-cover img { width: 100%; height: 100%; object-fit: cover; }
+.prod-cover .lib-check { position: absolute; top: 8px; left: 8px; }
+.prod-meta { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.prod-meta .lane { grid-template-columns: 56px 1fr auto; }
