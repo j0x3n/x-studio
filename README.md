@@ -332,3 +332,9 @@ go test ./... -count=1 -v
 - 通知用 SSE：`GET /api/notifications/stream`。连上先发 `unread`，新通知发 `notification`，里面带 `desktop`。收件箱关掉就不写表；免打扰或桌面关掉时照样写表，但 `desktop` 为 false。到期、逾期、额度 80% 每种只发一次。
 - 负载是 `GET /api/tasks/load`（`task.manage`）。完成统计是 `GET /api/tasks/stats`，路由挂在 `task.manage` 上，实际只允许管理员。
 
+## 库存
+
+`internal/modules/inventory` 提供 `/api/inventory/` 下的物料、仓库、代发、批次、流水、手工出入库、调拨、盘点和 CSV 导出接口；查看需 `inventory.view`，修改需 `inventory.edit`，成本字段仅向 `product.cost` 或 `finance.view` 返回。
+`StockIn`、`StockOut`、`Reserve`、`Release`、`Stock` 供后续 purchase、orders 模块调用：所有写函数只使用调用方传入的 `*sql.Tx`，由调用方记录业务审计并提交或回滚；发货先释放占用再出库。
+安全库存跌破时只写一次 `inventory.low_stock` 系统审计，恢复后再次跌破才重发；通知和补货任务留给后续 tasks 接入。
+
