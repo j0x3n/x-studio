@@ -87,7 +87,7 @@ func (a *Module) prompt(u core.User, ctx *chatContext) (string, error) {
 			context += strings.Join(selected, "、")
 		}
 	}
-	return strings.NewReplacer("{{today}}", now.Format("2006-01-02")+" "+days[now.Weekday()], "{{user}}", user, "{{tools}}", catalogText(u, toolCatalog), "{{actions}}", actionText(u), "{{context}}", context).Replace(string(b)), nil
+	return strings.NewReplacer("{{today}}", now.Format("2006-01-02")+" "+days[now.Weekday()]+" "+now.Format("15:04"), "{{user}}", user, "{{tools}}", catalogText(u, toolCatalog), "{{actions}}", actionText(u), "{{context}}", context).Replace(string(b)), nil
 }
 
 func validateRequest(in chatRequest) string {

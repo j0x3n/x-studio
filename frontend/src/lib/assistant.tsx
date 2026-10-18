@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api } from './api'
-import type { AssistAction, AssistReply, Job } from './types'
+import type { AssistAction, AssistReply, Job, Task } from './types'
 
 // AI 助手：右侧面板的开关、对话记录、当前页面上下文。对话只存在本标签页（sessionStorage），后端不存。
 export type ChatMsg = { role: 'user' | 'assistant'; content: string; actions?: AssistAction[]; refs?: AssistReply['refs']; error?: boolean }
@@ -33,7 +33,7 @@ function write(store: () => Storage, key: string, v: unknown) {
 const PAGES: [RegExp, string][] = [
   [/^\/$/, '今天（首页）'], [/^\/products\/\d+/, '商品详情'], [/^\/products/, '商品库'], [/^\/assets/, '素材库'],
   [/^\/process/, '图片处理'], [/^\/copy/, '文案中心'], [/^\/templates/, '模板中心'], [/^\/review/, '出图审核'],
-  [/^\/admin/, '账号与权限'], [/^\/settings/, '设置']
+  [/^\/tasks/, '任务'], [/^\/admin/, '账号与权限'], [/^\/settings/, '设置']
 ]
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
@@ -80,19 +80,27 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
 export const useAssistant = () => useContext(Ctx)
 
-// 执行一张动作卡：用当前登录用户调现有接口（权限、额度、日志都走原接口）。返回后台任务（有的话）。
-export async function runAction(a: AssistAction): Promise<Job | null> {
+// 执行一张动作卡：用当前登录用户调现有接口（权限、额度、日志都走原接口）。
+// 返回后台任务（有的话）或执行后可以打开的页面（如新建的任务）。
+export type ActionResult = { job?: Job; path?: string }
+export async function runAction(a: AssistAction): Promise<ActionResult> {
   const p = a.params as Record<string, unknown>
   const id = Number(p.listing_id)
-  const job = (r: unknown) => (r && typeof r === 'object' && 'job' in r ? (r as { job: Job }).job : null)
+  const job = (r: unknown): ActionResult => (r && typeof r === 'object' && 'job' in r ? { job: (r as { job: Job }).job } : {})
   switch (a.type) {
     case 'run_listing': return job(await api(`/api/listings/${id}/run`, { method: 'POST' }))
     case 'render_listing': return job(await api(`/api/listings/${id}/render/run`, { method: 'POST' }))
-    case 'render_batch': await api('/api/render/batch', { body: { listing_ids: p.listing_ids } }); return null
+    case 'render_batch': await api('/api/render/batch', { body: { listing_ids: p.listing_ids } }); return {}
     case 'process_assets': return job(await api('/api/assets/process', { body: { asset_ids: p.asset_ids, ops: p.ops, preset_id: p.preset_id ?? null } }))
     case 'generate_copy': return job(await api(`/api/listings/${id}/copies/generate`, { body: { instructions: p.instructions || '' } }))
-    case 'review': await api(`/api/listings/${id}/review`, { body: { status: p.status, note: p.note || '' } }); return null
+    case 'review': await api(`/api/listings/${id}/review`, { body: { status: p.status, note: p.note || '' } }); return {}
+    case 'create_task': {
+      // 后端已校验并把 assignee_id 补全，这里只挑任务接口认识的字段
+      const keys = ['title', 'body', 'assignee_id', 'priority', 'due_at', 'target_type', 'target_id', 'checklist', 'watcher_ids']
+      const body = Object.fromEntries(keys.filter(k => p[k] !== undefined).map(k => [k, p[k]]))
+      const r = await api<{ task: Task }>('/api/tasks', { body })
+      return { path: `/tasks/${r.task.id}` }
+    }
     default: throw new Error('不认识的操作：' + a.type)
   }
 }
-

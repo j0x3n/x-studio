@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Sparkles, X, RotateCcw, ArrowUp, ChevronRight, Loader2, Check, AlertTriangle, Play, LayoutTemplate, Wand2, PenLine, ClipboardCheck, ExternalLink, type LucideIcon } from 'lucide-react'
+import { Sparkles, X, RotateCcw, ArrowUp, ChevronRight, Loader2, Check, AlertTriangle, Play, LayoutTemplate, Wand2, PenLine, ClipboardCheck, ExternalLink, ListTodo, User, Clock, Link2, type LucideIcon } from 'lucide-react'
 import { useAssistant, runAction, type ChatMsg } from '../lib/assistant'
 import { useJobs, jobRunning } from '../lib/jobs'
 import { useToast, errText } from '../lib/toast'
-import type { AssistAction, AssistRef } from '../lib/types'
+import { useAuth } from '../lib/auth'
+import { taskPriority } from '../lib/tasks'
+import type { AssistAction, AssistRef, TaskPriority } from '../lib/types'
 
 const LOOK: Record<string, { icon: LucideIcon; tint: string }> = {
   open: { icon: ExternalLink, tint: 'tint-blue' },
@@ -13,7 +15,8 @@ const LOOK: Record<string, { icon: LucideIcon; tint: string }> = {
   render_batch: { icon: LayoutTemplate, tint: 'tint-purple' },
   process_assets: { icon: Wand2, tint: 'tint-blue' },
   generate_copy: { icon: PenLine, tint: 'tint-green' },
-  review: { icon: ClipboardCheck, tint: 'tint-orange' }
+  review: { icon: ClipboardCheck, tint: 'tint-orange' },
+  create_task: { icon: ListTodo, tint: 'tint-green' }
 }
 
 const refPath = (r: AssistRef) => r.path || (r.type === 'product' ? `/products/${r.id}` : r.type === 'asset' ? `/assets?q=${r.id}` : '')
@@ -21,6 +24,7 @@ const refPath = (r: AssistRef) => r.path || (r.type === 'product' ? `/products/$
 // 右侧常驻 AI 助手：知道当前页面和选中对象；动作卡要点确认才执行
 export function AssistantPanel() {
   const { messages, busy, send, clear, setOpen } = useAssistant()
+  const { can } = useAuth()
   const loc = useLocation()
   const [text, setText] = useState('')
   const body = useRef<HTMLDivElement>(null)
@@ -34,7 +38,8 @@ export function AssistantPanel() {
   const suggestions = [
     '今天先做什么？',
     '出图失败的是哪几款，为什么？',
-    ...(onProduct ? ['这款还差哪些步骤没做？', '这款的素材里哪些是 AI 改过的？'] : ['这周哪些款还没有繁体文案？'])
+    ...(onProduct ? ['这款还差哪些步骤没做？', '这款的素材里哪些是 AI 改过的？'] : ['这周哪些款还没有繁体文案？']),
+    ...(can('task.view') ? [onProduct ? (can('task.manage') ? '这款派给美工修图，明天下班前' : '提醒我明天把这款的照片补齐') : '提醒我周五前把新款都拍完'] : [])
   ]
 
   return (
@@ -49,7 +54,7 @@ export function AssistantPanel() {
       <div className="assist-body" ref={body}>
         {messages.length === 0 ? (
           <div className="col" style={{ gap: 12 }}>
-            <div className="bubble">我能帮你查商品、素材、出图状态和失败原因，也能帮你准备批量处理、重跑出图、写文案这些操作，你确认后才会执行。</div>
+            <div className="bubble">我能帮你查商品、素材、出图状态和失败原因，也能帮你准备批量处理、重跑出图、写文案、派任务这些操作，你确认后才会执行。</div>
             <div className="col" style={{ gap: 6 }}>
               <div className="eyebrow">可以这样问</div>
               {suggestions.map(s => <button key={s} className="suggest" onClick={() => send(s)}><Sparkles />{s}<ChevronRight className="end" /></button>)}
@@ -99,33 +104,65 @@ function ActionCard({ a }: { a: AssistAction }) {
     const path = String(a.params.path || '/')
     return <button className="suggest" onClick={() => nav(path)}><ExternalLink />{a.label}<ChevronRight className="end" /></button>
   }
+  const [opened, setOpened] = useState('')
   const go = async () => {
     setState('busy')
     try {
-      const j = await runAction(a)
-      if (j) setJobId(j.id)
+      const r = await runAction(a)
+      if (r.job) setJobId(r.job.id)
+      if (r.path) setOpened(r.path)
       setState('done')
-      toast(j ? `已开始：${a.label}` : `已完成：${a.label}`, 'ok')
+      toast(a.type === 'create_task' ? '任务已建好' : r.job ? `已开始：${a.label}` : `已完成：${a.label}`, 'ok')
     } catch (e) { setState('error'); toast(errText(e), 'error') }
   }
-  const status = job ? (jobRunning(job) ? `进行中 ${job.progress || 0}%` : job.status === 'done' ? '已完成' : `失败：${job.message || '原因未知'}`) : state === 'done' ? '已提交' : ''
+  const status = job ? (jobRunning(job) ? `进行中 ${job.progress || 0}%` : job.status === 'done' ? '已完成' : `失败：${job.message || '原因未知'}`) : state === 'done' ? (a.type === 'create_task' ? '已建好' : '已提交') : ''
+  const isTask = a.type === 'create_task'
   return (
     <div className="act-card">
       <div className="row" style={{ alignItems: 'flex-start' }}>
         <span className={'icon-tile sm ' + look.tint}><look.icon /></span>
         <div className="grow" style={{ minWidth: 0 }}>
-          <div className="t1" style={{ fontWeight: 500 }}>{a.label}</div>
-          <div className="fs-12 t3">{a.summary}</div>
+          {isTask ? <TaskPreview a={a} /> : <>
+            <div className="t1" style={{ fontWeight: 500 }}>{a.label}</div>
+            <div className="fs-12 t3">{a.summary}</div>
+          </>}
         </div>
       </div>
       <div className="row">
         {a.cost_hint && <span className="fs-12 t3">{a.cost_hint}</span>}
         {status && <span className={'fs-12 ' + (job?.status === 'failed' ? 'danger-text' : 't2')}>{status}</span>}
         <span className="grow" />
-        {state === 'done' || state === 'busy'
-          ? <button className="btn btn-secondary btn-sm" disabled>{state === 'busy' ? <Loader2 className="spin" /> : <Check />}{state === 'busy' ? '提交中' : '已确认'}</button>
-          : <button className="btn btn-primary btn-sm" onClick={go}>{state === 'error' ? '重试' : '确认执行'}</button>}
+        {opened
+          ? <button className="btn btn-secondary btn-sm" onClick={() => nav(opened)}>查看任务<ChevronRight /></button>
+          : state === 'done' || state === 'busy'
+            ? <button className="btn btn-secondary btn-sm" disabled>{state === 'busy' ? <Loader2 className="spin" /> : <Check />}{state === 'busy' ? '提交中' : '已确认'}</button>
+            : <button className="btn btn-primary btn-sm" onClick={go}>{state === 'error' ? '重试' : isTask ? '确认建任务' : '确认执行'}</button>}
       </div>
+    </div>
+  )
+}
+
+// 建任务的卡：标题 + 后端核对过的负责人、截止、对象（preview 由后端按真实数据生成，不用 AI 的原话）
+function TaskPreview({ a }: { a: AssistAction }) {
+  const p = a.params
+  const pv = a.preview
+  const prio = taskPriority[p.priority as TaskPriority]
+  const checklist = Array.isArray(p.checklist) ? p.checklist.length : 0
+  return (
+    <div className="col" style={{ gap: 4 }}>
+      <div className="row" style={{ gap: 6 }}>
+        <span className="t1 ellipsis" style={{ fontWeight: 500 }}>{String(p.title || a.label)}</span>
+        {prio && p.priority !== 'normal' && <span className={'pill ' + prio.pill}>{prio.label}</span>}
+      </div>
+      {!!p.body && <div className="fs-12 t3 clamp-2">{String(p.body)}</div>}
+      {pv ? (
+        <div className="act-meta fs-12 t2">
+          <span><User />{pv.assignee}</span>
+          {pv.due && <span><Clock />{pv.due}</span>}
+          {pv.target && <span><Link2 />{pv.target}</span>}
+          {checklist > 0 && <span><ListTodo />{checklist} 项清单</span>}
+        </div>
+      ) : <div className="fs-12 t3">{a.summary}</div>}
     </div>
   )
 }

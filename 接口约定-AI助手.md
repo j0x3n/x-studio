@@ -189,3 +189,95 @@ AI 调用失败（没配置 key、额度不够、超时）时返回 502，`error
   - 请求校验：空 messages、最后一条不是 user、超长内容 → 400。
   - 提示词缺失 → 500 中文错误。
 - 汇报：改了哪些文件、测试命令和结果、和本约定不一致的地方、风险。
+
+## 6. 补充：一句话派活（2026-10-19）
+
+用户对助手说「让小林明天下午把珠蝶修一下」，助手查到人和商品后给一张 `create_task` 动作卡，用户确认后前端调 `POST /api/tasks`。规则照第 1 节：助手只提议，真正建任务走任务模块的接口（权限、日志都在那边）。
+
+### 6.1 文件归属
+
+| 路径 | 归谁 |
+|---|---|
+| `internal/modules/assistant/**` | 编码 AI |
+| `prompts/助手.md`、`frontend/**`、本约定 | Claude |
+| 其他所有文件（含 `internal/modules/tasks/**`） | 冻结，只读 |
+
+assistant 模块**不 import tasks 包**，需要的检查用 `core` 已有的 `a.User(id)`、`u.Has`、`CanProduct` / `CanListing` / `assetProduct` 自己做，口径和 tasks 模块的 `checkMember`、`requireTarget` 一致。
+
+### 6.2 `{{today}}` 带上时间
+
+改成「2026-10-19 周一 14:30」（上海时区，到分钟），AI 才能把「明天下午」「两小时后」换算成截止时间。
+
+### 6.3 新工具 `list_assignees`
+
+| 名称 | 需要权限 | 参数 | 返回 |
+|---|---|---|---|
+| `list_assignees` | task.view | `target_type?`（`product`/`listing`/`asset`）+ `target_id?`，两个要么都给要么都不给 | `[{id, name, username, role_name, open_count}]` |
+
+- 口径同 `GET /api/tasks/assignees`：未停用、有 `task.view` 的账号；给了对象时只返回看得到它的人。对象当前用户看不到 → 工具返回错误。
+- `name` 是显示名，`open_count` 是手上 todo/doing/waiting 的任务数。
+- 当前用户**没有 `task.manage`** 时只返回他自己（反正派不了别人）。
+- 最多 50 人，按 id 排。
+
+### 6.4 新动作 `create_task`
+
+需要 `task.view`。
+
+```json
+{
+  "type": "create_task",
+  "label": "建任务",
+  "summary": "（后端重写，见下）",
+  "params": {
+    "title": "修图：珠蝶",
+    "body": "主图去灰、调白平衡",
+    "assignee_id": 3,
+    "priority": "high",
+    "due_at": "2026-10-20T18:00:00+08:00",
+    "target_type": "product", "target_id": 7,
+    "checklist": [{"text": "去灰", "done": false}],
+    "watcher_ids": [5]
+  },
+  "preview": {"assignee": "小林", "due": "10-20 周二 18:00", "target": "珠蝶"}
+}
+```
+
+参数和校验（不合格的整张卡丢掉，`dropped` 加 1）：
+
+| 参数 | 规则 |
+|---|---|
+| `title` | 必填，去掉首尾空白后 1–100 字 |
+| `body` | 可选，≤1000 字 |
+| `assignee_id` | 可选。不给 = 派给自己；`0` = 暂不派人；其他 = 别人。派给别人或 `0` 需要当前用户有 `task.manage`。负责人必须存在、未停用、有 `task.view`、看得到挂的对象 |
+| `priority` | 可选，`low`/`normal`/`high`/`urgent` |
+| `due_at` | 可选，RFC3339 带时区（`time.RFC3339` 能解析）；早于现在 1 小时以上的丢掉 |
+| `target_type` + `target_id` | 可选，两个要么都给要么都不给；当前用户必须看得到 |
+| `checklist` | 可选，≤20 项，每项 `text` 1–100 字，`done` 只能是 false |
+| `watcher_ids` | 可选，≤10 个，不重复，规则同负责人；不能包含负责人 |
+| 其他键 | 有就丢掉整张卡 |
+
+后端校验通过后**规范化**卡片，前端照着发、照着显示，不信 AI 写的文字：
+
+- `params.assignee_id` 一定写出来（没给时填当前用户 id），其他参数原样保留（`title` 用去掉空白后的）。
+- `preview`（新字段，`omitempty`，只有 `create_task` 有）：
+  - `assignee`：负责人显示名；是自己时为「自己」；`0` 时为「暂不派人」。
+  - `due`：上海时区「01-02 周一 15:04」；没有截止时间为空串。
+  - `target`：对象名称（同 Ref 的 label 规则）；没挂对象为空串。
+- `summary` 由后端重写：`标题 · 负责人 · 截止 · 对象`，空的部分省略，截到 60 字。
+- `label` 照常截 12 字，为空时填「建任务」。
+- 不给 `cost_hint`。
+
+### 6.5 `open` 支持任务页
+
+`safePath` 加上 `/tasks`：只允许 `/tasks` 本身（可以带查询参数，如 `/tasks?view=created`），`/tasks/xxx` 子路径丢掉。用户没有 `task.view` 时 `/tasks` 也丢掉。
+
+### 6.6 验收
+
+- `go build ./... && go vet ./... && go test ./... -count=1` 干净（命令见交接说明第 4 节）。
+- 必须有的测试：
+  - `{{today}}` 含 `HH:MM`。
+  - `list_assignees`：有 `task.manage` 时列出所有可派的人（停用的、没 `task.view` 的不在里面）；带对象时看不到对象的人不在里面；没 `task.manage` 时只有自己；当前用户看不到对象时报错；没 `task.view` 的用户 `{{tools}}` 里没有它、硬调报无权限。
+  - `create_task` 通过：不给负责人 → `assignee_id` 补成自己、`preview.assignee`=「自己」；派给别人 → `preview` 三项和重写后的 `summary` 正确。
+  - `create_task` 丢掉：没 `task.view`（`{{actions}}` 里也没有）；没 `task.manage` 派给别人或 `0`；负责人停用 / 没 `task.view` / 看不到对象；当前用户看不到对象；只给 `target_type` 没给 `target_id`；标题空或超长；`due_at` 格式错或太早；清单超 20 项或有 `done:true`；协作人包含负责人；有未知参数。
+  - `open`：`/tasks`、`/tasks?view=created` 通过；`/tasks/5` 丢掉；没 `task.view` 时 `/tasks` 丢掉。
+  - 现有测试全部通过。

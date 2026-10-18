@@ -15,6 +15,7 @@ type Action struct {
 	Label    string `json:"label"`
 	Summary  string `json:"summary"`
 	Params   object `json:"params"`
+	Preview  object `json:"preview,omitempty"`
 	CostHint string `json:"cost_hint,omitempty"`
 }
 type Ref struct {
@@ -25,7 +26,8 @@ type Ref struct {
 }
 
 var actionCatalog = []capability{
-	{"open", "", "打开前端页面；参数 {path: /、/products、/assets、/process、/copy、/templates、/review、/admin、/settings 及其子路由}"},
+	{"open", "", "打开前端页面；参数 {path: /、/products、/assets、/process、/copy、/templates、/review、/admin、/settings 及其子路由；/tasks 仅本身，可带查询参数，需要task.view}"},
+	{"create_task", core.TaskView, "建议新建任务，确认后调用POST /api/tasks；参数 {title:1至100字,body?:最多1000字,assignee_id?:默认自己或0暂不派人,priority?:low或normal或high或urgent,due_at?:带时区RFC3339,target_type?:product或listing或asset,target_id?:对象编号（与类型同时给）,checklist?:最多20项{text:1至100字,done:false},watcher_ids?:最多10个不重复且不含负责人的可见用户编号}；派给别人或0需要task.manage"},
 	{"run_listing", core.RenderRun, "从头一键出图；参数 {listing_id}"},
 	{"render_listing", core.RenderRun, "按当前模板出图；参数 {listing_id}"},
 	{"render_batch", core.RenderRun, "批量出图；参数 {listing_ids:最多50个}"},
@@ -73,7 +75,7 @@ func safePath(path string) bool {
 			return false
 		}
 	}
-	if u.Path == "/" {
+	if u.Path == "/" || u.Path == "/tasks" {
 		return true
 	}
 	for _, base := range []string{"/products", "/assets", "/process", "/copy", "/templates", "/review", "/admin", "/settings"} {
@@ -104,9 +106,22 @@ func (a *Module) validateAction(u core.User, raw json.RawMessage) (Action, bool)
 	}
 	params := json.RawMessage(core.JS(card.Params))
 	card.CostHint = ""
+	card.Preview = nil
 	card.Label = clip(card.Label, 12)
 	card.Summary = clip(card.Summary, 60)
 	switch card.Type {
+	case "create_task":
+		// Preserve integer IDs exactly while validating and forwarding task params.
+		var exact struct {
+			Params object `json:"params"`
+		}
+		decoder := json.NewDecoder(strings.NewReader(string(raw)))
+		decoder.UseNumber()
+		if decoder.Decode(&exact) != nil {
+			return card, false
+		}
+		card.Params = exact.Params
+		return a.createTaskAction(u, card)
 	case "open":
 		var in struct {
 			Path string `json:"path"`
@@ -164,6 +179,9 @@ func (a *Module) validateAction(u core.User, raw json.RawMessage) (Action, bool)
 func (a *Module) visiblePath(u core.User, path string) bool {
 	decoded, _ := url.PathUnescape(path) // safePath has already checked encoding.
 	parsed, _ := url.Parse(decoded)
+	if parsed.Path == "/tasks" && !u.Has(core.TaskView) {
+		return false
+	}
 	query, err := url.ParseQuery(parsed.RawQuery)
 	if err != nil {
 		return false

@@ -9,6 +9,7 @@ import (
 type capability struct{ name, perm, description string }
 
 var toolCatalog = []capability{
+	{"list_assignees", core.TaskView, "查询可派人员及未完成任务数，最多50人；参数 {target_type?:product或listing或asset,target_id?:对象编号}，两个同时给或同时省略；没有task.manage时只返回自己"},
 	{"today", "", "今天的统计与待办；参数 {}"},
 	{"search_products", core.ProductView, "查找商品；参数 {q?:款名或编号,status?:状态,shop_id?:店铺编号,limit?:1至20，默认10}"},
 	{"get_product", core.ProductView, "商品信息、版本和素材来源计数；参数 {id:商品编号}"},
@@ -55,6 +56,11 @@ func (a *Module) tool(u core.User, name string, raw json.RawMessage) (any, error
 		return nil, fmt.Errorf("未知工具")
 	}
 	switch name {
+	case "list_assignees":
+		if len(raw) == 0 {
+			raw = json.RawMessage(`{}`)
+		}
+		return a.listAssignees(u, raw)
 	case "today", "list_presets", "my_usage":
 		if len(raw) == 0 {
 			raw = json.RawMessage(`{}`)
