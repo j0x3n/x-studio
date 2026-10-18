@@ -304,3 +304,9 @@ go test ./... -count=1 -v
   - `pipeline/render.go` 按 `listing_render.detail_template` → 店铺 `default_detail` → `navy` 选择详情页模板渲染截图；模板不存在或停用时自动回退到 `模板.html` 并在任务 `message` 中记录提示；出图完成后自动更新 `rendered_job_id`、`rendered_template` 及审核状态（`require_review=true` 时置 `pending`，`false` 时直接 `approved`）。
   - `pipeline/files.go` 在 `require_review=true` 时拦截未通过审核（`review_status != 'approved'`）的 `GET /api/listings/{id}/download` 下载请求（返回 409）；数据库升级迁移时对已有成品的上架版本自动回填 `review_status='approved'`，保持向后兼容。
 
+## AI 助手
+
+- `GET /api/home`：当前用户可见范围内的首页统计、待办和最近素材。
+- `POST /api/assistant/chat`：只读查询、回复和动作卡提议；由前端经用户确认后调用现有接口执行。
+- AI 功能名为 `assistant`，使用文本模型并计入文本额度；提示词文件为 `prompts/助手.md`，每次请求读取。
+
