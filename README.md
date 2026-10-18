@@ -332,3 +332,9 @@ go test ./... -count=1 -v
 - 通知用 SSE：`GET /api/notifications/stream`。连上先发 `unread`，新通知发 `notification`，里面带 `desktop`。收件箱关掉就不写表；免打扰或桌面关掉时照样写表，但 `desktop` 为 false。到期、逾期、额度 80% 每种只发一次。
 - 负载是 `GET /api/tasks/load`（`task.manage`）。完成统计是 `GET /api/tasks/stats`，路由挂在 `task.manage` 上，实际只允许管理员。
 
+## 采购（供应商）
+
+供应商管理在 `internal/modules/purchase`，接口以《接口约定-进销存》第 6 节为准。
+
+- 迁移建立 `suppliers` 表，并从 `products.supplier` 自动去重导入已有货源名称（不修改 `products` 表）。
+- 提供 `GET/POST /api/suppliers`、`GET/PATCH /api/suppliers/{id}`：有 `purchase.manage` 或 `inventory.view` 可查看，有 `purchase.manage` 可新建与修改（外部协作者不可访问）；不提供物理删除，使用 `archived` 归档，写操作记录 `supplier.create`、`supplier.update` 审计日志。

@@ -19,6 +19,7 @@ import (
 	"xstudio/internal/modules/copywriting"
 	"xstudio/internal/modules/pipeline"
 	"xstudio/internal/modules/products"
+	"xstudio/internal/modules/purchase"
 	"xstudio/internal/modules/studio"
 	"xstudio/internal/modules/tasks"
 )
@@ -42,7 +43,7 @@ func main() {
 	if e != nil {
 		log.Fatal("启动失败：", e)
 	}
-	modules := []core.Module{accounts.New(a), products.New(a), assets.New(a), pipeline.New(a), copywriting.New(a), studio.New(a), assistant.New(a), tasks.New(a)}
+	modules := []core.Module{accounts.New(a), products.New(a), assets.New(a), pipeline.New(a), copywriting.New(a), studio.New(a), assistant.New(a), tasks.New(a), purchase.New(a)}
 	if e = a.Start(modules...); e != nil {
 		_ = a.Close()
 		log.Fatal("启动失败：", e)
