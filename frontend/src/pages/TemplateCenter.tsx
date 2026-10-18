@@ -1,10 +1,11 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LayoutTemplate, Star, Ban, RotateCcw, Sparkles, Check, ExternalLink, Layers } from 'lucide-react'
-import { api } from '../lib/api'
+import { api, qs } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import { useListingRefs } from '../lib/listings'
+import { useCategories } from '../lib/categories'
 import type { DetailTemplate, RenderState } from '../lib/types'
 import { Topbar, Pill, Loading, Empty, Drawer } from '../components/ui'
 
@@ -22,20 +23,23 @@ export function TemplateCenter() {
   const [state, setState] = useState<RenderState | null>(null)
   const [zoom, setZoom] = useState(0.5)
   const [batch, setBatch] = useState(false)
+  const [catKey, setCatKey] = useState('')
+  const { items: cats } = useCategories()
   const refs = useListingRefs()
-  const shopRefs = (refs || []).filter(r => r.shop_id === shopId)
+  // 选了品类时，模板和预览款都只看这个品类的
+  const shopRefs = (refs || []).filter(r => r.shop_id === shopId && (!catKey || r.product.category?.key === catKey))
   const manage = can('template.manage') && !!shopId
   const runner = can('render.run')
 
   const load = useCallback(() => {
-    api<Templates>('/api/templates' + (shopId ? `?shop_id=${shopId}` : '')).then(d => {
+    api<Templates>('/api/templates' + qs({ shop_id: shopId || undefined, category: catKey || undefined })).then(d => {
       setData(d)
       setSel(s => (d.detail.some(t => t.key === s) ? s : (d.detail.find(t => t.is_default) || d.detail[0])?.key || ''))
     }).catch(e => toast(errText(e), 'error'))
-  }, [shopId, toast])
+  }, [shopId, catKey, toast])
   useEffect(() => { load() }, [load])
   // 换店铺时预览款换成这个店的第一款
-  useEffect(() => { setListingId(id => (shopRefs.some(r => r.id === id) ? id : shopRefs[0]?.id || 0)) }, [shopId, refs]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setListingId(id => (shopRefs.some(r => r.id === id) ? id : shopRefs[0]?.id || 0)) }, [shopId, catKey, refs]) // eslint-disable-line react-hooks/exhaustive-deps
   const loadState = useCallback(() => {
     if (!listingId) { setState(null); return }
     api<RenderState>(`/api/listings/${listingId}/render`).then(setState).catch(() => setState(null))
@@ -71,6 +75,15 @@ export function TemplateCenter() {
               <div className="nav-label">店铺</div>
               <select className="input" value={shopId} onChange={e => setShopId(Number(e.target.value))}>
                 {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          )}
+          {(cats?.length || 0) > 1 && (
+            <div className="nav-group">
+              <div className="nav-label">品类</div>
+              <select className="input" value={catKey} onChange={e => setCatKey(e.target.value)}>
+                <option value="">全部品类</option>
+                {cats!.map(c => <option key={c.id} value={c.key}>{c.name}</option>)}
               </select>
             </div>
           )}
@@ -127,6 +140,7 @@ export function TemplateCenter() {
                   {t.disabled ? <Pill kind="pill-neutral">已停用</Pill> : <Pill kind="pill-success">可用</Pill>}
                 </div>
                 <div className="fs-12 t2">{t.fit}</div>
+                <div className="fs-12 t3">适用品类：{t.categories?.length ? t.categories.map(k => cats?.find(c => c.key === k)?.name || k).join('、') : '全部'}</div>
               </div>
               {Object.keys(t.optional || {}).length > 0 && (
                 <div className="inspector-section">

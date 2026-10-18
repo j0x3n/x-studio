@@ -13,6 +13,7 @@ import { Workbench } from './pages/Workbench'
 import { CopyCenter } from './pages/CopyCenter'
 import { TemplateCenter } from './pages/TemplateCenter'
 import { Review } from './pages/Review'
+import { ShootingGuide } from './pages/ShootingGuide'
 
 // 占位页（目前只用于地址不存在）
 function Soon({ title, desc }: { title: string; desc: string }) {
@@ -41,6 +42,7 @@ export function App() {
         <Route path="copy" element={<CopyCenter />} />
         <Route path="templates" element={<TemplateCenter />} />
         <Route path="review" element={<Review />} />
+        <Route path="guide" element={<ShootingGuide />} />
         <Route path="admin" element={<Admin />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Soon title="页面不存在" desc="检查一下地址，或者从左侧导航进入。" />} />

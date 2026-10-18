@@ -66,7 +66,7 @@ export type Keyword = { id: number; shop_id: number | null; word: string; grp: s
 export type Issue = { level: 'error' | 'warn'; field: string; text: string; reason: string; suggest: string }
 
 // 模板中心和出图审核
-export type DetailTemplate = { key: string; name: string; file: string; fit: string; optional: Record<string, string>; thumb_url: string; disabled: boolean; is_default: boolean }
+export type DetailTemplate = { key: string; name: string; file: string; fit: string; optional: Record<string, string>; thumb_url: string; disabled: boolean; is_default: boolean; categories?: string[] }
 export type Outputs = { main34: string[]; main11: string[]; detail: string[]; white: string; zip: string }
 export type ReviewStatus = 'none' | 'pending' | 'approved' | 'rejected'
 export type RenderState = {

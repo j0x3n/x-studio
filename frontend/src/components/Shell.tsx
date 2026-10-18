@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Gem, Sun, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, type LucideIcon } from 'lucide-react'
+import { Gem, Sun, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, Camera, type LucideIcon } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { AssistantProvider, useAssistant } from '../lib/assistant'
@@ -14,7 +14,8 @@ const GROUPS: { label?: string; items: Item[] }[] = [
   { items: [{ to: '/', label: '今天', icon: Sun, badge: 'todo' }] },
   { label: '商品', items: [
     { to: '/products', label: '商品库', icon: Package, perm: 'product.view' },
-    { to: '/assets', label: '素材库', icon: Images, perm: 'product.view' }
+    { to: '/assets', label: '素材库', icon: Images, perm: 'product.view' },
+    { to: '/guide', label: '拍摄要求', icon: Camera }
   ] },
   { label: '生产', items: [
     { to: '/process', label: '图片处理', icon: Wand2, perm: 'asset.upload' },

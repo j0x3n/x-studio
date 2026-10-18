@@ -366,3 +366,6 @@ button.chip.outline:hover { border-color: var(--border-strong); color: var(--tex
 .prod-cover .lib-check { position: absolute; top: 8px; left: 8px; }
 .prod-meta { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .prod-meta .lane { grid-template-columns: 56px 1fr auto; }
+
+/* 拍摄要求 */
+.guide-tips { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-13); color: var(--text-2); line-height: 1.6; }

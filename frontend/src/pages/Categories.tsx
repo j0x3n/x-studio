@@ -98,7 +98,7 @@ function CategoryDrawer({ cat, all, onClose, onDone }: { cat: Category | null; a
   )
 
   return (
-    <Drawer title={`编辑品类 · ${cat.name}`} width={760} onClose={onClose} foot={foot}>
+    <Drawer title={`编辑品类 · ${cat.name}`} width={880} onClose={onClose} foot={foot}>
       <Tabs value={sec} onChange={setSec} items={[
         { key: 'basic', label: '基本' },
         { key: 'attrs', label: '属性', count: attrs.length },
@@ -157,7 +157,7 @@ function AttrsEditor({ attrs, onChange }: { attrs: AttrField[]; onChange: (a: At
     <div className="stack">
       <div className="fs-12 t3">商品的基础信息按这里的字段填。标识用小写英文，改了标识老商品里的值就对不上，已在用的字段别改标识。必填只是提醒，不填也能保存。</div>
       <div className="table-wrap"><table className="table attr-table">
-        <thead><tr><th style={{ width: 110 }}>名称</th><th style={{ width: 110 }}>标识</th><th style={{ width: 96 }}>类型</th><th>选项 / 单位 / 提示</th><th style={{ width: 52 }}>必填</th><th style={{ width: 84 }} /></tr></thead>
+        <thead><tr><th style={{ width: 110 }}>名称</th><th style={{ width: 110 }}>标识</th><th style={{ width: 112 }}>类型</th><th>选项 / 单位 / 提示</th><th style={{ width: 52 }}>必填</th><th style={{ width: 84 }} /></tr></thead>
         <tbody>{attrs.map((a, i) => {
           const hasOpts = a.type === 'select' || a.type === 'multi'
           return (
