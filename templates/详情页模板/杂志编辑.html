@@ -112,7 +112,7 @@ XS.run({
     real: function (P, H) {
       var R = P.real, tray = P.photos.tray || {};
       var c = R.cols.map(function (x) { return String(x).split('\n')[0]; });
-      return '<section class="screen dark pad s-real">' + H.head('Real or not', R.title || '怎么分清真珍珠', R.lead) +
+      return '<section class="screen dark pad s-real">' + H.head(R.kicker || 'Real or not', R.title || '怎么分清真珍珠', R.lead) +
         H.unit(H.ph(tray), tray.cap ? '<div class="cap">' + H.esc(tray.cap) + '</div>' : '', 'tray') +
         H.list(R.rows, function (r, i) {
           return '<div class="pt"><i>0' + (i + 1) + '</i><div><b>看' + H.esc(r[0]) + '</b><p><em>' + H.esc(c[0]) + '：' + H.esc(r[1]) + '</em><br>' +

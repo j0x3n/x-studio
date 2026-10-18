@@ -112,7 +112,7 @@ XS.run({
     },
     real: function (P, H) {
       var R = P.real, tray = P.photos.tray || {};
-      return '<section class="screen alt pad s-real">' + H.head('Real pearl', R.title || '是真珍珠哦', R.lead) +
+      return '<section class="screen alt pad s-real">' + H.head(R.kicker || 'Real pearl', R.title || '是真珍珠哦', R.lead) +
         H.unit(H.ph(tray), tray.cap ? '<div class="cap">' + H.esc(tray.cap) + '</div>' : '', 'tray') +
         '<div class="vs">' + R.cols.map(function (col, i) {
           return '<div class="c' + (i ? '' : ' me') + '"><b>' + H.br(col) + '</b>' +

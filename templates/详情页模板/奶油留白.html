@@ -102,7 +102,7 @@ XS.run({
     real: function (P, H) {
       var R = P.real, tray = P.photos.tray || {};
       var c = R.cols.map(function (x) { return String(x).split('\n')[0]; });
-      return '<section class="screen alt pad s-real">' + H.head('How to tell', R.title || '怎么分清真珍珠', R.lead) +
+      return '<section class="screen alt pad s-real">' + H.head(R.kicker || 'How to tell', R.title || '怎么分清真珍珠', R.lead) +
         H.unit(H.ph(tray), tray.cap ? '<div class="cap">' + H.esc(tray.cap) + '</div>' : '', 'tray') +
         '<div class="duo">' + H.list(R.rows, function (r) {
           return '<div class="row"><div class="ours"><b>' + H.esc(c[0] + ' · ' + r[0]) + '</b>' + H.esc(r[1]) + '</div>' +

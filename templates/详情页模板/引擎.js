@@ -80,7 +80,7 @@ var XS = (function () {
     },
     real: function (P) {
       var R = P.real, tray = P.photos.tray || {};
-      return '<section class="screen alt pad s-real">' + head('Real Freshwater Pearl', R.title || '怎么分清真珍珠', R.lead, true) +
+      return '<section class="screen alt pad s-real">' + head(R.kicker || 'Real Freshwater Pearl', R.title || '怎么分清真珍珠', R.lead, true) +
         unit(ph(tray), tray.cap ? '<div class="cap">' + esc(tray.cap) + '</div>' : '', 'tray') +
         cmpTable(R) + (R.note ? '<div class="note">' + esc(R.note) + '</div>' : '') + '</section>';
     },
@@ -114,7 +114,7 @@ var XS = (function () {
     care: function (P) {
       var ol = function (a) { return '<ol>' + list(a, function (t) { return '<li><span>' + esc(t) + '</span></li>'; }) + '</ol>'; };
       return '<section class="screen base2 pad s-care">' + head('Care & Service', '保养与售后') +
-        '<div class="block"><div class="bt">珍珠怎么保养</div>' + ol(P.care) + '</div>' +
+        '<div class="block"><div class="bt">' + (P.careTitle || '珍珠怎么保养') + '</div>' + ol(P.care) + '</div>' +
         '<div class="block"><div class="bt">发货与售后</div>' + ol(P.service) + '</div></section>';
     },
     about: function (P) {
