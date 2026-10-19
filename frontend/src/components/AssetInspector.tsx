@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { X, Wand2, ScanSearch, Download, Archive, ArchiveRestore, Star, Package } from 'lucide-react'
+import { X, Wand2, ScanSearch, Download, Archive, ArchiveRestore, Star, Package, Shirt } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import type { Asset } from '../lib/types'
+import { ASPECTS, FRAMINGS, bodyLabel, type TryOnOp } from '../lib/tryon'
 import { Pill, Loading } from './ui'
 import { TagInput } from '../pages/Assets'
 import { sourceName, assetTitle, fmtDate, opName, quickOps, imgUrl } from '../lib/format'
@@ -12,8 +13,9 @@ type UsedBy = { type: 'code'; product_id: number; code: string } | { type: 'list
 type Detail = { asset: Asset; versions: Asset[]; used_by: UsedBy[] }
 
 // 素材库右侧的详情栏：预览、基本信息、标签备注、版本链、处理记录、被谁用着
-export function AssetInspector({ id, onClose, onChanged, onProcess, onSimilar, onOpenProduct, onSelect }: {
+export function AssetInspector({ id, onClose, onChanged, onProcess, onTryOn, onSimilar, onOpenProduct, onSelect }: {
   id: number; onClose: () => void; onChanged: () => void; onProcess: (id: number) => void
+  onTryOn?: (id: number) => void
   onSimilar: (a: Asset) => void; onOpenProduct: (pid: number) => void; onSelect: (id: number) => void
 }) {
   const { me, can } = useAuth()
@@ -45,6 +47,7 @@ export function AssetInspector({ id, onClose, onChanged, onProcess, onSimilar, o
   const editable = can('asset.upload')
   const holder = d.versions.find(v => v.code && v.id !== a.id)
   const op = a.op
+  const tryon = (op as TryOnOp | undefined)?.type === 'tryon' ? op as TryOnOp : null
   const ops = op?.ops ? Object.keys(op.ops).filter(k => k !== 'format') : []
   const listings = d.used_by.filter((u): u is Extract<UsedBy, { type: 'listing' }> => u.type === 'listing')
   const shopName = (sid: number) => me?.shops.find(s => s.id === sid)?.name || `店铺 ${sid}`
@@ -109,6 +112,12 @@ export function AssetInspector({ id, onClose, onChanged, onProcess, onSimilar, o
           </div>
         )}
 
+        {tryon && <div className="inspector-section">
+          <div className="head"><span className="label fs-12 t2" style={{ fontWeight: 600 }}>模特穿戴记录</span></div>
+          <dl className="kv narrow"><dt>模特</dt><dd>{tryon.model_name || '店铺模特'}</dd><dt>商品</dt><dd>{tryon.product_type || '按拍摄要求'}</dd><dt>拍摄</dt><dd>{[bodyLabel(tryon.body_part), tryon.framing && FRAMINGS[tryon.framing], tryon.aspect_ratio && ASPECTS[tryon.aspect_ratio]].filter(Boolean).join(' · ')}</dd></dl>
+          {tryon.prompt && <div className="fs-12 t2">拍摄要求：{tryon.prompt}</div>}
+        </div>}
+
         {op && ops.length > 0 && (
           <div className="inspector-section">
             <div className="head"><span className="label fs-12 t2" style={{ fontWeight: 600 }}>这张是怎么处理出来的</span>{op.elapsed_ms ? <span className="t4 fs-12 mono">{(op.elapsed_ms / 1000).toFixed(1)}s</span> : null}</div>
@@ -130,6 +139,7 @@ export function AssetInspector({ id, onClose, onChanged, onProcess, onSimilar, o
       </div>
       <div className="inspector-foot lib-actions">
         {editable && <button className="btn btn-secondary btn-sm" onClick={() => onProcess(a.id)}><Wand2 />处理</button>}
+        {onTryOn && a.kind === 'photo' && can('model.view') && can('asset.process') && editable && me?.role.scope !== 'shares' && <button className="btn btn-secondary btn-sm" onClick={() => onTryOn(a.id)}><Shirt />试穿试戴</button>}
         <button className="btn btn-secondary btn-sm" onClick={() => onSimilar(a)}><ScanSearch />找相似</button>
         <a className="btn btn-ghost btn-sm" href={a.url} download><Download />原图</a>
         {editable && <button className="btn btn-ghost btn-sm" onClick={() => patch({ archived: !a.archived }, a.archived ? '已取消归档' : '已归档')}>{a.archived ? <><ArchiveRestore />取消归档</> : <><Archive />归档</>}</button>}

@@ -14,12 +14,16 @@ func (a *Module) workbenchSave(w http.ResponseWriter, r *http.Request) {
 	defer a.Mu.Unlock()
 	u := currentUser(r)
 	item, err := a.workbenchItem(u.ID, idParam(r, "id"))
-	if err != nil {
+	if err != nil || !a.modelWorkbenchVisible(u, item) {
 		fail(w, 404, "处理台图片不存在")
 		return
 	}
 	if item.Kind != "result" {
 		fail(w, 400, "只有处理结果可以保存")
+		return
+	}
+	if item.Op["type"] == "model_candidate" {
+		fail(w, 400, "请确认保存到模特库")
 		return
 	}
 	var raw Object
@@ -33,6 +37,9 @@ func (a *Module) workbenchSave(w http.ResponseWriter, r *http.Request) {
 	if err = strictDecode(raw, &in); err != nil {
 		fail(w, 400, err.Error())
 		return
+	}
+	if item.Op["type"] == "tryon" {
+		in.SetCurrent = false
 	}
 	if item.SavedAssetID != nil {
 		p, e := a.asset(*item.SavedAssetID)

@@ -18,6 +18,9 @@ const FEATURES: Record<string, string> = {
   fill: 'AI 补图',
   upscale: '图片处理·高清化',
   process: '图片处理·AI 改图',
+  model_create: '模特库·创建与参考图',
+  tryon_analyze: '试穿·商品识别（看图）',
+  tryon: '试穿·生成穿戴照',
   assistant: 'AI 助手',
 }
 

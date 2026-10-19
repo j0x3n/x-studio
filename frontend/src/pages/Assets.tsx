@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Images, Archive, Layers, X, Wand2, Tags, Download, FolderInput, Trash2, ArrowLeft, ImageOff } from 'lucide-react'
+import { Search, Images, Archive, Layers, X, Wand2, Tags, Download, FolderInput, Trash2, ArrowLeft, ImageOff, Shirt } from 'lucide-react'
 import { api, downloadPost, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
@@ -104,6 +104,12 @@ export function Assets() {
   const remove = () => confirm(`删除选中的 ${selList.length} 张？只会删你有权删的，不能恢复。`) && batch('delete')
   const process = (ids: number[]) => nav('/process?assets=' + ids.join(','))
 
+  const canTryOn = can('model.view') && can('asset.process') && can('asset.upload') && me?.role.scope !== 'shares'
+  const tryOn = (ids: number[]) => {
+    const chosen = ids.map(id => byId.get(id))
+    if (ids.length > 2 || chosen.some(a => !a || a.kind !== 'photo' || a.product_id !== chosen[0]?.product_id)) { toast('请选择同一商品的 1–2 张素材照片', 'error'); return }
+    nav('/tryon?assets=' + ids.join(','))
+  }
   const shops = me?.shops || []
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE)) : 1
 
@@ -229,6 +235,7 @@ export function Assets() {
                 {can('product.edit') && <button className="btn btn-secondary btn-sm" onClick={() => setDialog('move')}><FolderInput />移到别的款</button>}
                 {can('export.run') && <button className="btn btn-secondary btn-sm" onClick={download}><Download />下载 {selected.size} 张</button>}
                 {(can('asset.delete_own') || can('asset.delete_any')) && <button className="btn btn-secondary btn-sm" onClick={remove}><Trash2 />删除</button>}
+                {canTryOn && <button className="btn btn-secondary btn-sm" disabled={selected.size > 2} onClick={() => tryOn(selList)}><Shirt />试穿试戴</button>}
                 {can('asset.upload') && <button className="btn btn-primary btn-sm" onClick={() => process(selList)}><Wand2 />处理 {selected.size} 张</button>}
               </div>
             </div>
@@ -238,6 +245,7 @@ export function Assets() {
         {active !== null && (
           <AssetInspector id={active} onClose={() => setActive(null)} onChanged={load}
             onProcess={id => process([id])}
+            onTryOn={id => nav('/tryon?assets=' + id)}
             onSimilar={a => { setSimilar(a); clearSel() }}
             onOpenProduct={pid => { setSimilar(null); set({ product_id: String(pid) }) }}
             onSelect={setActive} />

@@ -135,41 +135,60 @@ func (a *Module) workbenchRoutes(r *core.Router) {
 	r.Handle("POST /api/workbench/download", core.AssetUpload, a.workbenchDownload)
 }
 func (a *Module) workbenchList(w http.ResponseWriter, r *http.Request) {
+	operation := r.URL.Query().Get("operation")
+	if operation != "" && operation != "tryon" && operation != "model_candidate" && operation != "process" {
+		fail(w, 400, "operation 只能是 tryon、model_candidate 或 process")
+		return
+	}
 	kind := r.URL.Query().Get("kind")
 	if kind != "" && kind != "input" && kind != "result" {
 		fail(w, 400, "kind 只能是 input 或 result")
 		return
 	}
-	rows, err := a.DB.Query("SELECT "+workbenchColumns+" FROM workbench_items WHERE user_id=? AND julianday(created_at)>=julianday(?) AND (?='' OR kind=?) ORDER BY created_at DESC,id DESC LIMIT 200", currentUser(r).ID, time.Now().Add(-7*24*time.Hour).UTC().Format(time.RFC3339), kind, kind)
-	if err != nil {
-		fail(w, 500, "读取处理台失败")
-		return
-	}
 	items := []WorkbenchItem{}
-	for rows.Next() {
-		v, e := scanWorkbench(rows)
-		if e != nil {
-			err = e
+	cutoff := time.Now().Add(-7 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	// Filter operation in SQL before each limit. Refill after permission filtering,
+	// keeping memory bounded even when many revoked results precede visible ones.
+	for offset := 0; len(items) < 200; offset += 200 {
+		rows, err := a.DB.Query("SELECT "+workbenchColumns+" FROM workbench_items WHERE user_id=? AND julianday(created_at)>=julianday(?) AND (?='' OR kind=?) AND (?='' OR coalesce(json_extract(op,'$.type'),'process')=?) ORDER BY created_at DESC,id DESC LIMIT 200 OFFSET ?", currentUser(r).ID, cutoff, kind, kind, operation, operation, offset)
+		if err != nil {
+			fail(w, 500, "读取处理台失败")
+			return
+		}
+		batch := []WorkbenchItem{}
+		for rows.Next() {
+			v, e := scanWorkbench(rows)
+			if e != nil {
+				err = e
+				break
+			}
+			batch = append(batch, v)
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+		if err != nil {
+			fail(w, 500, "读取处理台失败")
+			return
+		}
+		for _, v := range batch {
+			if a.modelWorkbenchVisible(currentUser(r), v) {
+				items = append(items, a.decorateWorkbench(v, currentUser(r)))
+				if len(items) == 200 {
+					break
+				}
+			}
+		}
+		if len(batch) < 200 {
 			break
 		}
-		items = append(items, v)
-	}
-	if err == nil {
-		err = rows.Err()
-	}
-	rows.Close()
-	if err != nil {
-		fail(w, 500, "读取处理台失败")
-		return
-	}
-	for i := range items {
-		items[i] = a.decorateWorkbench(items[i], currentUser(r))
 	}
 	writeJSON(w, 200, Object{"items": items})
 }
 func (a *Module) workbenchGet(w http.ResponseWriter, r *http.Request) {
 	v, err := a.workbenchItem(currentUser(r).ID, idParam(r, "id"))
-	if err != nil {
+	if err != nil || !a.modelWorkbenchVisible(currentUser(r), v) {
 		fail(w, 404, "处理台图片不存在")
 		return
 	}

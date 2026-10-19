@@ -9,6 +9,8 @@ type Permission struct {
 }
 
 const (
+	ModelView        = "model.view"
+	ModelManage      = "model.manage"
 	ProductView      = "product.view"
 	ProductCost      = "product.cost"
 	ProductEdit      = "product.edit"
@@ -44,6 +46,7 @@ const (
 )
 
 var Permissions = []Permission{
+	{ModelView, "看店铺模特", "模特"}, {ModelManage, "维护店铺模特", "模特"},
 	{ProductView, "看商品", "商品"}, {ProductCost, "看成本价和货源", "商品"}, {ProductEdit, "新建、修改商品和上架版本", "商品"}, {ProductDeleteOwn, "删除自己创建的商品", "商品"}, {ProductDeleteAny, "删除任何商品", "商品"},
 	{AssetUpload, "上传照片", "素材"}, {AssetUpscale, "AI 高清化", "素材"}, {AssetProcess, "图片处理", "素材"}, {AssetDeleteOwn, "删除自己的素材", "素材"}, {AssetDeleteAny, "删除任何素材", "素材"},
 	{CopyView, "看文案", "文案"}, {CopyEdit, "编辑文案", "文案"}, {TemplateManage, "管理模板", "模板"}, {RenderRun, "跑出图任务", "出图"}, {ExportRun, "导出、下载成品", "出图"}, {RenderReview, "审核出图结果", "出图"},

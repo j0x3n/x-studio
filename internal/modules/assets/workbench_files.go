@@ -24,7 +24,7 @@ func workbenchFilename(v WorkbenchItem) string {
 }
 func (a *Module) workbenchFile(w http.ResponseWriter, r *http.Request) {
 	v, err := a.workbenchItem(currentUser(r).ID, idParam(r, "id"))
-	if err != nil {
+	if err != nil || !a.modelWorkbenchVisible(currentUser(r), v) {
 		fail(w, 404, "处理台图片不存在")
 		return
 	}
@@ -63,6 +63,9 @@ func (a *Module) workbenchFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "private, max-age=86400")
+	if modelWorkbenchItem(v) {
+		w.Header().Set("Cache-Control", "private, no-store")
+	}
 	w.Header().Add("Vary", "Cookie")
 	if download {
 		name = workbenchFilename(v)
@@ -93,7 +96,7 @@ func (a *Module) workbenchDownload(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[id] = true
 		v, err := a.workbenchItem(currentUser(r).ID, id)
-		if err != nil {
+		if err != nil || !a.modelWorkbenchVisible(currentUser(r), v) {
 			fail(w, 404, "处理台图片不存在")
 			return
 		}

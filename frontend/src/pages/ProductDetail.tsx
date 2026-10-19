@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package, Pencil } from 'lucide-react'
+import { Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package, Pencil, Shirt } from 'lucide-react'
 import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
@@ -96,7 +96,8 @@ export function ProductDetail() {
 }
 
 function AssetsTab({ product, assets, onChange }: { product: Product; assets: Asset[]; onChange: () => void }) {
-  const { can } = useAuth()
+  const nav = useNavigate()
+  const { me, can } = useAuth()
   const toast = useToast()
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
@@ -126,11 +127,12 @@ function AssetsTab({ product, assets, onChange }: { product: Product; assets: As
           <div className="thumbs">{assets.map(a => {
             const src = sourceName[a.source_override || a.source] || sourceName.original
             return (
-              <a key={a.id} className="thumb" href={a.url} target="_blank" rel="noreferrer" title={a.ai_note || a.orig_name}>
-                <img src={a.url + '?w=240'} alt="" loading="lazy" />
+              <div key={a.id} className="thumb product-tryon-thumb">
+                <a href={a.url} target="_blank" rel="noreferrer" title={a.ai_note || a.orig_name}><img src={a.url + '?w=240'} alt={a.orig_name} loading="lazy" /></a>
                 {src.label !== '实拍' && <span className="src"><Pill kind={src.pill} dot={false}>{src.label}</Pill></span>}
                 <div className="meta"><span className={'code' + (a.code ? '' : ' none')}>{a.code || '未编号'}</span><span className="grow" /><span className="t4 mono">{a.width}×{a.height}</span></div>
-              </a>
+                {a.kind === 'photo' && can('model.view') && can('asset.process') && can('asset.upload') && me?.role.scope !== 'shares' && <button className="btn btn-ghost btn-sm" onClick={() => nav('/tryon?assets=' + a.id)}><Shirt />试穿试戴</button>}
+              </div>
             )
           })}</div>
         )}

@@ -76,7 +76,7 @@ export function Workbench() {
   const fileRef = useRef<HTMLInputElement>(null)
   const jobs = useJobs(jobIds)
 
-  const loadResults = useCallback(() => api<Page<WbItem>>('/api/workbench/items' + qs({ kind: 'result' })).then(r => setResults(r.items)).catch(() => setResults([])), [])
+  const loadResults = useCallback(() => api<Page<WbItem>>('/api/workbench/items' + qs({ kind: 'result', operation: 'process' })).then(r => setResults(r.items)).catch(() => setResults([])), [])
   useEffect(() => { loadResults() }, [loadResults])
 
   const addAssets = useCallback((list: Asset[]) => {
@@ -448,7 +448,7 @@ function AssetPicker({ onClose, onPick }: { onClose: () => void; onPick: (list: 
 }
 
 // 保存到素材库：来自素材的默认存成原图的新版本；上传的要选存到哪一款
-function SaveDialog({ item, onClose, onSaved }: { item: WbItem; onClose: () => void; onSaved: () => void }) {
+export function SaveDialog({ item, onClose, onSaved, tryon = false }: { item: WbItem; onClose: () => void; onSaved: () => void; tryon?: boolean }) {
   const toast = useToast()
   const fromAsset = !!item.asset
   const [mode, setMode] = useState<'version' | 'other'>(fromAsset ? 'version' : 'other')
@@ -474,6 +474,7 @@ function SaveDialog({ item, onClose, onSaved }: { item: WbItem; onClose: () => v
       <button className="btn btn-secondary" onClick={onClose}>取消</button>
       <button className="btn btn-primary" disabled={busy || (mode === 'other' && !pid)} onClick={submit}>保存</button>
     </>}>
+      {tryon && <div className="help">保存后，这张 AI 穿戴照将按目标商品的权限共享，能查看该商品的同事也能看到它。</div>}
       {fromAsset && (
         <div className="segmented block">
           <button className={mode === 'version' ? 'active' : ''} onClick={() => setMode('version')}>存成原图的新版本</button>
@@ -482,7 +483,7 @@ function SaveDialog({ item, onClose, onSaved }: { item: WbItem; onClose: () => v
       )}
       {mode === 'version' && item.asset ? <>
         <div className="fs-13">存到「{item.asset.product_name}」，和原图放在同一条版本链里，原图不动。</div>
-        {item.asset.code && <label className="option">
+        {item.asset.code && !tryon && <label className="option">
           <input type="checkbox" className="check" checked={setCurrent} onChange={e => setSetCurrent(e.target.checked)} />
           <div><div className="title">设为 {item.asset.code} 的当前用图</div><div className="desc">下次一键出图就用这张。一键出图正在跑时不能改。</div></div>
         </label>}

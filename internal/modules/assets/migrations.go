@@ -44,5 +44,5 @@ CREATE TRIGGER IF NOT EXISTS assets_updated_at_insert AFTER INSERT ON assets WHE
  saved_asset_id INTEGER, created_at TEXT NOT NULL);
  CREATE INDEX workbench_user_created ON workbench_items(user_id,created_at);`)
 		return err
-	}}}
+	}}, {Version: 4, Up: modelMigration}}
 }

@@ -4,7 +4,7 @@ import type { UserRow } from '../../lib/types'
 import { Loading, Empty } from '../../components/ui'
 
 type Row = { user_id?: number; feature?: string; kind: string; units: number; est_cost: number }
-const FEATURE: Record<string, string> = { classify: '分拣', copy: '写文案', copy_rewrite: '文案改写', copy_check: '合规审查', enhance: '高清化', fill: '补图', process: '图片处理', tag: '打标签', assistant: 'AI 助手', upscale: '图片处理·高清化' }
+const FEATURE: Record<string, string> = { classify: '分拣', copy: '写文案', copy_rewrite: '文案改写', copy_check: '合规审查', enhance: '高清化', fill: '补图', process: '图片处理', tag: '打标签', assistant: 'AI 助手', upscale: '图片处理·高清化', model_create: '模特创建与参考图', tryon_analyze: '试穿商品识别', tryon: '模特穿戴出图' }
 
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 

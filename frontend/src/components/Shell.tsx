@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, Camera, BookOpen, Boxes, ShoppingCart, Truck, Contact, type LucideIcon } from 'lucide-react'
+import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, Camera, BookOpen, Boxes, ShoppingCart, Truck, Contact, UserRound, Shirt, type LucideIcon } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { AssistantProvider, useAssistant } from '../lib/assistant'
@@ -10,7 +10,7 @@ import type { Home } from '../lib/types'
 import { AssistantPanel } from './AssistantPanel'
 
 // 左侧 232px 侧边栏（clean 预设），按模块分组；窄屏自动收成 64px 图标栏。没有权限的入口不显示。
-type Item = { to: string; label: string; icon: LucideIcon; perm?: string; anyPerm?: string[]; badge?: 'todo' | 'review' | 'tasks' }
+type Item = { to: string; label: string; icon: LucideIcon; perm?: string; anyPerm?: string[]; allPerm?: string[]; internal?: boolean; badge?: 'todo' | 'review' | 'tasks' }
 const GROUPS: { label?: string; items: Item[] }[] = [
   { items: [
     { to: '/', label: '今天', icon: Sun, badge: 'todo' },
@@ -20,10 +20,12 @@ const GROUPS: { label?: string; items: Item[] }[] = [
   { label: '商品', items: [
     { to: '/products', label: '商品库', icon: Package, perm: 'product.view' },
     { to: '/assets', label: '素材库', icon: Images, perm: 'product.view' },
+    { to: '/models', label: '模特库', icon: UserRound, perm: 'model.view', internal: true },
     { to: '/guide', label: '拍摄要求', icon: Camera }
   ] },
   { label: '生产', items: [
     { to: '/process', label: '图片处理', icon: Wand2, perm: 'asset.upload' },
+    { to: '/tryon', label: 'AI 试穿试戴', icon: Shirt, allPerm: ['model.view', 'asset.process', 'asset.upload'], internal: true },
     { to: '/copy', label: '文案', icon: PenLine, perm: 'copy.view' },
     { to: '/templates', label: '模板', icon: LayoutTemplate, perm: 'product.view' },
     { to: '/review', label: '出图审核', icon: ClipboardCheck, perm: 'render.review', badge: 'review' }
@@ -92,7 +94,7 @@ function ShellInner() {
         <aside className="sidebar">
           <NavLink to="/" className="brand"><span className="brand-mark"><Gem /></span><span className="hide-rail">X Studio</span></NavLink>
           {GROUPS.map((g, i) => {
-            const items = g.items.filter(it => it.anyPerm ? it.anyPerm.some(can) : !it.perm || can(it.perm))
+            const items = g.items.filter(it => (!it.internal || me?.role.scope !== 'shares') && (it.allPerm ? it.allPerm.every(can) : it.anyPerm ? it.anyPerm.some(can) : !it.perm || can(it.perm)))
             if (!items.length) return null
             return (
               <nav key={i} className="nav-group">

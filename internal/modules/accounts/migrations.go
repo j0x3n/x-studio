@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS shares(id INTEGER PRIMARY KEY,product_id INTEGER NOT 
 			}
 		}
 		return nil
-	}}}
+	}}, {Version: 5, Up: modelPermissionsMigration}}
 }
 
 func appendBuiltinPerms(tx *sql.Tx, role string, add ...string) error {

@@ -8,7 +8,7 @@
 |---|---|
 | `cmd/server/main.go` | 入口，模块列表在这里注册 |
 | `internal/core/` | 公共框架：配置、路由和权限（`perm.go`）、迁移、审计（`audit.go`）、后台任务、AI 调用、品类 |
-| `internal/modules/<模块>/` | 每个模块自己的路由、表、迁移、测试：`accounts` 账号和角色、`products` 商品和上架版本、`assets` 图片库和处理、`copywriting` 文案、`studio` 模板和出图审核、`pipeline` 一键出图、`assistant` AI 助手、`tasks` 任务和通知、`inventory` 库存（`stock.go` 是给采购和订单用的库存 Go 接口）、`kb` 知识库、`purchase` 采购（供应商、采购单、分批到货质检、不合格退货）、`orders` 手工销售订单（占用、发货、售后） |
+| `internal/modules/<模块>/` | 每个模块自己的路由、表、迁移、测试：`accounts` 账号和角色、`products` 商品和上架版本、`assets` 图片库、处理台、店铺模特库和试穿试戴（`models.go/model_files.go/model_jobs.go/model_workbench.go`）、`copywriting` 文案、`studio` 模板和出图审核、`pipeline` 一键出图、`assistant` AI 助手、`tasks` 任务和通知、`inventory` 库存（`stock.go` 是给采购和订单用的库存 Go 接口）、`kb` 知识库、`purchase` 采购（供应商、采购单、分批到货质检、不合格退货）、`orders` 手工销售订单（占用、发货、售后） |
 | `frontend/src/pages/` | 页面；`components/` 通用组件（`Shell` 侧栏、`ui` 基础组件、`TaskViews` 任务抽屉、`NoticeBell` 铃铛）；`lib/` 接口、类型、各模块的中文和工具函数 |
 | `frontend/src/styles/` | 样式，按 admin-design-system 规范；模块样式写在 `app.css` 末尾的分段里 |
 | `prompts/`、`templates/` | 提示词、详情页模板（不是 Go 代码） |
@@ -22,4 +22,5 @@
 - 新权限点加在 `internal/core/perm.go`，给内置角色补权限用 `accounts` 模块的新迁移。
 - 写操作都调 `core.Audit`；请求要带 `X-Requested-With: fetch`。
 - 后端测试离线跑，命令见交接说明第 4 节。
+- AI 模特入口 `/models` 和 `/tryon`，契约见 `接口约定-AI模特.md`；前端类型在 `lib/tryon.ts`，模特参考永久保存，生成候选和试穿复用本人 workbench。
 - 分工和并行规则见 [并行开发规则.md](并行开发规则.md)。

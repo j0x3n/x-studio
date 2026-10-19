@@ -35,6 +35,17 @@ func ImageSize(im image.Image) string {
 // EditImage sends only PNG references, never URLs or generated-image references
 // supplied by a model. The image client has its own timeout (not the text 120s).
 func (a *Core) EditImage(ctx context.Context, prompt string, refs []image.Image) ([]byte, error) {
+	if len(refs) == 0 {
+		return nil, fmt.Errorf("图像编辑需要 1–3 张参考图")
+	}
+	return a.EditImageSize(ctx, prompt, refs, ImageSize(refs[0]))
+}
+
+// EditImageSize preserves reference order and uses an explicit output size.
+func (a *Core) EditImageSize(ctx context.Context, prompt string, refs []image.Image, size string) ([]byte, error) {
+	if !validImageSize(size) {
+		return nil, fmt.Errorf("图片尺寸不正确")
+	}
 	if a.Cfg.AIKey == "" {
 		return nil, fmt.Errorf("未配置 AI_API_KEY，无法生成或高清化照片")
 	}
@@ -42,19 +53,9 @@ func (a *Core) EditImage(ctx context.Context, prompt string, refs []image.Image)
 		return nil, fmt.Errorf("图像编辑需要 1–3 张参考图")
 	}
 	model := a.Model(Actor(ctx).Feature, a.Cfg.ImageModel)
-	finish, err := a.beginUsage(ctx, "image", model)
-	if err != nil {
-		return nil, err
-	}
-	charged := false
-	defer func() {
-		if !charged {
-			_ = finish(false)
-		}
-	}()
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
-	for _, v := range []struct{ k, v string }{{"model", model}, {"prompt", prompt}, {"size", ImageSize(refs[0])}, {"quality", "high"}} {
+	for _, v := range []struct{ k, v string }{{"model", model}, {"prompt", prompt}, {"size", size}, {"quality", "high"}} {
 		if err := mw.WriteField(v.k, v.v); err != nil {
 			return nil, fmt.Errorf("准备图像编辑请求失败")
 		}
@@ -75,6 +76,41 @@ func (a *Core) EditImage(ctx context.Context, prompt string, refs []image.Image)
 	if err := mw.Close(); err != nil {
 		return nil, err
 	}
+	finish, err := a.beginUsage(ctx, "image", model)
+	if err != nil {
+		return nil, err
+	}
+	return a.imageRequest(ctx, "/images/edits", mw.FormDataContentType(), body.Bytes(), finish)
+}
+
+func validImageSize(size string) bool {
+	return size == "1024x1024" || size == "1024x1536" || size == "1536x1024"
+}
+
+// GenerateImage uses the same provider, quota reservation and response checks as edits.
+func (a *Core) GenerateImage(ctx context.Context, prompt, size string) ([]byte, error) {
+	if !validImageSize(size) {
+		return nil, fmt.Errorf("图片尺寸不正确")
+	}
+	if a.Cfg.AIKey == "" {
+		return nil, fmt.Errorf("未配置 AI_API_KEY，无法生成照片")
+	}
+	model := a.Model(Actor(ctx).Feature, a.Cfg.ImageModel)
+	finish, err := a.beginUsage(ctx, "image", model)
+	if err != nil {
+		return nil, err
+	}
+	body := []byte(JS(Object{"model": model, "prompt": prompt, "size": size, "quality": "high", "n": 1}))
+	return a.imageRequest(ctx, "/images/generations", "application/json", body, finish)
+}
+
+func (a *Core) imageRequest(ctx context.Context, endpoint, contentType string, body []byte, finish func(bool) error) ([]byte, error) {
+	charged := false
+	defer func() {
+		if !charged {
+			_ = finish(false)
+		}
+	}()
 	client := *a.Client
 	client.Timeout = a.Cfg.ImageTimeout
 	var last error
@@ -84,11 +120,11 @@ func (a *Core) EditImage(ctx context.Context, prompt string, refs []image.Image)
 		}
 		requestCtx, cancel := context.WithTimeout(ctx, a.Cfg.ImageTimeout)
 		data, err := func() ([]byte, error) {
-			req, err := http.NewRequestWithContext(requestCtx, "POST", strings.TrimRight(a.Cfg.AIBaseURL, "/")+"/images/edits", bytes.NewReader(body.Bytes()))
+			req, err := http.NewRequestWithContext(requestCtx, "POST", strings.TrimRight(a.Cfg.AIBaseURL, "/")+endpoint, bytes.NewReader(body))
 			if err != nil {
 				return nil, fmt.Errorf("图像接口地址不正确")
 			}
-			req.Header.Set("Content-Type", mw.FormDataContentType())
+			req.Header.Set("Content-Type", contentType)
 			req.Header.Set("Authorization", "Bearer "+a.Cfg.AIKey)
 			res, err := client.Do(req)
 			if err != nil {
@@ -96,8 +132,7 @@ func (a *Core) EditImage(ctx context.Context, prompt string, refs []image.Image)
 			}
 			defer res.Body.Close()
 			if res.StatusCode < 200 || res.StatusCode >= 300 {
-				msg, _ := io.ReadAll(io.LimitReader(res.Body, 600))
-				return nil, fmt.Errorf("图像服务返回 HTTP %d：%s", res.StatusCode, strings.TrimSpace(string(msg)))
+				return nil, fmt.Errorf("图像服务返回 HTTP %d", res.StatusCode)
 			}
 			b, err := io.ReadAll(io.LimitReader(res.Body, (128<<20)+1))
 			if err != nil || len(b) > 128<<20 {
@@ -108,7 +143,7 @@ func (a *Core) EditImage(ctx context.Context, prompt string, refs []image.Image)
 					Base64 string `json:"b64_json"`
 				} `json:"data"`
 			}
-			if json.Unmarshal(b, &response) != nil || len(response.Data) == 0 || response.Data[0].Base64 == "" {
+			if json.Unmarshal(b, &response) != nil || len(response.Data) != 1 || response.Data[0].Base64 == "" {
 				return nil, fmt.Errorf("图像服务没有返回 data[0].b64_json")
 			}
 			decoded, err := base64.StdEncoding.DecodeString(response.Data[0].Base64)

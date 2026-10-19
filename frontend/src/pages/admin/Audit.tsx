@@ -14,10 +14,13 @@ const ACTION: Record<string, string> = {
   'listing.create': '新建上架版本', 'listing.update': '修改上架版本', 'listing.delete': '删除上架版本',
   'asset.delete': '删除素材', 'asset.source_override': '改判素材来源',
   'share.create': '分享给协作者', 'share.delete': '取消分享',
-  'export.run': '下载成品'
+  'export.run': '下载成品',
+  'assets.model.create': '创建店铺模特', 'assets.model.update': '修改模特档案',
+  'assets.model.reference.upload': '上传模特参考', 'assets.model.reference.confirm': '确认模特参考',
+  'assets.model_generate': '生成模特候选', 'assets.tryon_analyze': '识别试穿商品', 'assets.tryon': '生成穿戴照'
 }
 const PAGE = 50
-const TARGET: Record<string, string> = { user: '账号', role: '角色', shop: '店铺', product: '商品', listing: '上架版本', asset: '素材', share: '分享', settings: '设置', job: '任务' }
+const TARGET: Record<string, string> = { user: '账号', role: '角色', shop: '店铺', product: '商品', listing: '上架版本', asset: '素材', share: '分享', settings: '设置', job: '任务', model: '店铺模特' }
 const FIELD: Record<string, string> = {
   name: '名称', perms: '权限', scope: '数据范围', status: '状态', info: '基础信息', cost: '成本', supplier: '货源', content: '详情页文案', main: '主图文案', meta: '标题和规格',
   url: '链接', username: '登录名', password: '密码', role_id: '角色', disabled: '启用状态', display_name: '显示名', shop_ids: '分店', archived: '归档', platform: '平台', language: '语言',

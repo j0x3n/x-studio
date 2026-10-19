@@ -15,7 +15,7 @@ func (a *Core) Setting(key string) Object {
 }
 
 // aiFeatures 是 ai_models 里可以单独指定模型的功能名，对应 WithFeature 的取值。
-var aiFeatures = map[string]bool{"classify": true, "copy": true, "enhance": true, "fill": true, "tag": true, "upscale": true, "process": true, "copy_rewrite": true, "copy_check": true, "assistant": true}
+var aiFeatures = map[string]bool{"classify": true, "copy": true, "enhance": true, "fill": true, "tag": true, "upscale": true, "process": true, "copy_rewrite": true, "copy_check": true, "assistant": true, "model_create": true, "tryon_analyze": true, "tryon": true}
 
 func ValidateSetting(key string, v json.RawMessage) error {
 	var o Object
