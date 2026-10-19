@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 	_ "time/tzdata"
 )
@@ -91,8 +92,13 @@ func (a *Core) beginUsage(ctx context.Context, kind, model string) (func(bool) e
 	}, nil
 }
 func (a *Core) Model(feature, fallback string) string {
-	if s, ok := a.Setting("ai_models")[feature].(string); ok && s != "" {
-		return s
+	models := a.Setting("ai_models")
+	if s, ok := models[feature].(string); ok && strings.TrimSpace(s) != "" {
+		return strings.TrimSpace(s)
+	}
+	parent := map[string]string{"model_create": "process", "tryon": "process", "tryon_analyze": "classify"}[feature]
+	if s, ok := models[parent].(string); parent != "" && ok && strings.TrimSpace(s) != "" {
+		return strings.TrimSpace(s)
 	}
 	return fallback
 }
