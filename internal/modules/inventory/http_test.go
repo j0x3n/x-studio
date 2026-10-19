@@ -31,6 +31,10 @@ func TestItemValidationUnitsArchivingAndWarehouseRules(t *testing.T) {
 	if len(rows(f.req(t, "GET", "/api/inventory/items?archived=1", nil, 200))) != 1 {
 		t.Fatal("archived missing")
 	}
+	f.item(t, "ACTIVE-ALONGSIDE-ARCHIVED")
+	if len(rows(f.req(t, "GET", "/api/inventory/items?archived=1", nil, 200))) != 2 {
+		t.Fatal("include archived must retain active items")
+	}
 	f.tx(t, func(tx *sql.Tx) error {
 		_, e := StockIn(tx, In{ItemID: id, WarehouseID: 1, Qty: 1, Kind: "other_in"})
 		if e == nil {

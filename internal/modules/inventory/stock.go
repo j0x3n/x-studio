@@ -291,6 +291,15 @@ func stockOut(tx *sql.Tx, out Out, transfer, alert bool) ([]Taken, error) {
 	if e != nil {
 		return nil, e
 	}
+	// Reservations are company-wide, including finite dropship stock. Callers
+	// shipping an order must release its reservation in this transaction first.
+	s, e := Stock(tx, out.ItemID)
+	if e != nil {
+		return nil, e
+	}
+	if !transfer && !s.Unlimited && s.Available < out.Qty {
+		return nil, availableShort(code, unit, out.Qty, s.Available)
+	}
 	taken := []Taken{}
 	if typ == "dropship" {
 		if out.BatchID != 0 {
@@ -322,13 +331,6 @@ func stockOut(tx *sql.Tx, out Out, transfer, alert bool) ([]Taken, error) {
 		}
 		taken = append(taken, Taken{Qty: out.Qty, Cost: cost})
 	} else {
-		s, e := Stock(tx, out.ItemID)
-		if e != nil {
-			return nil, e
-		}
-		if !transfer && !s.Unlimited && s.Available < out.Qty {
-			return nil, availableShort(code, unit, out.Qty, s.Available)
-		}
 		rows, e := objects(tx, "SELECT id,qty_left,cost_left,currency FROM inv_batches WHERE item_id=? AND warehouse_id=? AND qty_left>0 AND (?=0 OR id=?) ORDER BY received_at,id", out.ItemID, out.WarehouseID, out.BatchID, out.BatchID)
 		if e != nil {
 			return nil, e

@@ -22,7 +22,11 @@ type statusError struct {
 }
 
 func (e *statusError) Error() string { return e.msg }
-func bad(code int, msg string) error { return &statusError{code, msg} }
+
+// HTTPStatus lets callers of the stock API preserve validation and conflict
+// responses without depending on inventory's private error type.
+func (e *statusError) HTTPStatus() int { return e.code }
+func bad(code int, msg string) error   { return &statusError{code, msg} }
 
 type endpoint func(http.ResponseWriter, *http.Request) (any, error)
 

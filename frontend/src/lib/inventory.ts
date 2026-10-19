@@ -11,7 +11,7 @@ export type InvItem = {
   cost_value?: number; archived: boolean; updated_at: string
 }
 export type Warehouse = { id: number; name: string; type: WhType; supplier_id: number | null; address: string; note: string; sort: number; archived: boolean; item_count?: number; cost_value?: number }
-export type Batch = { id: number; item_id: number; warehouse_id: number; warehouse_name?: string; qty_in: number; qty_left: number; cost_in?: number; cost_left?: number; currency: string; grade: string; supplier_id: number | null; received_at: string; ref_type: string; ref_id: number }
+export type Batch = { id: number; item_id: number; warehouse_id: number; warehouse_name?: string; qty_in: number; qty_left: number; cost_in?: number; cost_left?: number; currency: string; grade: string; supplier_id: number | null; received_at: string; ref_type: string; ref_id: number; ref_label?: string; ref_path?: string }
 export type Level = { warehouse_id: number; warehouse_name?: string; name?: string; type?: WhType; on_hand: number; qty?: number }
 export type Dropship = { warehouse_id: number; warehouse_name?: string; item_id: number; qty: number | null; unit_cost?: number | null; currency: string; updated_at: string }
 export type Reservation = { ref_type: string; ref_id: number; qty: number; ref_label?: string; ref_path?: string; created_at: string }
@@ -23,7 +23,7 @@ export type Ledger = {
 }
 export type ItemDetail = InvItem & { levels: Level[]; dropship_rows?: Dropship[]; batches: Batch[]; reservations: Reservation[]; ledger: Ledger[] }
 export type Count = { id: number; warehouse_id: number; warehouse_name?: string; status: 'draft' | 'done' | 'canceled'; note: string; created_by?: number; created_by_name?: string; created_at: string; done_at: string; line_count?: number; counted_count?: number }
-export type CountLine = { item_id: number; code: string; name: string; unit?: string; system_qty: number; current_qty: number; counted_qty: number | null; unit_cost?: number | null; diff?: number | null }
+export type CountLine = { item_id: number; code: string; name: string; unit?: string; system_qty: number; current_qty: number; counted_qty: number | null; unit_cost?: number | null; difference?: number | null }
 
 export const kindName: Record<ItemKind, string> = { sku: '成品', material: '原料配件', packaging: '包装耗材' }
 export const whTypeName: Record<WhType, string> = { own: '自有仓', stall: '档口', dropship: '代发' }

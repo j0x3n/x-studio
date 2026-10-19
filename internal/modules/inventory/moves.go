@@ -2,7 +2,6 @@ package inventory
 
 import (
 	"database/sql"
-	"fmt"
 	"net/http"
 	"xstudio/internal/core"
 )
@@ -120,17 +119,6 @@ func (a *Module) transfers(w http.ResponseWriter, r *http.Request) (any, error) 
 
 const ledgerSelect = `SELECT l.*,i.code,i.name,i.name AS item_name,w.name AS warehouse_name,coalesce(nullif(u.display_name,''),u.username,'') AS user_name FROM inv_ledger l JOIN inv_items i ON i.id=l.item_id JOIN inv_warehouses w ON w.id=l.warehouse_id LEFT JOIN users u ON u.id=l.user_id`
 
-func ledgerRefs(rows []core.Object) {
-	// Frontend document routes and the purchase/orders modules are not installed
-	// yet. Identify inventory-owned documents without inventing frontend paths.
-	for _, o := range rows {
-		o["ref_label"] = ""
-		o["ref_path"] = ""
-		if label, ok := map[string]string{"manual": "手工出入库", "transfer": "调拨", "count": "盘点"}[o["ref_type"].(string)]; ok && o["ref_id"].(int64) > 0 {
-			o["ref_label"] = fmt.Sprintf("%s #%d", label, o["ref_id"])
-		}
-	}
-}
 func (a *Module) listLedger(_ http.ResponseWriter, r *http.Request) (any, error) {
 	query := ledgerSelect + " WHERE 1=1"
 	args := []any{}
@@ -157,8 +145,8 @@ func (a *Module) listLedger(_ http.ResponseWriter, r *http.Request) (any, error)
 	if e != nil {
 		return nil, e
 	}
-	ledgerRefs(result["items"].([]core.Object))
-	return result, nil
+	e = a.documentRefs(r, result["items"].([]core.Object))
+	return result, e
 }
 func (a *Module) listBatches(_ http.ResponseWriter, r *http.Request) (any, error) {
 	query := `SELECT b.*,i.code,i.name,w.name AS warehouse_name FROM inv_batches b JOIN inv_items i ON i.id=b.item_id JOIN inv_warehouses w ON w.id=b.warehouse_id WHERE b.qty_left>0`
@@ -169,5 +157,10 @@ func (a *Module) listBatches(_ http.ResponseWriter, r *http.Request) (any, error
 			args = append(args, s)
 		}
 	}
-	return a.queryPage(r, query+" ORDER BY b.received_at,b.id", args...)
+	result, err := a.queryPage(r, query+" ORDER BY b.received_at,b.id", args...)
+	if err != nil {
+		return nil, err
+	}
+	err = a.documentRefs(r, result["items"].([]core.Object))
+	return result, err
 }

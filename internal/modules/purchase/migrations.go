@@ -76,5 +76,8 @@ func (a *Module) Migrations() []core.Migration {
 			}
 		}
 		return nil
+	}}, {Version: 2, Up: func(tx *sql.Tx) error {
+		_, err := tx.Exec(ordersSchema)
+		return err
 	}}}
 }

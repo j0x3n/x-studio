@@ -14,6 +14,7 @@ func (*Module) Name() string                     { return "purchase" }
 func (*Module) Jobs() map[string]core.JobHandler { return nil }
 
 func (a *Module) Routes(r *core.Router) {
+	a.purchaseRoutes(r)
 	r.Handle("GET /api/suppliers", core.LoggedIn, a.listSuppliers)
 	r.Handle("POST /api/suppliers", core.PurchaseManage, a.createSupplier)
 	r.Handle("GET /api/suppliers/{id}", core.LoggedIn, a.getSupplier)

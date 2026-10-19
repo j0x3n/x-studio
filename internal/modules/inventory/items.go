@@ -202,8 +202,9 @@ func (a *Module) filteredItems(r *http.Request, lookup bool) ([]core.Object, err
 			args = append(args, codeKey(strings.TrimSpace(c)))
 		}
 	} else {
-		query += " AND archived=?"
-		args = append(args, v.Get("archived") == "1")
+		if v.Get("archived") != "1" {
+			query += " AND archived=0"
+		}
 		if q := v.Get("q"); q != "" {
 			query += " AND (instr(lower(code),lower(?))>0 OR instr(lower(name),lower(?))>0)"
 			args = append(args, q, q)
@@ -275,8 +276,10 @@ func (a *Module) getItem(_ http.ResponseWriter, r *http.Request) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		if s.k == "ledger" {
-			ledgerRefs(rows)
+		if s.k == "ledger" || s.k == "batches" || s.k == "reservations" {
+			if err = a.documentRefs(r, rows); err != nil {
+				return nil, err
+			}
 		}
 		o[s.k] = redact(r, rows)
 	}

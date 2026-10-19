@@ -95,7 +95,7 @@ func (a *Module) listCounts(_ http.ResponseWriter, r *http.Request) (any, error)
 }
 func (a *Module) getCount(_ http.ResponseWriter, r *http.Request) (any, error) {
 	id := core.ID(r, "id")
-	o, e := one(a.DB, `SELECT c.*,coalesce(nullif(u.display_name,''),u.username,'') AS created_by_name FROM inv_counts c LEFT JOIN users u ON u.id=c.created_by WHERE c.id=?`, id)
+	o, e := one(a.DB, `SELECT c.*,w.name AS warehouse_name,coalesce(nullif(u.display_name,''),u.username,'') AS created_by_name FROM inv_counts c JOIN inv_warehouses w ON w.id=c.warehouse_id LEFT JOIN users u ON u.id=c.created_by WHERE c.id=?`, id)
 	if e != nil {
 		return nil, e
 	}
@@ -106,7 +106,15 @@ func (a *Module) getCount(_ http.ResponseWriter, r *http.Request) (any, error) {
 	for _, l := range rows {
 		l["difference"] = nil
 		if n, ok := l["counted_qty"].(int64); ok {
-			l["difference"] = n - l["current_qty"].(int64)
+			if o["status"] == "done" {
+				var actual int64
+				if e = a.DB.QueryRow("SELECT coalesce(sum(qty),0) FROM inv_ledger WHERE ref_type='count' AND ref_id=? AND item_id=?", id, l["item_id"]).Scan(&actual); e != nil {
+					return nil, e
+				}
+				l["difference"] = actual
+			} else if o["status"] == "draft" {
+				l["difference"] = n - l["current_qty"].(int64)
+			}
 		}
 	}
 	o["lines"] = redact(r, rows)

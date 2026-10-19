@@ -5,6 +5,7 @@ import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import { fmtAgo } from '../lib/format'
+import { plainText } from '../lib/markdown'
 import { flattenFolders, type KbArticle, type KbFolder, type KbDraft } from '../lib/kb'
 import { Topbar, Loading, Empty, Drawer, Field } from '../components/ui'
 
@@ -95,7 +96,7 @@ export function Kb() {
                 {items.map(a => (
                   <div key={a.id} className="kb-row" onClick={() => nav(`/kb/${a.id}`)}>
                     <div className="kb-row-title">{a.pinned && <Pin className="kb-pin" />}<span className="ellipsis">{a.title}</span></div>
-                    {a.summary && <div className="kb-row-sum">{a.summary}</div>}
+                    {a.summary && <div className="kb-row-sum">{plainText(a.summary)}</div>}
                     <div className="kb-row-meta">
                       {!folder && <span>{a.folder?.name}</span>}
                       {a.tags.slice(0, 4).map(t => <span key={t} className="tag tag-gray">{t}</span>)}

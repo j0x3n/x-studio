@@ -263,7 +263,7 @@ export function ItemDrawer({ item, product, onClose, onDone }: { item?: InvItem 
   )
 }
 
-function ProductPicker({ value, onChange }: { value: { id: number; name: string } | null; onChange: (p: { id: number; name: string } | null) => void }) {
+export function ProductPicker({ value, onChange }: { value: { id: number; name: string } | null; onChange: (p: { id: number; name: string } | null) => void }) {
   const [q, setQ] = useState('')
   const [list, setList] = useState<{ id: number; name: string }[]>([])
   const [open, setOpen] = useState(false)

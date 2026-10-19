@@ -89,7 +89,7 @@ export function InventoryItem() {
                       <td className="mono">#{b.id}</td><td>{b.warehouse_name || whName(b.warehouse_id)}</td><td>{b.grade || <span className="t4">—</span>}</td><td className="t2">{fmtDate(b.received_at)}</td>
                       <td className="num mono t3">{b.qty_in}</td><td className="num mono">{b.qty_left}</td>
                       {costPerm && <><td className="num mono t2">{b.qty_in ? yuan(Math.round((b.cost_in || 0) / b.qty_in)) : '—'}</td><td className="num mono">{yuan(b.cost_left)}</td></>}
-                      <td className="t3">{refName[b.ref_type] || b.ref_type}</td>
+                      <td>{b.ref_path ? <Link className="link" to={b.ref_path}>{b.ref_label || refName[b.ref_type]}</Link> : <span className="t3">{b.ref_label || refName[b.ref_type] || b.ref_type}</span>}</td>
                     </tr>
                   ))}</tbody>
                 </table></div>

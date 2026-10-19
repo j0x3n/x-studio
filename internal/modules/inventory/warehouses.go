@@ -155,8 +155,8 @@ func (a *Module) writeDropship(w http.ResponseWriter, r *http.Request) (any, err
 			return 0, nil, e
 		}
 		// Supplier-reported availability may fall below existing reservations.
-		// Keep that truthful shortage visible; only new reservations/outbound
-		// own stock are subject to the availability guard in stock.go.
+		// Keep that truthful shortage visible; new reservations and outbound
+		// stock are subject to the availability guard in stock.go.
 		if e = AfterChange(tx, iid); e != nil {
 			return 0, nil, e
 		}

@@ -58,6 +58,11 @@ func TestCountCurrentQuantityLossAndDraftExclusion(t *testing.T) {
 	if f.n(t, "SELECT sum(qty) FROM inv_ledger WHERE ref_type='count' AND ref_id=?", cid) != -7 {
 		t.Fatal("used snapshot")
 	}
+	f.in(t, id, 1, 2, 20, "")
+	done := f.req(t, "GET", countPath(cid), nil, 200)
+	if done["warehouse_name"] != "自有仓" || done["lines"].([]any)[0].(map[string]any)["difference"] != float64(-7) {
+		t.Fatal("completed count must keep actual ledger difference", done)
+	}
 	f.req(t, "POST", countPath(cid)+"/finish", nil, 409)
 	f.req(t, "PATCH", countPath(cid), obj{}, 409)
 	f.req(t, "POST", countPath(cid)+"/cancel", nil, 409)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, Camera, BookOpen, Boxes, type LucideIcon } from 'lucide-react'
+import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, Camera, BookOpen, Boxes, ShoppingCart, Truck, Contact, type LucideIcon } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { AssistantProvider, useAssistant } from '../lib/assistant'
@@ -10,7 +10,7 @@ import type { Home } from '../lib/types'
 import { AssistantPanel } from './AssistantPanel'
 
 // 左侧 232px 侧边栏（clean 预设），按模块分组；窄屏自动收成 64px 图标栏。没有权限的入口不显示。
-type Item = { to: string; label: string; icon: LucideIcon; perm?: string; badge?: 'todo' | 'review' | 'tasks' }
+type Item = { to: string; label: string; icon: LucideIcon; perm?: string; anyPerm?: string[]; badge?: 'todo' | 'review' | 'tasks' }
 const GROUPS: { label?: string; items: Item[] }[] = [
   { items: [
     { to: '/', label: '今天', icon: Sun, badge: 'todo' },
@@ -29,7 +29,10 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     { to: '/review', label: '出图审核', icon: ClipboardCheck, perm: 'render.review', badge: 'review' }
   ] },
   { label: '经营', items: [
-    { to: '/inventory', label: '库存', icon: Boxes, perm: 'inventory.view' }
+    { to: '/inventory', label: '库存', icon: Boxes, perm: 'inventory.view' },
+    { to: '/purchase-orders', label: '采购单', icon: ShoppingCart, perm: 'purchase.manage' },
+    { to: '/orders', label: '订单', icon: Truck, perm: 'order.view' },
+    { to: '/suppliers', label: '供应商', icon: Contact, anyPerm: ['purchase.manage', 'inventory.view'] }
   ] }
 ]
 
@@ -89,7 +92,7 @@ function ShellInner() {
         <aside className="sidebar">
           <NavLink to="/" className="brand"><span className="brand-mark"><Gem /></span><span className="hide-rail">X Studio</span></NavLink>
           {GROUPS.map((g, i) => {
-            const items = g.items.filter(it => !it.perm || can(it.perm))
+            const items = g.items.filter(it => it.anyPerm ? it.anyPerm.some(can) : !it.perm || can(it.perm))
             if (!items.length) return null
             return (
               <nav key={i} className="nav-group">

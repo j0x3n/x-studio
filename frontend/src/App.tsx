@@ -21,6 +21,11 @@ import { KbEdit } from './pages/KbEdit'
 import { Inventory } from './pages/Inventory'
 import { InventoryItem } from './pages/InventoryItem'
 import { InventoryCount } from './pages/InventoryCount'
+import { Suppliers } from './pages/Suppliers'
+import { Purchases } from './pages/Purchases'
+import { PurchaseDetail } from './pages/PurchaseDetail'
+import { Orders } from './pages/Orders'
+import { OrderDetail } from './pages/OrderDetail'
 
 // 占位页（目前只用于地址不存在）
 function Soon({ title, desc }: { title: string; desc: string }) {
@@ -54,6 +59,11 @@ export function App() {
         <Route path="inventory" element={<Inventory />} />
         <Route path="inventory/items/:id" element={<InventoryItem />} />
         <Route path="inventory/counts/:id" element={<InventoryCount />} />
+        <Route path="suppliers" element={<Suppliers />} />
+        <Route path="purchase-orders" element={<Purchases />} />
+        <Route path="purchase-orders/:id" element={<PurchaseDetail />} />
+        <Route path="orders" element={<Orders />} />
+        <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="kb" element={<Kb />} />
         <Route path="kb/new" element={<KbEdit />} />
         <Route path="kb/:id" element={<KbArticle />} />

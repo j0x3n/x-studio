@@ -37,9 +37,9 @@ export function InventoryCount() {
   if (!d) return <><Topbar crumbs={['库存', '盘点', '…']} /><Loading /></>
   const dirty = Object.keys(edits).length > 0
   const counted = d.lines.filter(l => val(l) !== '').length
-  // 盘点中按「实盘 − 当前现有」算（完成时就按这个生成流水）；完成后当前现有已经变了，只能对开盘时的快照
+  // 完成后的差异由盘点流水提供，盘点期间和完成后的出入库都不影响它。
   const diffOf = (l: CountLine) => {
-    if (d.status !== 'draft') return l.counted_qty == null ? null : l.counted_qty - l.system_qty
+    if (d.status !== 'draft') return l.difference ?? null
     const v = val(l); return v === '' ? null : Number(v) - l.current_qty
   }
   const gain = d.lines.reduce((s, l) => s + Math.max(0, diffOf(l) ?? 0), 0)
@@ -87,7 +87,7 @@ export function InventoryCount() {
         <section className="panel">
           {lines.length === 0 ? <Empty title="没有物料" /> : (
             <div className="table-wrap"><table className="table">
-              <thead><tr><th>物料</th><th className="num">开盘时</th><th className="num">当前现有</th><th className="num" style={{ width: 130 }}>实盘数</th><th className="num">{d.status === 'draft' ? '差异' : '差异（对开盘时）'}</th>{costPerm && <th className="num" style={{ width: 140 }}>盘盈单位成本（元）</th>}</tr></thead>
+              <thead><tr><th>物料</th><th className="num">开盘时</th><th className="num">当前现有</th><th className="num" style={{ width: 130 }}>实盘数</th><th className="num">{d.status === 'done' ? '实际盈亏' : '差异'}</th>{costPerm && <th className="num" style={{ width: 140 }}>盘盈单位成本（元）</th>}</tr></thead>
               <tbody>{lines.map(l => {
                 const diff = diffOf(l)
                 return (

@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"xstudio/internal/core"
 	"xstudio/internal/modules/accounts"
+	"xstudio/internal/modules/inventory"
 	"xstudio/internal/modules/products"
 )
 
@@ -69,7 +70,7 @@ func boot(t *testing.T, dir string, withPurchase bool) *fixture {
 	m := New(c)
 	mods := []core.Module{accounts.New(c), products.New(c)}
 	if withPurchase {
-		mods = append(mods, m)
+		mods = append(mods, inventory.New(c), m)
 	}
 	if err = c.Start(mods...); err != nil {
 		c.Close()
@@ -167,6 +168,8 @@ func num(v any) int64 {
 		return int64(n)
 	case int64:
 		return n
+	case int:
+		return int64(n)
 	default:
 		return 0
 	}
