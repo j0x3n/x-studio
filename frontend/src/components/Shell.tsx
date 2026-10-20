@@ -8,6 +8,7 @@ import { NotifyProvider, useNotify } from '../lib/notify'
 import { initials } from '../lib/format'
 import type { Home } from '../lib/types'
 import { AssistantPanel } from './AssistantPanel'
+import { LightboxProvider } from './Lightbox'
 
 // 左侧 232px 侧边栏（clean 预设），按模块分组；窄屏自动收成 64px 图标栏。没有权限的入口不显示。
 type Item = { to: string; label: string; icon: LucideIcon; perm?: string; anyPerm?: string[]; allPerm?: string[]; internal?: boolean; badge?: 'todo' | 'review' | 'tasks' }
@@ -44,7 +45,7 @@ const GROUPS: { label?: string; items: Item[] }[] = [
 type Usage = { items: { kind: string; units: number }[] }
 
 export function Shell() {
-  return <NotifyProvider><AssistantProvider><ShellInner /></AssistantProvider></NotifyProvider>
+  return <NotifyProvider><AssistantProvider><LightboxProvider><ShellInner /></LightboxProvider></AssistantProvider></NotifyProvider>
 }
 
 function ShellInner() {
@@ -52,10 +53,20 @@ function ShellInner() {
   const { open } = useAssistant()
   const { latest } = useNotify()
   const loc = useLocation()
-  const [expanded, setExpanded] = useState('')
+  // 分组可以同时展开多个，记在本机浏览器；进入某个页面时自动展开它所在的组
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('nav-expanded') || '[]')) } catch { return new Set() }
+  })
+  const toggleGroup = (label: string) => setExpanded(old => {
+    const next = new Set(old)
+    if (next.has(label)) next.delete(label)
+    else next.add(label)
+    try { localStorage.setItem('nav-expanded', JSON.stringify([...next])) } catch { /* 无痕模式 */ }
+    return next
+  })
   useEffect(() => {
     const group = GROUPS.find(g => g.label && g.items.some(it => loc.pathname === it.to || loc.pathname.startsWith(it.to + '/')))
-    setExpanded(group?.label || '')
+    if (group?.label) setExpanded(old => old.has(group.label!) ? old : new Set([...old, group.label!]))
   }, [loc.pathname])
   const [home, setHome] = useState<Home | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
@@ -105,11 +116,11 @@ function ShellInner() {
           {GROUPS.map((g, i) => {
             const items = g.items.filter(it => (!it.internal || me?.role.scope !== 'shares') && (it.allPerm ? it.allPerm.every(can) : it.anyPerm ? it.anyPerm.some(can) : !it.perm || can(it.perm)))
             if (!items.length) return null
-            const isOpen = !g.label || expanded === g.label
+            const isOpen = !g.label || expanded.has(g.label)
             const GroupIcon = g.label === '素材' ? Images : g.label === '生产' ? Wand2 : Boxes
             return (
               <nav key={i} className="nav-group" aria-label={g.label || '常用'}>
-                {g.label && <button className={'nav-section-toggle' + (isOpen ? ' expanded' : '')} aria-expanded={isOpen} aria-controls={`nav-section-${i}`} title={g.label} onClick={() => setExpanded(isOpen ? '' : g.label!)}><GroupIcon className="rail-group-icon" /><span className="hide-rail">{g.label}</span><ChevronDown className="nav-section-chevron hide-rail" /></button>}
+                {g.label && <button className={'nav-section-toggle' + (isOpen ? ' expanded' : '')} aria-expanded={isOpen} aria-controls={`nav-section-${i}`} title={g.label} onClick={() => toggleGroup(g.label!)}><GroupIcon className="rail-group-icon" /><span className="hide-rail">{g.label}</span><ChevronDown className="nav-section-chevron hide-rail" /></button>}
                 <div className="nav-section-items" id={`nav-section-${i}`} hidden={!isOpen}>{items.map(link)}</div>
               </nav>
             )

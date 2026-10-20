@@ -7,12 +7,14 @@ import { useToast, errText } from '../lib/toast'
 import type { DetailTemplate, QueueItem } from '../lib/types'
 import { Topbar, Pill, Loading, Empty } from '../components/ui'
 import { fmtAgo, fmtDate } from '../lib/format'
+import { useLightbox } from '../components/Lightbox'
 
 const REJECT_REASONS = ['文案有错', '图片不清晰', '颜色和实物不符', 'AI 痕迹明显', '模板不合适', '照片顺序不对']
 
 export function Review() {
   const { me, can } = useAuth()
   const toast = useToast()
+  const lightbox = useLightbox()
   const nav = useNavigate()
   const shops = me?.shops || []
   const [shop, setShop] = useState('')
@@ -116,7 +118,7 @@ export function Review() {
                 </div>
               ) : (
                 <div className="review-long">
-                  {cur.outputs.detail.length === 0 ? <Empty title="没有详情页切片" /> : cur.outputs.detail.map(u => <a key={u} href={u} target="_blank" rel="noreferrer"><img src={u} alt="" loading="lazy" /></a>)}
+                  {cur.outputs.detail.length === 0 ? <Empty title="没有详情页切片" /> : cur.outputs.detail.map((u, n, all) => <button key={u} type="button" className="zoomable" onClick={() => lightbox(all.map((x, k) => ({ src: x, title: `详情页 · 第 ${k + 1} 屏`, download: '' })), n)}><img src={u} alt="" loading="lazy" /></button>)}
                 </div>
               )}
             </div>
@@ -150,13 +152,14 @@ export function Review() {
 }
 
 function OutSection({ title, urls, big }: { title: string; urls: string[]; big?: boolean }) {
+  const lightbox = useLightbox()
   if (!urls.length) return null
   return (
     <section className="panel">
       <div className="panel-head"><ClipboardCheck className="t3" size={16} /><div className="panel-title">{title}</div><span className="t3 fs-12">{urls.length} 张</span></div>
       <div className="panel-pad">
         <div className={'out-grid' + (big ? ' big' : '')}>{urls.map((u, n) => (
-          <a key={u} className="thumb" href={u} target="_blank" rel="noreferrer"><img src={u + '?w=480'} alt="" loading="lazy" /><div className="meta"><span className="mono t3">{n + 1}</span></div></a>
+          <button key={u} type="button" className="thumb" onClick={() => lightbox(urls.map((x, k) => ({ src: x, title: `${title} · 第 ${k + 1} 张`, download: '' })), n)}><img src={u + '?w=480'} alt="" loading="lazy" /><div className="meta"><span className="mono t3">{n + 1}</span></div></button>
         ))}</div>
       </div>
     </section>

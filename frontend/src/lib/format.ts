@@ -20,7 +20,7 @@ export const platformName: Record<string, string> = { taobao: '淘宝', shopee_t
 export const languageName: Record<string, string> = { 'zh-CN': '简体中文', 'zh-TW': '繁体中文', en: '英文' }
 export const scopeName: Record<string, string> = { all: '全部数据', shops: '按分到的店铺', shares: '只看分享给他的款' }
 export const sourceName: Record<string, { label: string; pill: string }> = {
-  original: { label: '实拍', pill: 'pill-neutral' },
+  original: { label: '原图', pill: 'pill-neutral' },
   ai_enhanced: { label: 'AI 增强', pill: 'pill-info' },
   ai_edited: { label: 'AI 改图', pill: 'pill-purple' },
   ai_generated: { label: 'AI 生成', pill: 'pill-warning' }

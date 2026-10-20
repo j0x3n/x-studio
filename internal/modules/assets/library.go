@@ -25,6 +25,19 @@ func (a *Module) library(w http.ResponseWriter, r *http.Request) {
 	}
 	query += " AND a.archived=?"
 	args = append(args, archived)
+	if values, ok := q["folder_id"]; ok {
+		folderID, err := strconv.ParseInt(values[0], 10, 64)
+		if err != nil || folderID < 0 {
+			fail(w, 400, "文件夹编号不正确")
+			return
+		}
+		if folderID == 0 {
+			query += " AND a.folder_id IS NULL"
+		} else {
+			query += " AND a.folder_id=?"
+			args = append(args, folderID)
+		}
+	}
 	for _, key := range []string{"product_id", "created_by"} {
 		if v := q.Get(key); v != "" {
 			id, err := strconv.ParseInt(v, 10, 64)

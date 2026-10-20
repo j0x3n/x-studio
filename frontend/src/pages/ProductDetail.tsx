@@ -11,6 +11,7 @@ import { Topbar, Pill, Loading, Empty, Tabs } from '../components/ui'
 import { fmtAgo, money, productStatus, pipelineStatus, listingStatus, sourceName, platformName } from '../lib/format'
 import { useCategories, missingAttrs, emptyValue, attrText } from '../lib/categories'
 import { AttrFields } from '../components/AttrFields'
+import { useLightbox } from '../components/Lightbox'
 
 type Detail = { product: Product; assets: Asset[] }
 type ListingDetail = { listing: Listing; job: Job | null; outputs: { main34: string[]; main11: string[]; detail: string[]; white: string; zip: string } }
@@ -96,6 +97,7 @@ export function ProductDetail() {
 }
 
 function AssetsTab({ product, assets, onChange }: { product: Product; assets: Asset[]; onChange: () => void }) {
+  const lightbox = useLightbox()
   const nav = useNavigate()
   const { me, can } = useAuth()
   const toast = useToast()
@@ -113,23 +115,23 @@ function AssetsTab({ product, assets, onChange }: { product: Product; assets: As
   }
   return (
     <section className="panel">
-      <div className="panel-head"><div className="titles"><div className="panel-title">素材</div><div className="panel-sub">上传实拍图后，在店铺版本里点「一键出图」会自动分拣编号、修图、写文案、出图</div></div></div>
+      <div className="panel-head"><div className="titles"><div className="panel-title">素材</div><div className="panel-sub">上传原图后，在店铺版本里点「一键出图」会自动分拣编号、修图、写文案、出图</div></div></div>
       <div className="panel-pad stack">
         {can('asset.upload') && (
           <div className={'drop' + (over ? ' over' : '')} onClick={() => input.current?.click()}
             onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
             onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>
-            <Upload /><b>{busy ? '上传中…' : '点击或拖入实拍图'}</b>jpg / png / webp，单张不超过 25 MB，可以一次选多张
+            <Upload /><b>{busy ? '上传中…' : '点击或拖入原图'}</b>jpg / png / webp，单张不超过 25 MB，可以一次选多张
             <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={e => e.target.files && upload(e.target.files)} />
           </div>
         )}
         {assets.length === 0 ? <Empty title="还没有素材" /> : (
-          <div className="thumbs">{assets.map(a => {
+          <div className="thumbs">{assets.map((a, ai) => {
             const src = sourceName[a.source_override || a.source] || sourceName.original
             return (
               <div key={a.id} className="thumb product-tryon-thumb">
-                <a href={a.url} target="_blank" rel="noreferrer" title={a.ai_note || a.orig_name}><img src={a.url + '?w=240'} alt={a.orig_name} loading="lazy" /></a>
-                {src.label !== '实拍' && <span className="src"><Pill kind={src.pill} dot={false}>{src.label}</Pill></span>}
+                <button type="button" className="zoomable" title={a.ai_note || a.orig_name} onClick={() => lightbox(assets.map(x => ({ src: x.url, title: x.title || x.orig_name, meta: `${x.width}×${x.height}`, download: '' })), ai)}><img src={a.url + '?w=240'} alt={a.orig_name} loading="lazy" /></button>
+                {src.label !== '原图' && <span className="src"><Pill kind={src.pill} dot={false}>{src.label}</Pill></span>}
                 <div className="meta"><span className={'code' + (a.code ? '' : ' none')}>{a.code || '未编号'}</span><span className="grow" /><span className="t4 mono">{a.width}×{a.height}</span></div>
                 {a.kind === 'photo' && can('model.view') && can('asset.process') && can('asset.upload') && me?.role.scope !== 'shares' && <button className="btn btn-ghost btn-sm" onClick={() => nav('/tryon?assets=' + a.id)}><Shirt />试穿试戴</button>}
               </div>
@@ -144,6 +146,7 @@ function AssetsTab({ product, assets, onChange }: { product: Product; assets: As
 function ListingCard({ listing, shopName, onChange }: { listing: Listing; shopName: string; onChange: () => void }) {
   const { can } = useAuth()
   const toast = useToast()
+  const lightbox = useLightbox()
   const [d, setD] = useState<ListingDetail | null>(null)
   const load = useCallback(() => api<ListingDetail>(`/api/listings/${listing.id}`).then(setD).catch(() => {}), [listing.id])
   useEffect(() => { load() }, [load])
@@ -194,12 +197,12 @@ function ListingCard({ listing, shopName, onChange }: { listing: Listing; shopNa
           <div className="stack" style={{ gap: 8 }}>
             <div className="fs-12 t3">主图 3:4 · {out.main34.length} 张　详情页 · {out.detail.length} 张{out.white ? '　白底图 · 1 张' : ''}</div>
             <div className="thumbs">
-              {[...out.main34, ...(out.white ? [out.white] : [])].map(u => (
-                <a key={u} className="thumb" href={u} target="_blank" rel="noreferrer"><img src={u + '?w=240'} alt="" loading="lazy" /></a>
+              {[...out.main34, ...(out.white ? [out.white] : [])].map((u, n, all) => (
+                <button key={u} type="button" className="thumb" onClick={() => lightbox(all.map((x, k) => ({ src: x, title: out.white === x ? '白底图' : `主图 3:4 · 第 ${k + 1} 张`, download: '' })), n)}><img src={u + '?w=240'} alt="" loading="lazy" /></button>
               ))}
             </div>
           </div>
-        ) : !running && <div className="t3 fs-12">还没有成品。传好实拍图后点「一键出图」，一款大约 1–3 分钟。</div>}
+        ) : !running && <div className="t3 fs-12">还没有成品。传好原图后点「一键出图」，一款大约 1–3 分钟。</div>}
         {d?.listing.meta && Array.isArray((d.listing.meta as { compliance?: unknown[] }).compliance) && ((d.listing.meta as { compliance: { level: string; text: string }[] }).compliance.length > 0) && (
           <div className="stack" style={{ gap: 4 }}>
             <div className="fs-12 t2" style={{ fontWeight: 600 }}>合规检查</div>

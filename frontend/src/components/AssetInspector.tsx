@@ -3,23 +3,26 @@ import { X, Wand2, ScanSearch, Download, Archive, ArchiveRestore, Star, Package,
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
-import type { Asset } from '../lib/types'
+import type { Asset, AssetFolder } from '../lib/types'
 import { ASPECTS, FRAMINGS, bodyLabel, type TryOnOp } from '../lib/tryon'
 import { Pill, Loading } from './ui'
 import { TagInput } from '../pages/Assets'
+import { useLightbox } from './Lightbox'
+import { flatFolders } from './AssetFolders'
 import { sourceName, assetTitle, fmtDate, opName, quickOps, imgUrl } from '../lib/format'
 
 type UsedBy = { type: 'code'; product_id: number; code: string } | { type: 'listing'; id: number; shop_id: number }
 type Detail = { asset: Asset; versions: Asset[]; used_by: UsedBy[] }
 
 // 素材库右侧的详情栏：预览、基本信息、标签备注、版本链、处理记录、被谁用着
-export function AssetInspector({ id, onClose, onChanged, onProcess, onTryOn, onSimilar, onOpenProduct, onSelect }: {
-  id: number; onClose: () => void; onChanged: () => void; onProcess: (id: number) => void
+export function AssetInspector({ id, folders, onClose, onChanged, onProcess, onTryOn, onSimilar, onOpenProduct, onSelect }: {
+  id: number; folders?: AssetFolder[]; onClose: () => void; onChanged: () => void; onProcess: (id: number) => void
   onTryOn?: (id: number) => void
   onSimilar: (a: Asset) => void; onOpenProduct: (pid: number) => void; onSelect: (id: number) => void
 }) {
   const { me, can } = useAuth()
   const toast = useToast()
+  const lightbox = useLightbox()
   const [d, setD] = useState<Detail | null>(null)
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
@@ -29,6 +32,10 @@ export function AssetInspector({ id, onClose, onChanged, onProcess, onTryOn, onS
   const patch = async (body: Record<string, unknown>, okMsg?: string) => {
     try { await api(`/api/assets/${id}`, { method: 'PATCH', body }); if (okMsg) toast(okMsg, 'ok'); load(); onChanged() }
     catch (e) { toast(errText(e), 'error'); load() }
+  }
+  const moveFolder = async (folder_id: number | null) => {
+    try { await api('/api/assets/batch', { body: { action: 'folder', asset_ids: [id], folder_id } }); load(); onChanged() }
+    catch (e) { toast(errText(e), 'error') }
   }
   // 把拍摄编号从当前占着的版本转给这一张：先腾出来再设上（一键出图在跑时后端会拒绝）
   const makeCurrent = async (holder: Asset) => {
@@ -60,7 +67,7 @@ export function AssetInspector({ id, onClose, onChanged, onProcess, onTryOn, onS
       </div>
       <div className="inspector-body">
         <div className="inspector-section">
-          <a className="lib-preview" href={a.url} target="_blank" rel="noreferrer" title="看原图"><img src={imgUrl(a, 480)} alt="" /></a>
+          <button type="button" className="lib-preview" title="看大图" onClick={() => lightbox(d.versions.length > 1 ? d.versions.map((v, i) => ({ src: v.url, title: `${assetTitle(v)} · ${i === 0 ? '原图' : `v${i}`}`, meta: `${v.width}×${v.height}`, download: '' })) : [{ src: a.url, title: assetTitle(a), meta: `${a.width}×${a.height}`, download: '' }], Math.max(0, d.versions.findIndex(v => v.id === a.id)))}><img src={imgUrl(a, 480)} alt="" /></button>
           <div className="inline">
             <Pill kind={src.pill} dot={false}>{src.label}</Pill>
             {a.code ? <span className="chip">{a.code}</span> : <span className="t4 fs-12">未编号</span>}
@@ -72,6 +79,10 @@ export function AssetInspector({ id, onClose, onChanged, onProcess, onTryOn, onS
         <div className="inspector-section">
           <dl className="kv narrow">
             <dt>款</dt><dd><a className="link" onClick={() => onOpenProduct(a.product_id)}>{a.product?.name || `#${a.product_id}`}</a></dd>
+            {folders && <><dt>文件夹</dt><dd><select className="input" style={{ height: 26 }} value={a.folder_id || ''} onChange={e => moveFolder(Number(e.target.value) || null)}>
+              <option value="">未归类</option>
+              {flatFolders(folders).map(({ f, depth }) => <option key={f.id} value={f.id}>{'　'.repeat(depth)}{f.name}</option>)}
+            </select></dd></>}
             <dt>文件名</dt><dd className="ellipsis" title={a.orig_name}>{a.orig_name}</dd>
             <dt>上传</dt><dd>{fmtDate(a.created_at, true)}</dd>
             {a.ai_note && <><dt>AI 看到</dt><dd className="t2">{a.ai_note}</dd></>}

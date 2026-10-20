@@ -179,7 +179,7 @@ export function Products() {
             </div>
           )}
           {!items ? <Loading /> : shown.length === 0 ? (
-            <Empty title={q || shop || cat || mine || quick ? '没有符合条件的商品' : '还没有商品'} desc={can('product.edit') ? '点右上角「新建商品」，再上传实拍图。' : undefined} />
+            <Empty title={q || shop || cat || mine || quick ? '没有符合条件的商品' : '还没有商品'} desc={can('product.edit') ? '点右上角「新建商品」，再上传原图。' : undefined} />
           ) : view === 'table' ? (
             <div className="table-wrap"><table className="table">
               <thead><tr>
@@ -254,7 +254,7 @@ function CreateProduct({ onClose, onDone }: { onClose: () => void; onDone: (id: 
         if (supplier) body.supplier = { name: supplier }
       }
       const r = await api<{ product: { id: number } }>('/api/products', { body })
-      toast('已新建，接着上传实拍图', 'ok')
+      toast('已新建，接着上传原图', 'ok')
       onDone(r.product.id)
     } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }

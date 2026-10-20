@@ -9,8 +9,10 @@ import { ASPECTS, BODY_PARTS, FRAMINGS, bodyLabel, expiresAt, modelCover, result
 import { Empty, Field, Loading, Topbar } from '../components/ui'
 import { ModelImage, ModelJobStatus, TryOnAssetPicker, useTryOnJob } from '../components/TryOnShared'
 import { SaveDialog } from './Workbench'
+import { useLightbox } from '../components/Lightbox'
 
 export function TryOn() {
+  const lightbox = useLightbox()
   const { me, can } = useAuth()
   const toast = useToast()
   const [sp, setSp] = useSearchParams()
@@ -185,7 +187,7 @@ export function TryOn() {
       <main className="tryon-stage">
         <div className="tryon-stage-head"><span className="inline"><span className="tag">{current ? 'AI 生成' : '拍摄预览'}</span>{current && <span className="help">{current.op?.model_name} · {bodyLabel(current.op?.body_part)}</span>}</span><span className="grow" />{current && resultOriginal && <label className="inline help"><input type="checkbox" className="check" checked={compare} onChange={e => setCompare(e.target.checked)} />对照商品</label>}</div>
         <div className="tryon-preview">
-          {current ? <div className={'tryon-comparison' + (compare && resultOriginal ? ' with-original' : '')}>{compare && resultOriginal && <figure><img src={resultOriginal} alt="这次生成使用的商品原图" /><figcaption>生成时的商品原图</figcaption></figure>}<figure><img src={current.url + '?w=960'} alt="AI 模特穿戴结果" /><figcaption>穿戴效果 · 请核对商品细节与人体结构</figcaption></figure></div> : <div className="tryon-preview-empty"><div className="tryon-preview-symbol"><UserRound /><Sparkles /></div><h2>让商品穿戴在你的模特身上</h2><p>选择商品图片和模特，指定部位与构图。<br />耳饰、项链、手链可直接生成局部特写。</p>{srcs[0] && <div className="tryon-ready-images"><img src={sourceImage(srcs[0])} alt="已选商品" /><Plus />{reference ? <img src={reference.thumb_url || reference.url} alt="已选模特参考" /> : <span><UserRound /></span>}</div>}</div>}
+          {current ? <div className={'tryon-comparison' + (compare && resultOriginal ? ' with-original' : '')}>{compare && resultOriginal && <figure><img src={resultOriginal} alt="这次生成使用的商品原图" /><figcaption>生成时的商品原图</figcaption></figure>}<figure><img className="zoomable" title="看大图" src={current.url + '?w=960'} alt="AI 模特穿戴结果" onClick={() => lightbox({ src: current.url, title: '穿戴效果', meta: `${current.width}×${current.height}` })} /><figcaption>穿戴效果 · 请核对商品细节与人体结构</figcaption></figure></div> : <div className="tryon-preview-empty"><div className="tryon-preview-symbol"><UserRound /><Sparkles /></div><h2>让商品穿戴在你的模特身上</h2><p>选择商品图片和模特，指定部位与构图。<br />耳饰、项链、手链可直接生成局部特写。</p>{srcs[0] && <div className="tryon-ready-images"><img src={sourceImage(srcs[0])} alt="已选商品" /><Plus />{reference ? <img src={reference.thumb_url || reference.url} alt="已选模特参考" /> : <span><UserRound /></span>}</div>}</div>}
         </div>
         {task.job && <ModelJobStatus job={task.job} running={task.running} />}
         {current && <div className="tryon-result-actions"><span className="help">{current.saved_asset_id ? '已保存到素材库' : `暂存至 ${expiresAt(current.created_at)}`} · <span className="mono">{current.width}×{current.height}</span></span><span className="grow" /><button className="btn btn-ghost btn-sm" onClick={() => remove(current)}><Trash2 />删除暂存</button>{can('export.run') && <a className="btn btn-secondary btn-sm" href={`${current.url}?download=1`} download><Download />下载</a>}<button className="btn btn-secondary btn-sm" disabled={!!current.saved_asset_id} onClick={() => setSaving(current)}><Save />{current.saved_asset_id ? '已保存' : '保存到素材库'}</button></div>}

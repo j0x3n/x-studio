@@ -23,8 +23,10 @@ export type Asset = {
   // 图片库接口多出来的字段
   title?: string; note?: string; archived?: boolean; updated_at?: string
   product?: { id: number; name: string }; effective_source?: string; thumb_url?: string; version_count?: number
-  op?: AssetOp
+  op?: AssetOp; folder_id?: number | null
 }
+// 素材文件夹：团队共用的整理层级，一张素材最多在一个文件夹里；删文件夹不删图
+export type AssetFolder = { id: number; parent_id: number | null; name: string; count: number; created_by: number; created_at: string }
 // 处理出来的新版本在 op 里记做了什么
 export type AssetOp = {
   ops?: ProcessOps; preset_id?: number | null; prompts?: string[]; models?: Record<string, string>

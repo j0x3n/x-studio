@@ -47,5 +47,11 @@ CREATE TRIGGER IF NOT EXISTS assets_updated_at_insert AFTER INSERT ON assets WHE
 	}}, {Version: 4, Up: modelMigration}, {Version: 5, Up: func(tx *sql.Tx) error {
 		_, err := tx.Exec("ALTER TABLE model_references ADD COLUMN deleted_at TEXT NOT NULL DEFAULT ''")
 		return err
+	}}, {Version: 6, Up: func(tx *sql.Tx) error {
+		_, err := tx.Exec(`CREATE TABLE asset_folders(id INTEGER PRIMARY KEY,parent_id INTEGER REFERENCES asset_folders(id) ON DELETE CASCADE,name TEXT NOT NULL,created_by INTEGER NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE UNIQUE INDEX asset_folders_name ON asset_folders(COALESCE(parent_id,0),name);
+ALTER TABLE assets ADD COLUMN folder_id INTEGER;
+CREATE INDEX assets_folder_id ON assets(folder_id);`)
+		return err
 	}}}
 }

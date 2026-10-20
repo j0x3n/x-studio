@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 	"xstudio/internal/imaging"
@@ -48,11 +49,26 @@ func imageConfig(b []byte) (image.Config, string, error) {
 func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 	a.Mu.Lock()
 	defer a.Mu.Unlock()
+	var folderID *int64
+	if values, ok := r.URL.Query()["folder_id"]; ok {
+		if !folderWriteAllowed(w, r) {
+			return
+		}
+		value, err := strconv.ParseInt(values[0], 10, 64)
+		if err != nil || value < 1 {
+			fail(w, 400, "文件夹编号不正确")
+			return
+		}
+		folderID = &value
+	}
 	id := idParam(r, "id")
 	if _, ok := a.authorizedProduct(w, r, id, true); !ok {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 256<<20)
+	if !a.requireFolder(w, r, folderID) {
+		return
+	}
 	mr, e := r.MultipartReader()
 	if e != nil {
 		fail(w, 400, "请使用 multipart 的 files 字段上传")
@@ -150,13 +166,14 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 	photos := []Asset{}
 	for _, v := range files {
 		p := v.p
+		p.FolderID = folderID
 		p.CreatedBy = currentUser(r).ID
 		p.CreatedAt = now()
 		p.UpdatedAt = p.CreatedAt
 		p.Kind = "photo"
 		p.Tags = []string{}
 		p.Op = Object{}
-		res, e := tx.Exec("INSERT INTO assets(product_id,file,orig_name,width,height,created_by,created_at) VALUES(?,'',?,?,?,?,?)", id, p.OrigName, p.Width, p.Height, currentUser(r).ID, now())
+		res, e := tx.Exec("INSERT INTO assets(product_id,file,orig_name,width,height,created_by,created_at,folder_id) VALUES(?,'',?,?,?,?,?,?)", id, p.OrigName, p.Width, p.Height, currentUser(r).ID, now(), folderID)
 		if e != nil {
 			fail(w, 500, "保存照片失败")
 			return

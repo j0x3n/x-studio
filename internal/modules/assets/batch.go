@@ -49,6 +49,7 @@ func (a *Module) batch(w http.ResponseWriter, r *http.Request) {
 		Action    string   `json:"action"`
 		Tags      []string `json:"tags"`
 		ProductID int64    `json:"product_id"`
+		FolderID  *int64   `json:"folder_id"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -61,6 +62,10 @@ func (a *Module) batch(w http.ResponseWriter, r *http.Request) {
 	perm := core.AssetUpload
 	switch in.Action {
 	case "tag_add", "tag_remove", "archive", "unarchive":
+	case "folder":
+		if !folderWriteAllowed(w, r) {
+			return
+		}
 	case "move":
 		perm = core.ProductEdit
 	case "delete":
@@ -75,6 +80,9 @@ func (a *Module) batch(w http.ResponseWriter, r *http.Request) {
 	}
 	a.Mu.Lock()
 	defer a.Mu.Unlock()
+	if in.Action == "folder" && !a.requireFolder(w, r, in.FolderID) {
+		return
+	}
 	if in.Action == "move" && !a.CanProduct(u, in.ProductID) {
 		fail(w, 404, "目标商品不存在")
 		return
@@ -95,6 +103,8 @@ func (a *Module) batch(w http.ResponseWriter, r *http.Request) {
 			err = fmt.Errorf("此商品不允许修改素材")
 		} else {
 			switch in.Action {
+			case "folder":
+				_, err = a.DB.Exec("UPDATE assets SET folder_id=?,updated_at=? WHERE id=?", in.FolderID, now(), id)
 			case "tag_add", "tag_remove":
 				tags := normalizeTags(in.Tags)
 				if in.Action == "tag_add" {
@@ -142,7 +152,11 @@ func (a *Module) batch(w http.ResponseWriter, r *http.Request) {
 			result["error"] = a.SafeAIError(err.Error())
 		} else {
 			result["ok"] = true
-			a.Audit(r, "assets.batch."+in.Action, "asset", id, Object{"product_id": p.ProductID, "to_product_id": in.ProductID})
+			detail := Object{"product_id": p.ProductID, "to_product_id": in.ProductID}
+			if in.Action == "folder" {
+				detail["folder_id"] = in.FolderID
+			}
+			a.Audit(r, "assets.batch."+in.Action, "asset", id, detail)
 		}
 		items = append(items, result)
 	}

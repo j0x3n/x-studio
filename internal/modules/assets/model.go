@@ -14,13 +14,14 @@ type Asset struct {
 	Archived     bool   `json:"archived"`
 	UpdatedAt    string `json:"updated_at"`
 	PHash        string `json:"phash"`
+	FolderID     *int64 `json:"folder_id"`
 	Product      Object `json:"product"`
 	Effective    string `json:"effective_source"`
 	ThumbURL     string `json:"thumb_url"`
 	VersionCount int    `json:"version_count"`
 }
 
-const assetColumns = core.PhotoColumns + ",title,note,archived,updated_at,phash"
+const assetColumns = core.PhotoColumns + ",title,note,archived,updated_at,phash,folder_id"
 
 type extraScanner struct {
 	core.Scanner
@@ -29,7 +30,7 @@ type extraScanner struct {
 
 func (s extraScanner) Scan(v ...any) error { return s.Scanner.Scan(append(v, s.extra...)...) }
 func scanAsset(s core.Scanner) (p Asset, err error) {
-	p.Photo, err = core.ScanPhoto(extraScanner{s, []any{&p.Title, &p.Note, &p.Archived, &p.UpdatedAt, &p.PHash}})
+	p.Photo, err = core.ScanPhoto(extraScanner{s, []any{&p.Title, &p.Note, &p.Archived, &p.UpdatedAt, &p.PHash, &p.FolderID}})
 	return
 }
 func (a *Module) asset(id int64) (Asset, error) {

@@ -332,7 +332,7 @@ func (a *Module) publishProcess(j core.Job, in ProcessRequest, v stagedProcess) 
 		}
 	}
 	t := now()
-	res, err := tx.Exec("INSERT INTO assets(product_id,parent_id,file,orig_name,width,height,source,code,manual,tags,created_by,created_at,updated_at,title,note,op,phash,ai_enhanced,ai_generated) VALUES(?,?,'',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", fresh.ProductID, fresh.ID, fresh.OrigName, v.width, v.height, v.source, code, code != "", js(fresh.Tags), j.UserID, t, t, fresh.Title, fresh.Note, js(v.op), v.phash, v.source != "original", v.source == "ai_generated")
+	res, err := tx.Exec("INSERT INTO assets(product_id,parent_id,file,orig_name,width,height,source,code,manual,tags,created_by,created_at,updated_at,title,note,op,phash,ai_enhanced,ai_generated,folder_id) VALUES(?,?,'',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", fresh.ProductID, fresh.ID, fresh.OrigName, v.width, v.height, v.source, code, code != "", js(fresh.Tags), j.UserID, t, t, fresh.Title, fresh.Note, js(v.op), v.phash, v.source != "original", v.source == "ai_generated", fresh.FolderID)
 	if err != nil {
 		return 0, fmt.Errorf("保存新素材记录失败：%w", err)
 	}

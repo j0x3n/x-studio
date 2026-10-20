@@ -8,6 +8,7 @@ import type { Job } from '../lib/types'
 import { ASPECTS, BODY_PARTS, bodyLabel, expiresAt, modelCover, type Aspect, type BodyPart, type ModelResult, type ShopModel } from '../lib/tryon'
 import { Drawer, Empty, Field, Loading, Pill, Topbar } from '../components/ui'
 import { ModelImage, ModelJobStatus, useTryOnJob } from '../components/TryOnShared'
+import { useLightbox } from '../components/Lightbox'
 
 export function ModelLibrary() {
   const { me, can } = useAuth()
@@ -97,6 +98,8 @@ function ModelForm({ model, shopId, onClose, onSaved }: { model?: ShopModel; sho
 
 function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; onClose: () => void; onChange: () => void; onEdit: () => void }) {
   const { can } = useAuth()
+  const lightbox = useLightbox()
+  const refItems = (model.references || []).map(r => ({ src: r.url, title: `${model.name} · ${bodyLabel(r.body_part)}`, download: '' }))
   const toast = useToast()
   const editable = can('model.manage')
   const ai = editable && can('asset.process') && can('asset.upload')
@@ -167,8 +170,8 @@ function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; o
     <div className="row between"><span className="help">固定参考长期保留 · {model.references?.length || 0} 张</span>{editable && <button className="btn btn-ghost btn-sm" onClick={onEdit}><Pencil />编辑档案</button>}</div>
     <p className="model-detail-description">{model.description || '尚未填写外观与风格描述'}</p>
     {model.archived && <div className="model-note">已归档，恢复使用后可以继续添加参考图和生成穿戴照。</div>}
-    <div className="model-ref-grid">{(model.references || []).map(r => <div className="model-ref" key={r.id}>
-      <a href={r.url} target="_blank" rel="noreferrer"><ModelImage src={r.thumb_url || r.url} alt={`${model.name} ${bodyLabel(r.body_part)}`} /></a>
+    <div className="model-ref-grid">{(model.references || []).map((r, ri) => <div className="model-ref" key={r.id}>
+      <button type="button" className="model-ref-photo" title="看大图" onClick={() => lightbox(refItems, ri)}><ModelImage src={r.thumb_url || r.url} alt={`${model.name} ${bodyLabel(r.body_part)}`} /></button>
       <div className="row between"><span>{bodyLabel(r.body_part)}</span>{r.id === model.cover_reference_id ? <span className="inline help"><Star size={12} />封面</span> : editable && !model.archived && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => patch({ cover_reference_id: r.id })}>设封面</button>}</div>
       {editable && <button className="btn btn-ghost btn-sm danger-text model-ref-delete" disabled={busy || task.running} onClick={() => removeReference(r.id)}><Trash2 size={14} />删除参考图</button>}
     </div>)}</div>
@@ -189,8 +192,8 @@ function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; o
       <div className="row between"><span className="section-title">生成候选</span><span className="help">暂存 7 天</span></div>
       {candidateError && <div className="form-err">{candidateError}</div>}
       {!model.archived && <label className="inline help"><input className="check" type="checkbox" checked={cover} onChange={e => setCover(e.target.checked)} />确认时设为档案封面</label>}
-      <div className="model-candidates">{candidates.map(i => <article className="model-candidate" key={i.id}>
-        <a href={i.url} target="_blank" rel="noreferrer"><img src={i.thumb_url || i.url} alt="生成的模特候选" /></a>
+      <div className="model-candidates">{candidates.map((i, ci) => <article className="model-candidate" key={i.id}>
+        <button type="button" title="看大图" onClick={() => lightbox(candidates.map(c => ({ src: c.url, title: `候选 · ${bodyLabel(c.op?.body_part)}`, meta: `${expiresAt(c.created_at)} 到期` })), ci)}><img src={i.thumb_url || i.url} alt="生成的模特候选" /></button>
         <div className="stack"><div className="row between"><b>{bodyLabel(i.op?.body_part)}</b><span className="help">{expiresAt(i.created_at)} 到期</span></div><p className="help">{i.op?.prompt || '按模特档案生成'}</p>
           {i.op?.confirmed_reference_id ? <span className="inline t3"><Check size={14} />已保存为固定参考</span> : !model.archived && <button className="btn btn-secondary" disabled={busy || task.running} onClick={() => confirmCandidate(i)}><Check />确认保存到模特库</button>}
         </div>

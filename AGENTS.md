@@ -22,6 +22,7 @@
 - 新权限点加在 `internal/core/perm.go`，给内置角色补权限用 `accounts` 模块的新迁移。
 - 写操作都调 `core.Audit`；请求要带 `X-Requested-With: fetch`。
 - 后端测试离线跑，命令见交接说明第 4 节。
+- 素材文件夹见 `接口约定-图片库与处理.md` 第 8 节（后端 `assets/folders.go`）；前端通用组件：`Lightbox.tsx`（站内看大图，不要再用 `target=_blank` 打开图片）、`ContextMenu.tsx`（右键菜单）、`AssetFolders.tsx`。
 - AI 模特入口 `/models` 和 `/tryon`，契约见 `接口约定-AI模特.md`；前端类型在 `lib/tryon.ts`，模特参考永久保存，生成候选和试穿复用本人 workbench。
 - 三期经营已开发并升级本机：组装 `internal/modules/assembly`、财务 `finance`；新入口 `/assembly`、`/finance`、`/replenishment`、`/purchase-recognize`，契约见 `接口约定-三期经营.md`。库存变更仍通过 `inventory.StockIn/StockOut`，财务不写采购/订单表，事务内鉴权用同一事务避免单 SQLite 连接死锁。
 - 本轮用户要求减少测试与额度占用，全部开发完成后统一手动验证；三期已于 2026-10-21 按 `手动验收-三期经营.md` 验收通过。知识库助手/经营派活已恢复整合，不要重复合并历史暂停分支。

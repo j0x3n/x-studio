@@ -10,6 +10,7 @@ import { useToast, errText } from '../lib/toast'
 import { useJobs, jobRunning } from '../lib/jobs'
 import type { Asset, Product, ProcessOps, WbItem } from '../lib/types'
 import { Topbar, Pill, Loading, Empty, Drawer, Field } from '../components/ui'
+import { useLightbox } from '../components/Lightbox'
 import { sourceName, assetTitle, quickOps, imgUrl, opName, fmtAgo } from '../lib/format'
 
 // 一张待处理的图：来自素材库，或者上传 / 粘贴进来的
@@ -55,6 +56,7 @@ const resultTool = (r: WbItem) => Object.keys(r.op?.ops || {}).filter(k => k !==
 const fromSrc = (r: WbItem, s: Src) => (s.asset && r.asset_id === s.asset.id) || (s.item && r.input_id === s.item.id)
 
 export function Workbench() {
+  const lightbox = useLightbox()
   const { can } = useAuth()
   const toast = useToast()
   const nav = useNavigate()
@@ -214,7 +216,7 @@ export function Workbench() {
                   <img src={wbUrl(r, 240)} alt="" />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div className="ellipsis fs-12" style={{ fontWeight: 500 }}>{resultTool(r)}</div>
-                    <div className="ellipsis fs-12 t3">{r.saved_asset_id ? '已存进素材库' : fmtAgo(r.created_at)}{rs.label !== '实拍' ? ` · ${rs.label}` : ''}</div>
+                    <div className="ellipsis fs-12 t3">{r.saved_asset_id ? '已存进素材库' : fmtAgo(r.created_at)}{rs.label !== '原图' ? ` · ${rs.label}` : ''}</div>
                   </div>
                   {r.saved_asset_id ? <Check className="st ok" /> : null}
                   <button className="tag-x" title="从处理台删掉" onClick={e => { e.stopPropagation(); removeResult(r) }}><X /></button>
@@ -255,6 +257,7 @@ export function Workbench() {
                 {curResult.saved_asset_id
                   ? <span className="fs-12 t2"><Check style={{ width: 14, height: 14, verticalAlign: -2 }} /> 已存进素材库 <a className="link" onClick={() => nav('/assets')}>去素材库看</a></span>
                   : <button className="btn btn-secondary btn-sm" onClick={() => setSaving(curResult)}><Save />保存到素材库</button>}
+                <button className="btn btn-ghost btn-sm" onClick={() => lightbox({ src: curResult.url, title: curResult.orig_name, meta: `${curResult.width}×${curResult.height}` })}><Maximize2 />看大图</button>
                 {can('export.run') && <a className="btn btn-secondary btn-sm" href={`${curResult.url}?download=1`}><Download />下载</a>}
                 {curResult.op?.diff && <span className="t3 fs-12">和原图差异 <span className="mono">{curResult.op.diff.phash_distance}</span>{curResult.op.diff.phash_distance > 16 ? '，商品外观可能被改了，请对照原图' : ''}</span>}
               </div>

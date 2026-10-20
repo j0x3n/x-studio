@@ -16,7 +16,7 @@ import (
 )
 
 func workbenchFilename(v WorkbenchItem) string {
-	source := map[string]string{"original": "实拍", "ai_enhanced": "AI增强", "ai_edited": "AI改图", "ai_generated": "AI生成"}[v.Source]
+	source := map[string]string{"original": "原图", "ai_enhanced": "AI增强", "ai_edited": "AI改图", "ai_generated": "AI生成"}[v.Source]
 	if source == "" {
 		source = v.Source
 	}

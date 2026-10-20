@@ -25,6 +25,10 @@ func (a *Module) Routes(r *core.Router) {
 	a.startWorkbenchCleanup()
 	a.workbenchRoutes(r)
 	a.modelRoutes(r)
+	r.Handle("GET /api/asset-folders", core.ProductView, a.folders)
+	r.Handle("POST /api/asset-folders", core.AssetUpload, a.createFolder)
+	r.Handle("PATCH /api/asset-folders/{id}", core.AssetUpload, a.patchFolder)
+	r.Handle("DELETE /api/asset-folders/{id}", core.AssetUpload, a.deleteFolder)
 	r.Handle("GET /api/presets", core.AssetUpload, a.presets)
 	r.Handle("POST /api/presets", core.AssetUpload, a.createPreset)
 	r.Handle("PATCH /api/presets/{id}", core.Scoped, a.patchPreset)
@@ -72,7 +76,7 @@ func (a *Module) list(w http.ResponseWriter, r *http.Request) {
 	if !a.RequireProduct(w, r, id, false) {
 		return
 	}
-	q := "SELECT " + core.PhotoColumns + " FROM assets WHERE product_id=?"
+	q := "SELECT " + assetColumns + " FROM assets WHERE product_id=?"
 	args := []any{id}
 	for _, key := range []string{"kind", "code"} {
 		if s := r.URL.Query().Get(key); s != "" {
@@ -85,9 +89,9 @@ func (a *Module) list(w http.ResponseWriter, r *http.Request) {
 		core.Fail(w, 500, "读取素材失败")
 		return
 	}
-	items := []Photo{}
+	items := []Asset{}
 	for rows.Next() {
-		p, e := core.ScanPhoto(rows)
+		p, e := scanAsset(rows)
 		if e != nil {
 			rows.Close()
 			core.Fail(w, 500, "读取素材失败")
