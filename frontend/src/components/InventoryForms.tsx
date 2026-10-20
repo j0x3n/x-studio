@@ -30,7 +30,7 @@ export function ItemPicker({ value, onChange, kind, autoFocus }: { value: InvIte
     return () => clearTimeout(t)
   }, [q, kind, open])
   if (value) return (
-    <div className="inv-picked input"><span className="mono">{value.code}</span><span className="ellipsis grow">{value.name}</span><button className="tag-x" onClick={() => onChange(null)}><X /></button></div>
+    <div className="inv-picked input"><span className="mono">{value.code}</span><span className="ellipsis grow">{value.name}</span><button type="button" className="tag-x" onClick={() => onChange(null)} aria-label="重新选择物料"><X /></button></div>
   )
   return (
     <div className="inv-picker">
@@ -218,10 +218,10 @@ export function ItemDrawer({ item, product, onClose, onDone }: { item?: InvItem 
   }
   return (
     <Drawer title={item ? '修改物料' : '新建物料'} width={520} onClose={onClose}
-      foot={<><span className="grow" /><button className="btn btn-secondary" onClick={onClose}>取消</button><button className="btn btn-primary" disabled={busy || !code.trim() || !name.trim() || !unit.trim()} onClick={submit}>保存</button></>}>
+      foot={<><span className="grow" /><button className="btn btn-secondary" onClick={onClose}>取消</button><button className="btn btn-primary" disabled={busy || (!!item && !code.trim()) || !name.trim() || !unit.trim()} onClick={submit}>保存</button></>}>
       <div className="segmented">{(Object.keys(kindName) as ItemKind[]).map(k => <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>{kindName[k]}</button>)}</div>
       <div className="form-row">
-        <Field label="编码" req hint={kind === 'sku' ? '就是平台上的商家编码，录单和导入靠它匹配' : '唯一，建议带品类前缀'}><input className="input mono" maxLength={64} value={code} onChange={e => setCode(e.target.value)} /></Field>
+        <Field label="编码" req={!!item} hint={item ? '编码唯一，可修改；成品编码用于匹配平台商家编码' : '留空按「设置 → 编码」规则生成，也可手动填写'}><input className="input mono" maxLength={64} placeholder={item ? undefined : '保存时自动生成'} value={code} onChange={e => setCode(e.target.value)} /></Field>
         <Field label="名称" req><input className="input" maxLength={100} value={name} onChange={e => setName(e.target.value)} /></Field>
       </div>
       {kind === 'sku' && <Field label="挂在哪个商品下" hint="一个商品的每个规格建一个成品物料"><ProductPicker value={prod} onChange={setProd} /></Field>}

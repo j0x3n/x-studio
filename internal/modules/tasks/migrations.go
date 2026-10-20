@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"database/sql"
+	"errors"
 	"strconv"
 	"xstudio/internal/core"
 )
@@ -125,10 +126,10 @@ func (a *Module) Migrations() []core.Migration {
 			return e
 		}
 		var photoID, designID int64
-		if e := tx.QueryRow("SELECT id FROM roles WHERE key='photographer'").Scan(&photoID); e != nil {
+		if e := tx.QueryRow("SELECT id FROM roles WHERE key='photographer'").Scan(&photoID); e != nil && !errors.Is(e, sql.ErrNoRows) {
 			return e
 		}
-		if e := tx.QueryRow("SELECT id FROM roles WHERE key='designer'").Scan(&designID); e != nil {
+		if e := tx.QueryRow("SELECT id FROM roles WHERE key='designer'").Scan(&designID); e != nil && !errors.Is(e, sql.ErrNoRows) {
 			return e
 		}
 		type seed struct {
@@ -151,5 +152,5 @@ func (a *Module) Migrations() []core.Migration {
 			}
 		}
 		return nil
-	}}, {Version: 2, Up: migrateTargets}, {Version: 3, Up: indexTargetProducts}}
+	}}, {Version: 2, Up: migrateTargets}, {Version: 3, Up: indexTargetProducts}, {Version: 4, Up: migrateCommerce}, {Version: 5, Up: migratePush}}
 }

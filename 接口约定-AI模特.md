@@ -14,7 +14,7 @@
 
 `shop_models`：id、shop_id、name（必填≤80字）、description（≤4000字）、archived、cover_reference_id?、created_by、created_at、updated_at。
 
-`model_references`：id、model_id、body_part、source（original/ai_generated）、file、orig_name、width、height、op JSON、created_by、created_at。不可替换字节；更换参考上传新图。无硬删除接口，本期通过归档模特停止使用。cover只能指向本档案的参考图。
+`model_references`：id、model_id、body_part、source（original/ai_generated）、file、orig_name、width、height、op JSON、created_by、created_at、deleted_at（assets v5，默认空串）。不可替换字节；更换参考上传新图。支持单张删除：保留删除标记避免历史ID被复用，列表/文件/生成/封面校验过滤已删除参考，并清理文件。cover只能指向本档案的未删除参考图。
 
 `body_part` 枚举：`full_body/upper_body/hand/wrist/ear/neck/foot/custom`。参考图和试穿共用。`framing`：`full_body/half_body/closeup`。`aspect_ratio`：`1:1/2:3/3:2`，对应1024x1024/1024x1536/1536x1024。
 
@@ -31,6 +31,7 @@ Reference JSON：`{id,model_id,body_part,source,orig_name,width,height,url,thumb
 | GET /api/models/{id} | `{model}` |
 | PATCH /api/models/{id} | `{name?,description?,archived?,cover_reference_id?}` |
 | POST /api/models/{id}/references | multipart `files`（最多1张）、`body_part`；复用真实格式/25MB/40M像素/EXIF处理 →201 `{reference,model}` |
+| DELETE /api/models/{id}/references/{ref} | 需 `model.manage + model.view + CanShop`，shares不可；允许清理归档模特的参考。排队/运行的模特或试穿任务使用该参考时409；成功200 `{model}`。删除封面自动选剩余最早参考，没有则清空封面；已生成结果不变，尚在workbench的原候选解除确认标记，可再次确认生成新参考ID。事务审计 `assets.model.reference.delete`，提交后清理参考文件。 |
 | GET /api/models/{id}/references/{ref}/file?w=240\|480\|960 | 受保护图片，不暴露本机路径 |
 | POST /api/models/{id}/generate | `{body_part,prompt,aspect_ratio,base_reference_id?}` →202 `{job}`；初次无基准则纯文生图，有基准则编辑；局部参考生成默认必须有基准（专用手模等首次创建可从文字生成） |
 | POST /api/models/{id}/references/confirm | `{item_id,set_cover?:boolean}` →201 `{reference,model}`；候选必须属于本人、op.type=model_candidate、该model；事务确认幂等，op记录confirmed_reference_id；不覆盖已有基准 |

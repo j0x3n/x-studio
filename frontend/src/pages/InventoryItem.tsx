@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pencil, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft, Truck, Plus, AlertTriangle } from 'lucide-react'
+import { Pencil, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft, Truck, Plus, AlertTriangle, ListTodo } from 'lucide-react'
 import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
@@ -11,6 +11,7 @@ import type { KbArticle } from '../lib/kb'
 import { Topbar, Loading, Empty } from '../components/ui'
 import { MoveDrawer, TransferDrawer, ItemDrawer, DropshipDrawer, useCostPerm, useWarehouses } from '../components/InventoryForms'
 import { LedgerTable } from './Inventory'
+import { NewTaskDrawer } from '../components/TaskViews'
 
 // 后端详情里代发行可能叫 dropship（数组），列表里 dropship 是数字；统一成 dropship_rows
 function norm(r: unknown): ItemDetail {
@@ -35,6 +36,7 @@ export function InventoryItem() {
   const [d, setD] = useState<ItemDetail | null>(null)
   const [drawer, setDrawer] = useState<'' | 'edit' | 'in' | 'out' | 'transfer' | 'drop'>('')
   const [drop, setDrop] = useState<Dropship | null>(null)
+  const [newTask, setNewTask] = useState(false)
   const [kb, setKb] = useState<KbArticle[]>([])
   const load = useCallback(() => {
     api(`/api/inventory/items/${id}`).then(r => setD(norm(r))).catch(e => { toast(errText(e), 'error'); nav('/inventory') })
@@ -53,6 +55,7 @@ export function InventoryItem() {
   return (
     <>
       <Topbar crumbs={[<Link key="i" to="/inventory">库存</Link>]} title={<><span className="mono">{d.code}</span> {d.name}</>} sub={<>{kindName[d.kind]}{cat && ` · ${cat.name}`}{d.archived && ' · 已归档'}</>}>
+        {can('task.view') && <button className="btn btn-secondary" onClick={() => setNewTask(true)}><ListTodo />建任务</button>}
         {edit && !d.archived && <>
           <button className="btn btn-secondary" onClick={() => setDrawer('in')}><ArrowDownToLine />入库</button>
           <button className="btn btn-secondary" onClick={() => setDrawer('out')}><ArrowUpFromLine />出库</button>
@@ -143,6 +146,7 @@ export function InventoryItem() {
           </aside>
         </div>
       </main></div>
+      {newTask && <NewTaskDrawer target={{ type: 'inv_item', id: d.id, label: `${d.code} ${d.name}` }} onClose={() => setNewTask(false)} onCreated={t => { setNewTask(false); window.dispatchEvent(new Event('xs:tasks-changed')); nav(`/tasks/${t.id}`) }} />}
       {drawer === 'edit' && <ItemDrawer item={d} onClose={() => setDrawer('')} onDone={done} />}
       {drawer === 'in' && <MoveDrawer kind="other_in" item={d} onClose={() => setDrawer('')} onDone={done} />}
       {drawer === 'out' && <MoveDrawer kind="other_out" item={d} onClose={() => setDrawer('')} onDone={done} />}

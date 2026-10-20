@@ -5,7 +5,7 @@ import type { AssistAction, AssistReply, Job, Task } from './types'
 
 // AI 助手：右侧面板的开关、对话记录、当前页面上下文。对话只存在本标签页（sessionStorage），后端不存。
 export type ChatMsg = { role: 'user' | 'assistant'; content: string; actions?: AssistAction[]; refs?: AssistReply['refs']; error?: boolean }
-export type Selection = { type: 'product' | 'listing' | 'asset'; ids: number[] } | null
+export type Selection = { type: 'product' | 'listing' | 'asset' | 'kb_article' | 'inv_item' | 'purchase_order'; ids: number[] } | null
 
 type Assistant = {
   open: boolean
@@ -33,7 +33,10 @@ function write(store: () => Storage, key: string, v: unknown) {
 const PAGES: [RegExp, string][] = [
   [/^\/$/, '今天（首页）'], [/^\/products\/\d+/, '商品详情'], [/^\/products/, '商品库'], [/^\/assets/, '素材库'],
   [/^\/process/, '图片处理'], [/^\/copy/, '文案中心'], [/^\/templates/, '模板中心'], [/^\/review/, '出图审核'],
-  [/^\/tasks/, '任务'], [/^\/admin/, '账号与权限'], [/^\/settings/, '设置']
+  [/^\/tasks/, '任务'], [/^\/kb/, '知识库'], [/^\/inventory/, '库存'], [/^\/purchase-orders/, '采购单'],
+  [/^\/orders/, '订单'], [/^\/suppliers/, '供应商'], [/^\/assembly/, '组装加工'], [/^\/finance/, '财务'],
+  [/^\/replenishment/, '补货建议'], [/^\/purchase-recognize/, '单据识别'], [/^\/models/, '模特库'], [/^\/tryon/, '试穿试戴'],
+  [/^\/admin/, '账号与权限'], [/^\/settings/, '设置']
 ]
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
@@ -48,11 +51,20 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   useEffect(() => { write(() => sessionStorage, KEY_MSGS, messages.slice(-40)) }, [messages])
   const setOpen = useCallback((v: boolean) => { setOpenState(v); write(() => localStorage, KEY_OPEN, v) }, [])
 
-  // 商品详情页自动把这款当作选中对象
+  // 详情页自动把当前对象交给助手，真实名称和权限由后端核对。
   const selection = useMemo<Selection>(() => {
     if (picked && picked.ids.length) return picked
-    const m = /^\/products\/(\d+)/.exec(loc.pathname)
-    return m ? { type: 'product', ids: [Number(m[1])] } : null
+    const routes = [
+      [/^\/products\/(\d+)(?:\/|$)/, 'product'],
+      [/^\/kb\/(\d+)$/, 'kb_article'],
+      [/^\/inventory\/items\/(\d+)$/, 'inv_item'],
+      [/^\/purchase-orders\/(\d+)$/, 'purchase_order']
+    ] as const
+    for (const [re, type] of routes) {
+      const m = re.exec(loc.pathname)
+      if (m) return { type, ids: [Number(m[1])] }
+    }
+    return null
   }, [picked, loc.pathname])
 
   const send = useCallback((text: string) => {

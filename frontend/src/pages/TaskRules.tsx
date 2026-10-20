@@ -70,6 +70,8 @@ function RuleDrawer({ rule, roles, people, onClose, onSaved }: { rule: Partial<T
   const toast = useToast()
   const [f, setF] = useState<Partial<TaskRule>>(rule)
   const [busy, setBusy] = useState(false)
+  const commerce = f.event === 'inventory.low_stock' || f.event === 'purchase.received'
+  const templateHint = f.event === 'inventory.low_stock' ? '可以用 {item} 物料编码和名称、{reason} 触发原因' : f.event === 'purchase.received' ? '可以用 {purchase} 采购单号、{reason} 触发原因' : '可以用 {product} 款名、{shop} 店铺名、{reason} 失败原因或退回意见'
   const set = <K extends keyof TaskRule>(k: K, v: TaskRule[K]) => setF(x => ({ ...x, [k]: v }))
   const save = async () => {
     if (!f.name?.trim()) return toast('起个规则名', 'error')
@@ -93,17 +95,19 @@ function RuleDrawer({ rule, roles, people, onClose, onSaved }: { rule: Partial<T
     <Drawer title={f.id ? '编辑规则' : '加规则'} width={480} onClose={onClose} foot={<><span className="grow" /><button className="btn btn-secondary" onClick={onClose}>取消</button><button className="btn btn-primary" disabled={busy} onClick={save}>保存</button></>}>
       <Field label="规则名" req><input className="input" value={f.name || ''} onChange={e => set('name', e.target.value)} placeholder="例如：新款自动派拍样" /></Field>
       <Field label="什么时候" req>
-        <select className="input" value={f.event} onChange={e => set('event', e.target.value)}>
+        <select className="input" value={f.event} onChange={e => setF(x => ({ ...x, event: e.target.value, ...(['inventory.low_stock', 'purchase.received'].includes(e.target.value) && ['product_owner', 'job_user'].includes(x.assign_mode || '') ? { assign_mode: 'role_least_loaded' } : {}) }))}>
           {Object.entries(ruleEvent).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </Field>
-      <Field label="任务标题" req hint="可以用 {product} 款名、{shop} 店铺名、{reason} 失败原因或退回意见">
+      {f.event === 'purchase.received' && <p className="help">登记到货时已完成质检入库，这条规则用于后续复核。分批到货会归入同一采购单的未完成任务。</p>}
+      {f.event === 'inventory.low_stock' && <p className="help">库存从正常变为低于安全线时触发。持续低库存不会反复派活，恢复后再次跌破会重新触发。</p>}
+      <Field label="任务标题" req hint={templateHint}>
         <input className="input mono" maxLength={100} value={f.title_tpl || ''} onChange={e => set('title_tpl', e.target.value)} placeholder="修图：{product}" />
       </Field>
       <Field label="任务说明"><textarea className="textarea mono" rows={3} value={f.body_tpl || ''} onChange={e => set('body_tpl', e.target.value)} placeholder="{reason}" /></Field>
       <Field label="派给">
         <select className="input" value={f.assign_mode} onChange={e => set('assign_mode', e.target.value as TaskRule['assign_mode'])}>
-          {Object.entries(assignMode).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          {Object.entries(assignMode).filter(([k]) => !commerce || !['product_owner', 'job_user'].includes(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </Field>
       {f.assign_mode === 'fixed' && (
@@ -115,7 +119,7 @@ function RuleDrawer({ rule, roles, people, onClose, onSaved }: { rule: Partial<T
         </Field>
       )}
       {NEEDS_ROLE.includes(f.assign_mode || '') && (
-        <Field label="哪个角色" req hint="停用的账号和没有「看任务」权限的账号不参与">
+        <Field label="哪个角色" req hint="只派给未停用、有「看任务」且能查看目标对象的人">
           <select className="input" value={f.assign_role_id ?? ''} onChange={e => set('assign_role_id', e.target.value ? Number(e.target.value) : null)}>
             <option value="">选一个角色</option>
             {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}

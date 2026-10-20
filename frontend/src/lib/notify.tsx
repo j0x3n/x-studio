@@ -3,6 +3,44 @@ import { useNavigate } from 'react-router-dom'
 import { api } from './api'
 import type { Notice } from './types'
 
+export async function releasePushSubscription(fetchImpl?: typeof fetch) {
+  const call = fetchImpl || window.fetch.bind(window)
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  const reg = await navigator.serviceWorker.getRegistration()
+  const sub = reg ? await reg.pushManager.getSubscription() : null
+  if (!sub) { localStorage.removeItem('xs-push-owner'); return }
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), 4000)
+  try {
+    await call('/api/push/subscriptions', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+      signal: ctl.signal,
+    })
+  } catch {
+    // Cancel in the browser even when the server is temporarily unreachable.
+  } finally { clearTimeout(timer) }
+  const removed = await sub.unsubscribe()
+  if (!removed && await reg?.pushManager.getSubscription()) throw new Error('浏览器未能取消推送，请重试')
+  localStorage.removeItem('xs-push-owner')
+}
+
+async function pushSubscriptionActive() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
+    const reg = await navigator.serviceWorker.getRegistration()
+    if (!reg) return false
+    const sub = await reg.pushManager.getSubscription()
+    if (!sub) return false
+    const key = await api<{ enabled: boolean }>('/api/push/key')
+    return key.enabled && localStorage.getItem('xs-push-owner') !== null
+  } catch {
+    return false
+  }
+}
+
 type Ctx = {
   unread: number
   latest: Notice | null // 最近推来的一条，铃铛用来刷新列表
@@ -26,15 +64,16 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
     const es = new EventSource('/api/notifications/stream', { withCredentials: true })
     es.addEventListener('unread', e => { try { setUnread(JSON.parse((e as MessageEvent).data).count || 0) } catch { /* 忽略坏数据 */ } })
     es.addEventListener('notification', e => {
-      let n: Notice
-      try { n = JSON.parse((e as MessageEvent).data) } catch { return }
-      setLatest(n)
-      setUnread(c => c + 1)
-      // 多个标签页都会收到，用同一个 tag 让系统只显示一条
-      if (n.desktop !== false && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      void (async () => {
+        let n: Notice
+        try { n = JSON.parse((e as MessageEvent).data) } catch { return }
+        setLatest(n)
+        setUnread(c => c + 1)
+        if (n.desktop === false || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+        if (await pushSubscriptionActive()) return
         const sys = new Notification(n.title, { body: n.body, tag: `xs-${n.id}`, icon: '/favicon.svg' })
         sys.onclick = () => { window.focus(); if (n.link) navRef.current(n.link); sys.close() }
-      }
+      })()
     })
     return () => es.close()
   }, [])

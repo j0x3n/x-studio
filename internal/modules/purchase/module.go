@@ -19,6 +19,7 @@ func (a *Module) Routes(r *core.Router) {
 	r.Handle("POST /api/suppliers", core.PurchaseManage, a.createSupplier)
 	r.Handle("GET /api/suppliers/{id}", core.LoggedIn, a.getSupplier)
 	r.Handle("PATCH /api/suppliers/{id}", core.PurchaseManage, a.patchSupplier)
+	r.Handle("POST /api/purchase-orders/recognize", core.PurchaseManage, a.recognize)
 }
 
 type statusError struct {

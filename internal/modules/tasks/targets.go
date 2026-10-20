@@ -28,9 +28,9 @@ const targetProductID = `coalesce(CASE target_type
 // Called in the same transaction as an explicit new binding. Unrelated PATCHes
 // must never refresh these fields, or a reused id could resurrect an old target.
 func bindTaskTarget(q dbx, id int64) error {
-	_, err := q.Exec(`UPDATE tasks SET target_created_at=`+targetCreatedAt+`,
+	_, err := q.Exec(`UPDATE tasks SET target_created_at=`+bindingCreatedAt(q)+`,
  target_product_id=`+targetProductID+`,
- target_deleted=CASE WHEN target_type IS NOT NULL AND `+targetCreatedAt+`='' THEN 1 ELSE 0 END WHERE id=?`, id)
+ target_deleted=CASE WHEN target_type IS NOT NULL AND `+bindingCreatedAt(q)+`='' THEN 1 ELSE 0 END WHERE id=?`, id)
 	return err
 }
 
@@ -39,12 +39,12 @@ func (a *Module) taskTargetAlive(t taskRec) bool {
 		return false
 	}
 	var n int
-	return a.DB.QueryRow("SELECT count(*) FROM tasks t WHERE t.id=? AND ("+liveTarget+")", t.ID).Scan(&n) == nil && n > 0
+	return a.DB.QueryRow("SELECT count(*) FROM tasks t WHERE t.id=? AND ("+liveTargets(a.DB)+")", t.ID).Scan(&n) == nil && n > 0
 }
 
 // One-time migration sweep only. Runtime deletion marking uses incremental events.
 func markDeletedTargets(q dbx) error {
-	_, err := q.Exec("UPDATE tasks AS t SET target_deleted=1 WHERE t.target_type IS NOT NULL AND t.target_deleted=0 AND NOT (" + liveTarget + ")")
+	_, err := q.Exec("UPDATE tasks AS t SET target_deleted=1 WHERE t.target_type IS NOT NULL AND t.target_deleted=0 AND NOT (" + liveTargets(q) + ")")
 	return err
 }
 
@@ -58,6 +58,10 @@ func applyTargetAudit(q dbx, row auditRow) error {
 	}
 	var typ string
 	switch row.Action {
+	case "inventory.item.delete":
+		typ = "inv_item"
+	case "purchase.delete":
+		typ = "purchase_order"
 	case "product.delete":
 		typ = "product"
 	case "listing.delete":
@@ -86,11 +90,11 @@ func applyTargetAudit(q dbx, row auditRow) error {
 	if row.TargetType != typ {
 		return nil
 	}
-	if _, err := q.Exec("UPDATE tasks AS t SET target_deleted=1 WHERE target_type=? AND target_id=? AND target_deleted=0 AND NOT ("+liveTarget+")", typ, row.TargetID); err != nil {
+	if _, err := q.Exec("UPDATE tasks AS t SET target_deleted=1 WHERE target_type=? AND target_id=? AND target_deleted=0 AND NOT ("+liveTargets(q)+")", typ, row.TargetID); err != nil {
 		return err
 	}
 	if typ == "product" {
-		_, err := q.Exec("UPDATE tasks AS t SET target_deleted=1 WHERE target_product_id=? AND target_type IN ('listing','asset') AND target_deleted=0 AND NOT ("+liveTarget+")", row.TargetID)
+		_, err := q.Exec("UPDATE tasks AS t SET target_deleted=1 WHERE target_product_id=? AND target_type IN ('listing','asset') AND target_deleted=0 AND NOT ("+liveTargets(q)+")", row.TargetID)
 		return err
 	}
 	return nil

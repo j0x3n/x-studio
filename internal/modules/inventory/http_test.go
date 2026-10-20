@@ -8,6 +8,8 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
+	"xstudio/internal/core"
 )
 
 func TestItemValidationUnitsArchivingAndWarehouseRules(t *testing.T) {
@@ -44,6 +46,75 @@ func TestItemValidationUnitsArchivingAndWarehouseRules(t *testing.T) {
 	})
 	f.req(t, "PATCH", "/api/inventory/warehouses/1", obj{"archived": true}, 200)
 	f.req(t, "POST", "/api/inventory/moves", obj{"kind": "other_in", "warehouse_id": 1, "lines": []obj{{"item_id": id, "qty": 1}}}, 409)
+}
+
+func TestItemAutomaticCodeAndManualOverride(t *testing.T) {
+	f := boot(t)
+	f.item(t, "wl000001") // A manually assigned code must also block automatic allocation.
+	var ids []int64
+	for i, body := range []obj{
+		{"name": "自动编码", "kind": "material", "unit": "个"},
+		{"code": "  ", "name": "空白编码", "kind": "packaging", "unit": "个"},
+	} {
+		id := int64(f.req(t, "POST", "/api/inventory/items", body, 200)["id"].(float64))
+		ids = append(ids, id)
+		want := fmt.Sprintf("WL%06d", i+2)
+		if f.n(t, "SELECT count(*) FROM inv_items WHERE id=? AND code=?", id, want) != 1 {
+			t.Fatalf("automatic code should be %s", want)
+		}
+		f.req(t, "PATCH", path(id), obj{"name": "仅修改名称"}, 200)
+		if f.n(t, "SELECT count(*) FROM inv_items WHERE id=? AND code=?", id, want) != 1 {
+			t.Fatal("unrelated edit changed the code")
+		}
+	}
+	for i, id := range ids {
+		manual := fmt.Sprintf("CUSTOM-%d", i)
+		f.req(t, "PATCH", path(id), obj{"code": manual}, 200)
+		if f.n(t, "SELECT count(*) FROM inv_items WHERE id=? AND code=?", id, manual) != 1 {
+			t.Fatal("manual code edit was not saved")
+		}
+		f.req(t, "PATCH", path(id), obj{"code": "WL000001"}, 409)
+		f.req(t, "PATCH", path(id), obj{"code": ""}, 400)
+	}
+}
+
+func TestItemCodeRules(t *testing.T) {
+	f := boot(t)
+	rule := core.ItemCodeRule{Prefix: "MAT", Date: "day", Separator: "-", Digits: 4, Start: 10}
+	f.req(t, "PATCH", "/api/settings", obj{"item_code_rule": rule}, 200)
+	for key, value := range (obj{"prefix": "坏前缀", "date": "invalid", "separator": "/", "digits": 0, "start": 1.5}) {
+		body := obj{"prefix": rule.Prefix, "date": rule.Date, "separator": rule.Separator, "digits": rule.Digits, "start": rule.Start}
+		body[key] = value
+		f.req(t, "PATCH", "/api/settings", obj{"item_code_rule": body}, 400)
+	}
+	// An invalid item must not consume a number, and HTTP creation reads the saved rule.
+	f.req(t, "POST", "/api/inventory/items", obj{"name": "", "unit": "个"}, 400)
+	id := int64(f.req(t, "POST", "/api/inventory/items", obj{"name": "自动编码", "unit": "个"}, 200)["id"].(float64))
+	var code string
+	if err := f.c.DB.QueryRow("SELECT code FROM inv_items WHERE id=?", id).Scan(&code); err != nil || !strings.HasPrefix(code, "MAT-") || !strings.HasSuffix(code, "-0010") {
+		t.Fatalf("saved rule not applied: %q, %v", code, err)
+	}
+	// Verify China midnight, period rollover, counter persistence and no rollback on a lower start.
+	instant := time.Date(2020, 1, 1, 16, 0, 0, 0, time.UTC)
+	rule.Start = 20
+	f.tx(t, func(tx *sql.Tx) error {
+		for i, tc := range []struct {
+			at   time.Time
+			want string
+		}{{instant, "MAT-20200102-0020"}, {instant.Add(24 * time.Hour), "MAT-20200103-0020"}, {instant, "MAT-20200102-0021"}} {
+			if i == 2 {
+				rule.Start = 1
+			}
+			got, err := allocateItemCode(tx, rule, tc.at)
+			if err != nil || got != tc.want {
+				t.Fatalf("got %q, %v; want %s", got, err, tc.want)
+			}
+		}
+		return nil
+	})
+	f.user(t, "code-warehouse", "warehouse")
+	f.login(t, "code-warehouse")
+	f.req(t, "PATCH", "/api/settings", obj{"item_code_rule": rule}, 403)
 }
 
 func TestManualMovesWholeDocumentRollbackGroupingAndAudit(t *testing.T) {

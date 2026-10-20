@@ -69,8 +69,8 @@ type outgoing struct {
 
 var statuses = map[string]bool{"todo": true, "doing": true, "waiting": true, "done": true, "canceled": true}
 var priorities = map[string]bool{"low": true, "normal": true, "high": true, "urgent": true}
-var targetTypes = map[string]bool{"product": true, "listing": true, "asset": true}
-var ruleEvents = map[string]bool{"product.created": true, "assets.first_upload": true, "render.failed": true, "review.rejected": true}
+var targetTypes = map[string]bool{"product": true, "listing": true, "asset": true, "inv_item": true, "purchase_order": true}
+var ruleEvents = map[string]bool{"product.created": true, "assets.first_upload": true, "render.failed": true, "review.rejected": true, "inventory.low_stock": true, "purchase.received": true}
 var assignModes = map[string]bool{"fixed": true, "role_round_robin": true, "role_least_loaded": true, "product_owner": true, "job_user": true}
 
 var noticeTypes = []string{"task_assigned", "task_mentioned", "task_comment", "task_due", "task_overdue", "task_done", "job_failed", "job_done", "review_result", "quota_80", "task_unassigned"}
@@ -198,6 +198,10 @@ func listingWhere(u core.User, alias string) (string, []any) {
 }
 
 func (a *Module) visibleWhere(u core.User) (string, []any) {
+	return a.visibleWhereQ(a.DB, u)
+}
+
+func (a *Module) legacyVisibleWhere(u core.User) (string, []any) {
 	if u.Role.Key == "admin" {
 		return "1=1", nil
 	}
@@ -225,6 +229,10 @@ func (a *Module) targetExists(typ string, id int64) bool {
 		q = "SELECT count(*) FROM listings WHERE id=?"
 	case "asset":
 		q = "SELECT count(*) FROM assets WHERE id=?"
+	case "inv_item":
+		q = "SELECT count(*) FROM inv_items WHERE id=?"
+	case "purchase_order":
+		q = "SELECT count(*) FROM purchase_orders WHERE id=?"
 	default:
 		return false
 	}
@@ -236,6 +244,13 @@ func (a *Module) targetExists(typ string, id int64) bool {
 }
 
 func (a *Module) targetVisible(u core.User, typ string, id int64) bool {
+	if commerceTarget(typ) {
+		perm := core.InventoryView
+		if typ == "purchase_order" {
+			perm = core.PurchaseManage
+		}
+		return u.Role.Scope != "shares" && u.Has(perm) && a.targetExists(typ, id)
+	}
 	switch typ {
 	case "product":
 		return a.CanProduct(u, id)
@@ -259,6 +274,9 @@ func (a *Module) isWatcher(taskID, userID int64) bool {
 }
 
 func (a *Module) canSeeTask(u core.User, t taskRec) bool {
+	if commerceTarget(t.TargetType) && (!a.taskTargetAlive(t) || !a.targetVisible(u, t.TargetType, t.TargetID)) {
+		return false
+	}
 	if u.Role.Key == "admin" {
 		return true
 	}
@@ -278,6 +296,14 @@ func (a *Module) canSeeTask(u core.User, t taskRec) bool {
 }
 
 func (a *Module) targetNames(typ string, id int64) (product, shop string, productID int64, exists bool) {
+	if typ == "inv_item" {
+		err := a.DB.QueryRow("SELECT code || ' ' || name FROM inv_items WHERE id=?", id).Scan(&product)
+		return product, "", 0, err == nil
+	}
+	if typ == "purchase_order" {
+		err := a.DB.QueryRow("SELECT no FROM purchase_orders WHERE id=?", id).Scan(&product)
+		return product, "", 0, err == nil
+	}
 	switch typ {
 	case "product":
 		err := a.DB.QueryRow("SELECT name FROM products WHERE id=?", id).Scan(&product)
@@ -309,6 +335,12 @@ func (a *Module) targetJSON(u core.User, t taskRec) any {
 		return core.Object{"type": typ, "id": id, "label": "已删除", "path": ""}
 	}
 	label := product
+	if typ == "inv_item" {
+		return core.Object{"type": typ, "id": id, "label": label, "path": "/inventory/items/" + strconv.FormatInt(id, 10)}
+	}
+	if typ == "purchase_order" {
+		return core.Object{"type": typ, "id": id, "label": label, "path": "/purchase-orders/" + strconv.FormatInt(id, 10)}
+	}
 	path := ""
 	if pid > 0 {
 		path = "/products/" + strconv.FormatInt(pid, 10)
@@ -458,6 +490,10 @@ func targetMissing(typ string) string {
 
 func targetNoun(typ string) string {
 	switch typ {
+	case "inv_item":
+		return "物料"
+	case "purchase_order":
+		return "采购单"
 	case "listing":
 		return "上架版本"
 	case "asset":

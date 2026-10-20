@@ -142,7 +142,7 @@ func (a *Module) validateModelJob(u core.User, kind string, in modelJobRequest) 
 		}
 		if in.BaseReferenceID == nil && in.BodyPart != "full_body" {
 			var count int
-			if e = a.DB.QueryRow("SELECT count(*) FROM model_references WHERE model_id=?", m.ID).Scan(&count); e != nil {
+			if e = a.DB.QueryRow("SELECT count(*) FROM model_references WHERE model_id=? AND deleted_at=''", m.ID).Scan(&count); e != nil {
 				return m, nil, fmt.Errorf("读取基准参考失败")
 			}
 			if count > 0 {

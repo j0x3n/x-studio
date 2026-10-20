@@ -15,7 +15,7 @@ func (a *Module) documentRefs(r *http.Request, rows []core.Object) error {
 	if len(rows) == 0 {
 		return nil
 	}
-	tableRows, err := objects(a.DB, "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('purchase_orders','purchase_receipts','orders','order_returns')")
+	tableRows, err := objects(a.DB, "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('purchase_orders','purchase_receipts','orders','order_returns','assembly_orders')")
 	if err != nil {
 		return err
 	}
@@ -46,12 +46,21 @@ func (a *Module) documentRefs(r *http.Request, rows []core.Object) error {
 }
 
 func (a *Module) documentRef(u core.User, kind string, id int64, tables map[string]bool) (string, string, error) {
-	label := map[string]string{"manual": "手工出入库", "transfer": "调拨", "count": "盘点", "purchase_receipt": "采购到货", "order": "订单", "order_return": "售后退货"}[kind]
+	label := map[string]string{"manual": "手工出入库", "transfer": "调拨", "count": "盘点", "purchase_receipt": "采购到货", "order": "订单", "order_return": "售后退货", "assembly": "组装加工", "assembly_order": "组装加工"}[kind]
 	if id <= 0 {
 		return label, "", nil
 	}
 	var query string
 	switch kind {
+	case "assembly", "assembly_order":
+		if u.Role.Scope != "shares" && u.Has(core.InventoryView) && tables["assembly_orders"] {
+			var no string
+			if err := a.DB.QueryRow("SELECT no FROM assembly_orders WHERE id=?", id).Scan(&no); err == nil {
+				return label + " " + no, fmt.Sprintf("/assembly?order_id=%d", id), nil
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return "", "", err
+			}
+		}
 	case "manual", "transfer":
 		return fmt.Sprintf("%s #%d", label, id), "", nil
 	case "count":

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { Pencil, PackageCheck } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Pencil, PackageCheck, ListTodo } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
@@ -9,9 +9,11 @@ import { money, purchaseStatus, type Purchase } from '../lib/commerce'
 import { Topbar, Empty, Pill, Drawer, Field } from '../components/ui'
 import { DocumentPanel, RecordState, useRecord } from '../components/CommerceShared'
 import { PurchaseForm, ReceiptForm } from '../components/PurchaseForms'
+import { NewTaskDrawer } from '../components/TaskViews'
 
 export function PurchaseDetail() {
   const { id } = useParams()
+  const nav = useNavigate()
   const { can } = useAuth()
   const toast = useToast()
   const { data: p, error, reload } = useRecord<Purchase>(`/api/purchase-orders/${id}`)
@@ -29,6 +31,7 @@ export function PurchaseDetail() {
   const lineName = (lineID: number) => { const l = p.lines.find(l => l.id === lineID); return l ? `${l.code} · ${l.name}` : `明细 #${lineID}` }
   return <>
     <Topbar crumbs={[<Link to="/purchase-orders">采购单</Link>]} title={<span className="mono">{p.no}</span>} sub={<Pill kind={purchaseStatus[p.status].pill}>{purchaseStatus[p.status].label}</Pill>}>
+      {can('task.view') && <button className="btn btn-secondary" onClick={() => setDrawer('task')}><ListTodo />建任务</button>}
       {active && <button className="btn btn-secondary" onClick={() => setDrawer(p.status === 'draft' ? 'edit' : 'note')}><Pencil />{p.status === 'draft' ? '编辑草稿' : '改备注 / 日期'}</button>}
       {['draft', 'ordered'].includes(p.status) && <button className="btn btn-danger" disabled={busy} onClick={() => setDrawer('cancel')}>取消采购</button>}
       {['partial', 'received'].includes(p.status) && <button className={'btn ' + (p.status === 'received' ? 'btn-primary' : 'btn-secondary')} disabled={busy} onClick={() => setDrawer('finish')}>完成采购</button>}
@@ -43,6 +46,7 @@ export function PurchaseDetail() {
       </div>
       <aside className="stack"><DocumentPanel title="采购信息"><dl className="kv commerce-kv"><dt>供应商</dt><dd><Link className="link" to="/suppliers">{p.supplier_name}</Link></dd><dt>类型</dt><dd>{p.is_sample ? '拍样单' : '普通采购'}</dd>{p.product_id && <><dt>关联商品</dt><dd><Link className="link" to={`/products/${p.product_id}`}>商品 #{p.product_id}</Link></dd></>}<dt>预计到货</dt><dd className="mono">{p.expected_at ? fmtDate(p.expected_at) : '未填写'}</dd><dt>运费</dt><dd className="mono">{money(p.shipping_fee, p.currency)}</dd><dt>创建</dt><dd className="mono">{fmtDate(p.created_at, true)}</dd>{p.ordered_at && <><dt>下单</dt><dd className="mono">{fmtDate(p.ordered_at, true)}</dd></>}{p.done_at && <><dt>{p.status === 'canceled' ? '取消' : '完成'}</dt><dd className="mono">{fmtDate(p.done_at, true)}</dd></>}<dt>备注</dt><dd className="commerce-pre">{p.note || '—'}</dd></dl></DocumentPanel></aside>
     </main></div>
+    {drawer === 'task' && <NewTaskDrawer target={{ type: 'purchase_order', id: p.id, label: p.no }} onClose={() => setDrawer('')} onCreated={t => { setDrawer(''); window.dispatchEvent(new Event('xs:tasks-changed')); nav(`/tasks/${t.id}`) }} />}
     {drawer === 'edit' && <PurchaseForm value={p} onClose={() => setDrawer('')} onDone={() => { setDrawer(''); reload() }} />}
     {drawer === 'receipt' && <ReceiptForm value={p} onClose={() => setDrawer('')} onDone={() => { toast('到货质检已登记', 'ok'); setDrawer(''); reload() }} />}
     {drawer === 'note' && <PurchaseNote value={p} onClose={() => setDrawer('')} onDone={() => { setDrawer(''); reload() }} />}

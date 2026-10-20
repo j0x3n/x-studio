@@ -8,6 +8,7 @@ import { fmtAgo } from '../lib/format'
 import { plainText } from '../lib/markdown'
 import { flattenFolders, type KbArticle, type KbFolder, type KbDraft } from '../lib/kb'
 import { Topbar, Loading, Empty, Drawer, Field } from '../components/ui'
+import { KnowledgeTabs } from '../components/KnowledgeTabs'
 
 // 知识库首页：左边目录，右边文章列表；有 kb.edit 的可以新建、AI 整理、管目录
 export function Kb() {
@@ -73,6 +74,7 @@ export function Kb() {
         {edit && <button className="btn btn-primary" onClick={() => nav('/kb/new' + (folder ? `?folder=${folder}` : ''))}><Plus />新建文章</button>}
       </Topbar>
       <div className="scroll"><main className="content">
+        <KnowledgeTabs />
         <div className="kb-layout">
           <aside className="panel kb-side">
             <div className={'kb-folder' + (!folder ? ' active' : '')} onClick={() => pick('folder', 0)}><BookOpen /><span className="grow">全部文章</span><span className="count mono">{total || ''}</span></div>

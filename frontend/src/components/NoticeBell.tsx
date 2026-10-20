@@ -8,6 +8,7 @@ import { noticeType } from '../lib/tasks'
 import { fmtAgo } from '../lib/format'
 import type { Notice, NoticePrefs } from '../lib/types'
 import { Drawer, Empty, Loading } from './ui'
+import { PushSettings } from './PushSettings'
 
 const LOOK: Record<string, { icon: LucideIcon; tint: string }> = {
   task_assigned: { icon: ListTodo, tint: 'tint-blue' },
@@ -121,6 +122,7 @@ function PrefsDrawer({ onClose }: { onClose: () => void }) {
   }
   return (
     <Drawer title="通知设置" width={460} onClose={onClose} foot={<><span className="grow" /><button className="btn btn-secondary" onClick={onClose}>取消</button><button className="btn btn-primary" disabled={busy} onClick={save}>保存</button></>}>
+      <PushSettings />
       {desktop !== 'granted' && desktop !== 'unsupported' && (
         <div className="bell-tip boxed"><BellRing size={14} /><span className="grow">{desktop === 'denied' ? '浏览器拦截了桌面通知，下面的「桌面」开关暂时不起作用' : '这个浏览器还没允许桌面通知'}</span>{desktop === 'default' && <button className="btn btn-soft btn-sm" onClick={enableDesktop}>允许</button>}</div>
       )}

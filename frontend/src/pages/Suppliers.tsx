@@ -17,7 +17,7 @@ export function Suppliers() {
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Supplier | null | undefined>(undefined)
   const { data, error, reload } = useRecord<Page<Supplier>>('/api/suppliers' + qs({ q, archived: archived ? 1 : undefined, page, page_size: 50 }))
-  if (!edit && !can('inventory.view')) return <><Topbar title="供应商" /><Empty title="没有查看供应商的权限" /></>
+  if (!edit && !can('inventory.view') && !can('finance.view')) return <><Topbar title="供应商" /><Empty title="没有查看供应商的权限" /></>
   return <>
     <Topbar title="供应商" sub="货源、联系人与结算方式">{edit && <button className="btn btn-primary" onClick={() => setSelected(null)}><Plus />新建供应商</button>}</Topbar>
     <div className="scroll"><main className="content">

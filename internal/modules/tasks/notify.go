@@ -263,7 +263,7 @@ func (a *Module) canReceiveTask(q dbx, uid, taskID int64) (bool, error) {
 	if u.Disabled || !u.Has(core.TaskView) {
 		return false, nil
 	}
-	vis, args := a.visibleWhere(u)
+	vis, args := a.visibleWhereQ(q, u)
 	var n int
 	err = q.QueryRow("SELECT count(*) FROM tasks t WHERE t.id=? AND ("+vis+")", append([]any{taskID}, args...)...).Scan(&n)
 	return n > 0, err
@@ -300,18 +300,26 @@ func (a *Module) insertNote(q dbx, n note, ts string) (*outgoing, error) {
 	if n.TargetType != "" && n.TargetID > 0 {
 		tt, tid = n.TargetType, n.TargetID
 	}
-	res, err := q.Exec("INSERT INTO notifications(user_id,type,title,body,link,target_type,target_id,created_at) VALUES(?,?,?,?,?,?,?,?)", n.UserID, n.Type, n.Title, n.Body, n.Link, tt, tid, ts)
+	res, err := q.Exec("INSERT INTO notifications(user_id,type,title,body,link,target_type,target_id,created_at,task_id) VALUES(?,?,?,?,?,?,?,?,?)", n.UserID, n.Type, n.Title, n.Body, n.Link, tt, tid, ts, nullableID(n.TaskID))
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
+	if commerceTarget(n.TargetType) {
+		if _, err = q.Exec("UPDATE notifications SET target_created_at=coalesce((SELECT target_created_at FROM tasks WHERE id=?),'') WHERE id=?", n.TaskID, id); err != nil {
+			return nil, err
+		}
+	}
 	desktop := pref.desktop && !inQuiet(a.now(), pref.quietFrom, pref.quietTo)
 	return &outgoing{userID: n.UserID, frame: sseFrame("notification", noteObject(id, n, ts, "", &desktop))}, nil
 }
 
 func (a *Module) publish(list []outgoing) {
 	for _, o := range list {
-		a.hub.publish(o.userID, o.frame)
+		if a.frameAllowed(o.userID, o.frame) {
+			a.hub.publish(o.userID, o.frame)
+			a.enqueuePush(o)
+		}
 	}
 }
 
@@ -332,15 +340,121 @@ func (a *Module) deliver(n note) {
 		return
 	}
 	if o != nil {
-		a.hub.publish(o.userID, o.frame)
+		if a.frameAllowed(o.userID, o.frame) {
+			a.hub.publish(o.userID, o.frame)
+			a.enqueuePush(*o)
+		}
 	}
+}
+
+func frameMeta(frame []byte) (int64, bool) {
+	parts := strings.SplitN(string(frame), "\ndata: ", 2)
+	if len(parts) != 2 {
+		return 0, false
+	}
+	var n struct {
+		ID      int64 `json:"id"`
+		Desktop *bool `json:"desktop"`
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(parts[1])), &n) != nil || n.ID <= 0 {
+		return 0, false
+	}
+	if n.Desktop != nil && !*n.Desktop {
+		return n.ID, false
+	}
+	return n.ID, true
+}
+
+func (a *Module) noteVisible(uid, id int64) bool {
+	if uid <= 0 || id <= 0 {
+		return false
+	}
+	u, err := a.User(uid)
+	if err != nil || u.Disabled {
+		return false
+	}
+	var typ string
+	var target sql.NullString
+	var targetID, taskID sql.NullInt64
+	err = a.DB.QueryRow("SELECT type, target_type, target_id, task_id FROM notifications WHERE id=? AND user_id=?", id, uid).Scan(&typ, &target, &targetID, &taskID)
+	if err != nil {
+		return false
+	}
+	vis, args := a.noticeScope(u)
+	var n int
+	if a.DB.QueryRow("SELECT count(*) FROM notifications WHERE id=? AND user_id=? AND ("+vis+")", append([]any{id, uid}, args...)...).Scan(&n) != nil || n != 1 {
+		return false
+	}
+	tt := ""
+	var tid int64
+	if target.Valid {
+		tt = target.String
+	}
+	if targetID.Valid {
+		tid = targetID.Int64
+	}
+	if tt != "" || tid != 0 {
+		if !a.targetStillAllowed(u, tt, tid) {
+			return false
+		}
+	}
+	if strings.HasPrefix(typ, "task_") {
+		if !taskID.Valid || taskID.Int64 <= 0 {
+			return false
+		}
+		ok, err := a.canReceiveTask(a.DB, uid, taskID.Int64)
+		if err != nil || !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (a *Module) targetStillAllowed(u core.User, typ string, id int64) bool {
+	if u.Disabled || id <= 0 {
+		return false
+	}
+	switch typ {
+	case "user":
+		return id == u.ID
+	case "product", "listing", "asset", "inv_item", "purchase_order":
+		if (typ == "product" || typ == "listing" || typ == "asset") && !u.Has(core.ProductView) {
+			return false
+		}
+		if !a.targetExists(typ, id) {
+			return false
+		}
+		return a.targetVisible(u, typ, id)
+	default:
+		return false
+	}
+}
+
+func (a *Module) pushAllowed(uid, id int64) bool {
+	if !a.noteVisible(uid, id) {
+		return false
+	}
+	var typ string
+	var read sql.NullString
+	if a.DB.QueryRow("SELECT type, read_at FROM notifications WHERE id=? AND user_id=?", id, uid).Scan(&typ, &read) != nil {
+		return false
+	}
+	if read.Valid && strings.TrimSpace(read.String) != "" {
+		return false
+	}
+	pref, err := readChan(a.DB, uid, typ)
+	if err != nil || !pref.inbox || !pref.desktop || inQuiet(a.now(), pref.quietFrom, pref.quietTo) {
+		return false
+	}
+	return true
 }
 
 func (a *Module) listNotes(w http.ResponseWriter, r *http.Request) {
 	u := core.CurrentUser(r)
 	q := r.URL.Query()
-	where := "user_id=?"
-	args := []any{u.ID}
+	vis, visArgs := a.noticeScope(u)
+	where := "user_id=? AND (" + vis + ")"
+	args := append([]any{u.ID}, visArgs...)
 	if q.Get("unread") == "1" {
 		where += " AND read_at IS NULL"
 	}
@@ -392,7 +506,9 @@ func (a *Module) listNotes(w http.ResponseWriter, r *http.Request) {
 
 func (a *Module) unreadCount(w http.ResponseWriter, r *http.Request) {
 	var n int
-	if err := a.DB.QueryRow("SELECT count(*) FROM notifications WHERE user_id=? AND read_at IS NULL", core.CurrentUser(r).ID).Scan(&n); err != nil {
+	var err error
+	n, err = a.unreadFor(core.CurrentUser(r))
+	if err != nil {
 		writeErr(w, err, "读取未读数失败：", "读取未读数失败")
 		return
 	}
@@ -412,10 +528,11 @@ func (a *Module) markRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := core.CurrentUser(r).ID
+	vis, visArgs := a.noticeScope(core.CurrentUser(r))
 	ts := a.ts()
 	var updated int64
 	if in.All {
-		res, err := a.DB.Exec("UPDATE notifications SET read_at=? WHERE user_id=? AND read_at IS NULL", ts, uid)
+		res, err := a.DB.Exec("UPDATE notifications SET read_at=? WHERE user_id=? AND read_at IS NULL AND ("+vis+")", append([]any{ts, uid}, visArgs...)...)
 		if err != nil {
 			writeErr(w, err, "标记已读失败：", "标记已读失败")
 			return
@@ -423,7 +540,7 @@ func (a *Module) markRead(w http.ResponseWriter, r *http.Request) {
 		updated, _ = res.RowsAffected()
 	} else {
 		for _, id := range in.IDs {
-			res, err := a.DB.Exec("UPDATE notifications SET read_at=? WHERE id=? AND user_id=? AND read_at IS NULL", ts, id, uid)
+			res, err := a.DB.Exec("UPDATE notifications SET read_at=? WHERE id=? AND user_id=? AND read_at IS NULL AND ("+vis+")", append([]any{ts, id, uid}, visArgs...)...)
 			if err != nil {
 				writeErr(w, err, "标记已读失败：", "标记已读失败")
 				return
@@ -450,7 +567,9 @@ func (a *Module) stream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	u := core.CurrentUser(r)
 	var n int
-	if err := a.DB.QueryRow("SELECT count(*) FROM notifications WHERE user_id=? AND read_at IS NULL", u.ID).Scan(&n); err != nil {
+	var err error
+	n, err = a.unreadFor(u)
+	if err != nil {
 		core.Fail(w, 500, "读取未读数失败")
 		return
 	}
@@ -473,6 +592,9 @@ func (a *Module) stream(w http.ResponseWriter, r *http.Request) {
 		case <-a.Context().Done():
 			return
 		case frame := <-ch:
+			if !a.frameAllowed(u.ID, frame) {
+				continue
+			}
 			if _, err := w.Write(frame); err != nil {
 				return
 			}

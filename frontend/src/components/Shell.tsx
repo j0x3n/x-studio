@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, Camera, BookOpen, Boxes, ShoppingCart, Truck, Contact, UserRound, Shirt, type LucideIcon } from 'lucide-react'
+import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, ChevronDown, BookOpen, Boxes, ShoppingCart, Truck, Contact, UserRound, Shirt, Hammer, Wallet, PackagePlus, ScanLine, type LucideIcon } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { AssistantProvider, useAssistant } from '../lib/assistant'
@@ -17,11 +17,10 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     { to: '/tasks', label: '任务', icon: ListTodo, perm: 'task.view', badge: 'tasks' },
     { to: '/kb', label: '知识库', icon: BookOpen, perm: 'kb.view' }
   ] },
-  { label: '商品', items: [
+  { label: '素材', items: [
     { to: '/products', label: '商品库', icon: Package, perm: 'product.view' },
     { to: '/assets', label: '素材库', icon: Images, perm: 'product.view' },
-    { to: '/models', label: '模特库', icon: UserRound, perm: 'model.view', internal: true },
-    { to: '/guide', label: '拍摄要求', icon: Camera }
+    { to: '/models', label: '模特库', icon: UserRound, perm: 'model.view', internal: true }
   ] },
   { label: '生产', items: [
     { to: '/process', label: '图片处理', icon: Wand2, perm: 'asset.upload' },
@@ -32,9 +31,13 @@ const GROUPS: { label?: string; items: Item[] }[] = [
   ] },
   { label: '经营', items: [
     { to: '/inventory', label: '库存', icon: Boxes, perm: 'inventory.view' },
+    { to: '/replenishment', label: '补货建议', icon: PackagePlus, perm: 'inventory.view', internal: true },
+    { to: '/assembly', label: '组装加工', icon: Hammer, perm: 'inventory.view', internal: true },
     { to: '/purchase-orders', label: '采购单', icon: ShoppingCart, perm: 'purchase.manage' },
+    { to: '/purchase-recognize', label: '单据识别', icon: ScanLine, perm: 'purchase.manage', internal: true },
     { to: '/orders', label: '订单', icon: Truck, perm: 'order.view' },
-    { to: '/suppliers', label: '供应商', icon: Contact, anyPerm: ['purchase.manage', 'inventory.view'] }
+    { to: '/suppliers', label: '供应商', icon: Contact, anyPerm: ['purchase.manage', 'inventory.view', 'finance.view'], internal: true },
+    { to: '/finance', label: '财务', icon: Wallet, perm: 'finance.view', internal: true }
   ] }
 ]
 
@@ -49,6 +52,11 @@ function ShellInner() {
   const { open } = useAssistant()
   const { latest } = useNotify()
   const loc = useLocation()
+  const [expanded, setExpanded] = useState('')
+  useEffect(() => {
+    const group = GROUPS.find(g => g.label && g.items.some(it => loc.pathname === it.to || loc.pathname.startsWith(it.to + '/')))
+    setExpanded(group?.label || '')
+  }, [loc.pathname])
   const [home, setHome] = useState<Home | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
   const name = me?.user.display_name || me?.user.username || ''
@@ -93,24 +101,27 @@ function ShellInner() {
       <div className="shell">
         <aside className="sidebar">
           <NavLink to="/" className="brand"><span className="brand-mark"><Gem /></span><span className="hide-rail">X Studio</span></NavLink>
+          <div className="sidebar-nav">
           {GROUPS.map((g, i) => {
             const items = g.items.filter(it => (!it.internal || me?.role.scope !== 'shares') && (it.allPerm ? it.allPerm.every(can) : it.anyPerm ? it.anyPerm.some(can) : !it.perm || can(it.perm)))
             if (!items.length) return null
+            const isOpen = !g.label || expanded === g.label
+            const GroupIcon = g.label === '素材' ? Images : g.label === '生产' ? Wand2 : Boxes
             return (
-              <nav key={i} className="nav-group">
-                {g.label && <div className="nav-label hide-rail">{g.label}</div>}
-                {items.map(link)}
+              <nav key={i} className="nav-group" aria-label={g.label || '常用'}>
+                {g.label && <button className={'nav-section-toggle' + (isOpen ? ' expanded' : '')} aria-expanded={isOpen} aria-controls={`nav-section-${i}`} title={g.label} onClick={() => setExpanded(isOpen ? '' : g.label!)}><GroupIcon className="rail-group-icon" /><span className="hide-rail">{g.label}</span><ChevronDown className="nav-section-chevron hide-rail" /></button>}
+                <div className="nav-section-items" id={`nav-section-${i}`} hidden={!isOpen}>{items.map(link)}</div>
               </nav>
             )
           })}
+          </div>
+          <div className="sidebar-foot">
           {(admin || can('admin.settings')) && (
-            <nav className="nav-group">
-              <div className="nav-label hide-rail">管理</div>
+            <nav className="nav-group sidebar-admin" aria-label="管理">
               {admin && link({ to: '/admin', label: '账号与权限', icon: Users })}
               {can('admin.settings') && link({ to: '/settings', label: '设置', icon: Settings })}
             </nav>
           )}
-          <div className="sidebar-foot">
             {usage && (
               <div className="side-usage hide-rail">
                 <span className="t3">本月 AI</span>

@@ -209,7 +209,7 @@ func stockIn(tx *sql.Tx, in In, alert bool) (int64, error) {
 		return 0, bad(400, "入库数量、成本或等级不正确")
 	}
 	switch in.Kind {
-	case "purchase_in", "return_in", "other_in", "count_gain", "transfer_in":
+	case "purchase_in", "return_in", "other_in", "count_gain", "transfer_in", "assembly_in":
 	default:
 		return 0, bad(400, "入库类型不正确")
 	}
@@ -279,7 +279,7 @@ func stockOut(tx *sql.Tx, out Out, transfer, alert bool) ([]Taken, error) {
 		return nil, bad(400, "出库数量或批次不正确")
 	}
 	switch out.Kind {
-	case "sale_out", "other_out", "scrap", "count_loss", "transfer_out":
+	case "sale_out", "other_out", "scrap", "count_loss", "transfer_out", "assembly_out":
 	default:
 		return nil, bad(400, "出库类型不正确")
 	}

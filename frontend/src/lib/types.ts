@@ -83,7 +83,7 @@ export type QueueItem = {
 
 // 首页和 AI 助手（接口约定-AI助手.md）
 export type AssistAction = { type: 'open' | 'run_listing' | 'render_listing' | 'render_batch' | 'process_assets' | 'generate_copy' | 'review' | 'create_task'; label: string; summary: string; params: Record<string, unknown>; cost_hint?: string; preview?: { assignee: string; due: string; target: string } }
-export type AssistRef = { type: 'product' | 'listing' | 'asset' | 'job'; id: number; label: string; path?: string }
+export type AssistRef = { type: 'product' | 'listing' | 'asset' | 'job' | 'kb_article' | 'inv_item' | 'purchase_order'; id: number; label: string; path?: string }
 export type AssistReply = { reply: string; actions: AssistAction[]; refs: AssistRef[]; dropped: number; rounds: number }
 export type Todo = { kind: 'render_failed' | 'review_pending' | 'copy_unapplied' | 'no_photo'; level: 'danger' | 'warning' | 'info'; title: string; detail: string; count: number; product_id?: number; listing_id?: number; action: AssistAction | null }
 export type Home = {

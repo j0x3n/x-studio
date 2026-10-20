@@ -28,6 +28,10 @@ import { Purchases } from './pages/Purchases'
 import { PurchaseDetail } from './pages/PurchaseDetail'
 import { Orders } from './pages/Orders'
 import { OrderDetail } from './pages/OrderDetail'
+import { Finance } from './pages/Finance'
+import { Assembly } from './pages/Assembly'
+import { Replenishment } from './pages/Replenishment'
+import { DocumentImport } from './pages/DocumentImport'
 
 // 占位页（目前只用于地址不存在）
 function Soon({ title, desc }: { title: string; desc: string }) {
@@ -59,7 +63,7 @@ export function App() {
         <Route path="templates" element={<TemplateCenter />} />
         <Route path="review" element={<Review />} />
         <Route path="tasks/:id?" element={<Tasks />} />
-        <Route path="guide" element={<ShootingGuide />} />
+        <Route path="guide" element={<Navigate to="/kb/shooting-guide" replace />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="inventory/items/:id" element={<InventoryItem />} />
         <Route path="inventory/counts/:id" element={<InventoryCount />} />
@@ -68,7 +72,12 @@ export function App() {
         <Route path="purchase-orders/:id" element={<PurchaseDetail />} />
         <Route path="orders" element={<Orders />} />
         <Route path="orders/:id" element={<OrderDetail />} />
+        <Route path="finance" element={<Finance />} />
+        <Route path="assembly" element={<Assembly />} />
+        <Route path="replenishment" element={<Replenishment />} />
+        <Route path="purchase-recognize" element={<DocumentImport />} />
         <Route path="kb" element={<Kb />} />
+        <Route path="kb/shooting-guide" element={<ShootingGuide />} />
         <Route path="kb/new" element={<KbEdit />} />
         <Route path="kb/:id" element={<KbArticle />} />
         <Route path="kb/:id/edit" element={<KbEdit key="edit" />} />

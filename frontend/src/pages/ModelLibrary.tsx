@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Archive, ArchiveRestore, Check, ChevronLeft, ChevronRight, ImagePlus, Pencil, Plus, Search, Sparkles, Star, Upload, UserRound } from 'lucide-react'
+import { Archive, ArchiveRestore, Check, ChevronLeft, ChevronRight, ImagePlus, Pencil, Plus, Search, Sparkles, Star, Trash2, Upload, UserRound } from 'lucide-react'
 import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
@@ -109,10 +109,10 @@ function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; o
   const [candidateError, setCandidateError] = useState('')
   const [cover, setCover] = useState(!model.references?.length)
   useEffect(() => {
-    if (!base && model.references?.length) setBase(model.cover_reference_id || model.references[0].id)
+    if (!model.references?.some(r => r.id === base)) setBase(model.cover_reference_id || model.references?.[0]?.id || 0)
     // 新档案首次上传后默认沿用基准，后续局部图继续参照同一人物。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model.references?.length])
+  }, [model.references, model.cover_reference_id])
   const input = useRef<HTMLInputElement>(null)
   const task = useTryOnJob(ai)
   const handled = useRef(0)
@@ -152,6 +152,14 @@ function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; o
     try { await api(`/api/models/${model.id}`, { method: 'PATCH', body }); onChange() }
     catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }
+  const removeReference = async (id: number) => {
+    if (!confirm('删除这张固定参考图？已有生成结果会保留，之后不能再用这张参考图生成。')) return
+    setBusy(true)
+    try {
+      await api(`/api/models/${model.id}/references/${id}`, { method: 'DELETE' })
+      toast('固定参考图已删除', 'ok'); onChange(); loadCandidates()
+    } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+  }
   return <Drawer title={<span className="inline"><UserRound size={16} />{model.name}</span>} width={620} onClose={onClose} foot={<>
     {editable && <button className="btn btn-ghost" disabled={busy || task.running} onClick={() => patch({ archived: !model.archived })}>{model.archived ? <ArchiveRestore /> : <Archive />}{model.archived ? '恢复使用' : '归档模特'}</button>}
     <span className="grow" />{!model.archived && model.references?.length > 0 && can('asset.process') && can('asset.upload') && <Link className="btn btn-secondary" to={`/tryon?model=${model.id}&shop_id=${model.shop_id}`}><Sparkles />用这位模特试穿</Link>}
@@ -162,6 +170,7 @@ function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; o
     <div className="model-ref-grid">{(model.references || []).map(r => <div className="model-ref" key={r.id}>
       <a href={r.url} target="_blank" rel="noreferrer"><ModelImage src={r.thumb_url || r.url} alt={`${model.name} ${bodyLabel(r.body_part)}`} /></a>
       <div className="row between"><span>{bodyLabel(r.body_part)}</span>{r.id === model.cover_reference_id ? <span className="inline help"><Star size={12} />封面</span> : editable && !model.archived && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => patch({ cover_reference_id: r.id })}>设封面</button>}</div>
+      {editable && <button className="btn btn-ghost btn-sm danger-text model-ref-delete" disabled={busy || task.running} onClick={() => removeReference(r.id)}><Trash2 size={14} />删除参考图</button>}
     </div>)}</div>
     {!model.references?.length && <div className="model-note">先为这位模特添加一张人物或局部参考。确认后的参考图会反复用于商品穿戴。</div>}
     {editable && !model.archived && <section className="model-reference-form stack">

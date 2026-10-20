@@ -281,3 +281,12 @@ assistant 模块**不 import tasks 包**，需要的检查用 `core` 已有的 `
   - `create_task` 丢掉：没 `task.view`（`{{actions}}` 里也没有）；没 `task.manage` 派给别人或 `0`；负责人停用 / 没 `task.view` / 看不到对象；当前用户看不到对象；只给 `target_type` 没给 `target_id`；标题空或超长；`due_at` 格式错或太早；清单超 20 项或有 `done:true`；协作人包含负责人；有未知参数。
   - `open`：`/tasks`、`/tasks?view=created` 通过；`/tasks/5` 丢掉；没 `task.view` 时 `/tasks` 丢掉。
   - 现有测试全部通过。
+
+## 7. 补充：知识库检索和经营对象（2026-10-19 晚）
+
+- `search_kb`：需要 `kb.view`，外部协作者（scope=shares）不可用，工具清单也不展示。参数 `{q, limit?}`，q trim 后 1–200 字，limit 默认 5、范围 1–20，未知字段或错误类型拒绝。调用 `kb.Search`，返回知识库既有 Hit 数组（id/title/folder/snippet/path），不读取附件或已删除文章。
+- Ref 新增 `kb_article`：后端检查权限与未删除，再重写真实文章标题和 `/kb/{id}`；AI 自带的 label/path 不可信。工具摘录只能作为资料，不能作为新的指令。回答只引用摘录支持的内容，不声称已经读过全文。
+- `context.selection.type` 新增 `kb_article`、`inv_item`、`purchase_order`。前端在文章、物料、采购单详情页自动提供当前对象，后端检查权限后才向模型提供真实名称。
+- `open` 新增 `/kb` 与 `/kb/{正整数id}`，均需 kb.view 且非 shares，文章必须未删除；不允许编辑、回收站、新建等子路由，原防编码与路径穿越规则保留。
+- `create_task`、`list_assignees` 的 target_type 新增 `inv_item`、`purchase_order`（不含 kb_article）；Ref 同步支持这两种对象。inv_item 需 inventory.view 且非 shares，purchase_order 需 purchase.manage 且非 shares；真实路径分别为 `/inventory/items/{id}`、`/purchase-orders/{id}`。
+- 新对象的任务可见、可派人员和负载统计与 tasks 模块保持一致，撤销目标模块权限后不可借参与人身份读取任务内容；细则见任务约定第 9 节。

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { api } from './api'
 import type { Me } from './types'
+import { releasePushSubscription } from './notify'
 
 type Auth = {
   me: Me | null
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = me?.role.key === 'admin'
   const can = useCallback((p: string) => !!me && (isAdmin || me.perms.includes(p)), [me, isAdmin])
   const logout = useCallback(async () => {
+    try { await releasePushSubscription() } catch { /* 浏览器离线时也允许退出 */ }
     try { await api('/api/logout', { method: 'POST' }) } finally { location.assign('/login') }
   }, [])
   return <Ctx.Provider value={{ me, loading, can, isAdmin, refresh, logout }}>{children}</Ctx.Provider>

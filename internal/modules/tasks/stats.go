@@ -134,7 +134,8 @@ func (a *Module) stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	where := "status='done' AND assignee_id IS NOT NULL AND done_at IS NOT NULL"
-	var args []any
+	vis, args := a.visibleWhere(u)
+	where += " AND (" + vis + ")"
 	if hasFrom {
 		where += " AND " + doneExpr + " >= julianday(?)"
 		args = append(args, sqlTime(from))
@@ -143,7 +144,7 @@ func (a *Module) stats(w http.ResponseWriter, r *http.Request) {
 		where += " AND " + doneExpr + " < julianday(?)"
 		args = append(args, sqlTime(to))
 	}
-	rows, err := a.DB.Query("SELECT assignee_id, count(*), SUM(CASE WHEN due_at IS NOT NULL AND "+doneExpr+" <= "+dueExpr+" THEN 1 ELSE 0 END), SUM(CASE WHEN due_at IS NOT NULL THEN 1 ELSE 0 END), coalesce(SUM(reopen_count),0) FROM tasks WHERE "+where+" GROUP BY assignee_id", args...)
+	rows, err := a.DB.Query("SELECT assignee_id, count(*), SUM(CASE WHEN due_at IS NOT NULL AND "+doneExpr+" <= "+dueExpr+" THEN 1 ELSE 0 END), SUM(CASE WHEN due_at IS NOT NULL THEN 1 ELSE 0 END), coalesce(SUM(reopen_count),0) FROM tasks t WHERE "+where+" GROUP BY assignee_id", args...)
 	if err != nil {
 		writeErr(w, err, "读取统计失败：", "读取统计失败")
 		return

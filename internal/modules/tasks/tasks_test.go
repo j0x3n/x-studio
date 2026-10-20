@@ -19,7 +19,9 @@ import (
 	"xstudio/internal/core"
 	"xstudio/internal/modules/accounts"
 	"xstudio/internal/modules/assets"
+	"xstudio/internal/modules/inventory"
 	"xstudio/internal/modules/products"
+	"xstudio/internal/modules/purchase"
 )
 
 type assetSchema struct{ *assets.Module }
@@ -53,7 +55,7 @@ func passwordHash() []byte {
 	return hashPass
 }
 
-func boot(t *testing.T, dir string, withTasks bool) *fixture {
+func boot(t *testing.T, dir string, withTasks bool, commerce ...bool) *fixture {
 	t.Helper()
 	if dir == "" {
 		dir = t.TempDir()
@@ -70,6 +72,9 @@ func boot(t *testing.T, dir string, withTasks bool) *fixture {
 	m.ScanInterval = time.Hour
 	m.RemindInterval = time.Hour
 	mods := []core.Module{accounts.New(c), products.New(c), assetSchema{assets.New(c)}}
+	if len(commerce) > 0 && commerce[0] {
+		mods = append(mods, inventory.New(c), purchase.New(c))
+	}
 	if withTasks {
 		mods = append(mods, m)
 	}
@@ -1014,8 +1019,8 @@ func TestRules(t *testing.T) {
 	f := boot(t, "", true)
 	f.login(t, "admin")
 	list := f.req(t, "GET", "/api/task-rules", nil, 200)
-	if num(list["total"]) != 4 {
-		t.Fatalf("要有 4 条默认规则：%s", core.JS(list))
+	if num(list["total"]) != 6 {
+		t.Fatalf("要有 6 条默认规则：%s", core.JS(list))
 	}
 	seen := map[string]bool{}
 	for _, it := range arr(list["items"]) {
@@ -1025,7 +1030,7 @@ func TestRules(t *testing.T) {
 		}
 		seen[str(item["event"])] = true
 	}
-	for _, ev := range []string{"product.created", "assets.first_upload", "render.failed", "review.rejected"} {
+	for _, ev := range []string{"product.created", "assets.first_upload", "render.failed", "review.rejected", "inventory.low_stock", "purchase.received"} {
 		if !seen[ev] {
 			t.Fatalf("缺默认事件 %s", ev)
 		}

@@ -1,0 +1,198 @@
+/* ==========================================================================
+   财务模块样式（遵循 Admin Design System — clean 清爽蓝紧凑规范）
+   13px 正文、32px 控件高度、扁平无投影、纯 CSS Token 变量。
+   ========================================================================== */
+
+.finance-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
+}
+
+.finance-drawer-form .form-control,
+.finance-toolbar input:not([type='checkbox']):not([type='radio']),
+.finance-toolbar select {
+  width: 100%; height: 32px; padding: 0 10px; border: 1px solid var(--border-strong);
+  border-radius: var(--r-md); background: var(--surface); color: var(--text); font: inherit;
+}
+.finance-toolbar input:not([type='checkbox']):not([type='radio']), .finance-toolbar select { width: auto; max-width: 100%; }
+.finance-drawer-form textarea.form-control { height: auto; min-height: 72px; padding: 8px 10px; }
+.finance-drawer-form .form-control:focus, .finance-toolbar input:focus, .finance-toolbar select:focus { outline: 2px solid var(--primary-100); border-color: var(--primary); }
+@media (max-width: 1024px) { .finance-drawer-row { flex-wrap: wrap; } .finance-drawer-row > * { min-width: 160px; } }
+
+.finance-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.finance-table-wrap table {
+  min-width: 900px;
+}
+
+.finance-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+}
+
+.finance-toolbar .form-control,
+.finance-toolbar select,
+.finance-toolbar input {
+  height: 32px;
+  font-size: var(--fs-13, 13px);
+}
+
+.finance-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-4);
+}
+
+.finance-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.finance-stat-label {
+  font-size: var(--fs-12, 12px);
+  color: var(--text-3);
+}
+
+.finance-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.finance-col-amount {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.finance-col-date {
+  font-family: var(--font-mono);
+  font-size: var(--fs-12, 12px);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.finance-drawer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.finance-drawer-row {
+  display: flex;
+  gap: 12px;
+}
+
+.finance-drawer-row > * {
+  flex: 1;
+}
+
+.finance-diff-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: var(--fs-11, 11px);
+  font-family: var(--font-mono);
+  border-radius: var(--r-xs);
+}
+
+.finance-diff-badge.danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.finance-diff-badge.warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.finance-diff-badge.success {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.finance-csv-box {
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-xl);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.finance-csv-textarea {
+  width: 100%;
+  min-height: 120px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12, 12px);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+}
+
+.finance-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.finance-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: var(--fs-12, 12px);
+}
+
+.finance-summary-chip .chip-num {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.finance-alert-box {
+  padding: 10px 14px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning);
+  color: var(--warning-text);
+  border-radius: var(--r-xl);
+  font-size: var(--fs-13, 13px);
+  line-height: 1.4;
+}
+
+.finance-info-box {
+  padding: 10px 14px;
+  background: var(--info-bg);
+  border: 1px solid var(--info);
+  color: var(--info-text);
+  border-radius: var(--r-xl);
+  font-size: var(--fs-13, 13px);
+  line-height: 1.4;
+}

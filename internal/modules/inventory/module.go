@@ -57,6 +57,7 @@ func (a *Module) Routes(r *core.Router) {
 		{"POST /api/inventory/counts/{id}/finish", core.InventoryEdit, a.finishCount},
 		{"POST /api/inventory/counts/{id}/cancel", core.InventoryEdit, a.cancelCount},
 		{"GET /api/inventory/export.csv", core.InventoryView, a.export},
+		{"GET /api/inventory/replenishment", core.InventoryView, a.replenishment},
 	} {
 		fn := v.fn
 		r.Handle(v.path, v.perm, func(w http.ResponseWriter, r *http.Request) {

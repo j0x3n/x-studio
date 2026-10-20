@@ -21,7 +21,8 @@ export const noticeType: Record<string, string> = {
 }
 
 export const ruleEvent: Record<string, string> = {
-  'product.created': '新建商品', 'assets.first_upload': '商品第一次上传素材', 'render.failed': '一键出图失败', 'review.rejected': '出图审核被退回'
+  'product.created': '新建商品', 'assets.first_upload': '商品第一次上传素材', 'render.failed': '一键出图失败', 'review.rejected': '出图审核被退回',
+  'inventory.low_stock': '库存低于安全线', 'purchase.received': '登记采购到货后复核'
 }
 export const assignMode: Record<string, string> = {
   fixed: '固定的人', role_round_robin: '按角色轮流', role_least_loaded: '按角色派给最闲的', product_owner: '商品创建人', job_user: '出图发起人'

@@ -152,7 +152,7 @@ func canViewSupplier(u core.User) bool {
 	if u.Role.Key != "admin" && u.Role.Scope == "shares" {
 		return false
 	}
-	return u.Has(core.PurchaseManage) || u.Has(core.InventoryView)
+	return u.Has(core.PurchaseManage) || u.Has(core.InventoryView) || u.Has(core.FinanceView)
 }
 
 func canManageSupplier(u core.User) bool {

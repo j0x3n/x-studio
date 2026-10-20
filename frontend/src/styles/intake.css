@@ -1,0 +1,219 @@
+/* 补货建议与单据识别样式 - 基于 admin-design-system 紧凑 clean 规范 */
+.intake-end { justify-content: flex-end; }
+.intake-between { justify-content: space-between; }
+.intake-gap-sm { gap: var(--sp-1); }
+.intake-gap { gap: var(--sp-2); }
+.intake-mt-sm { margin-top: var(--sp-1); }
+.intake-mt { margin-top: var(--sp-4); }
+.intake-mb-sm { margin-bottom: var(--sp-1); }
+.intake-mb { margin-bottom: var(--sp-3); }
+.intake-medium { font-weight: 500; }
+.intake-success { color: var(--success-text); }
+.intake-wrap { flex-wrap: wrap; }
+.intake-upload-panel { padding: var(--sp-4); max-width: 640px; margin-inline: auto; }
+
+/* 补货建议页面 */
+.replenishment-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.replenishment-target {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-13);
+  color: var(--text-2);
+}
+
+.replenishment-target input {
+  width: 90px;
+}
+
+.stock-short {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.stock-tag-short {
+  display: inline-block;
+  margin-left: var(--sp-1);
+  padding: 1px 4px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-radius: var(--r-xs);
+  font-size: var(--fs-11);
+  font-weight: 500;
+}
+
+.replenishment-suggested {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.replenish-batch-bar {
+  position: sticky;
+  bottom: var(--sp-3);
+  margin-top: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--primary-100);
+  box-shadow: none;
+  border-radius: var(--r-xl);
+  z-index: 10;
+}
+
+.replenish-batch-bar .batch-info {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-13);
+  color: var(--text);
+}
+
+/* 单据识别页面 */
+.recognize-grid {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.recognize-upload-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--r-xl);
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.recognize-upload-box:hover {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+
+.recognize-upload-box input[type="file"] {
+  display: none;
+}
+
+.recognize-upload-icon {
+  width: 40px;
+  height: 40px;
+  color: var(--text-3);
+  margin-bottom: var(--sp-2);
+}
+
+.recognize-preview-pane {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.recognize-image-wrap {
+  width: 100%;
+  max-height: 480px;
+  overflow: auto;
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recognize-image-wrap img {
+  max-width: 100%;
+  max-height: 460px;
+  object-fit: contain;
+  display: block;
+}
+
+.recognize-result-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.recognize-warnings {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-bg);
+  border-radius: var(--r-xl);
+  padding: var(--sp-3);
+  color: var(--warning-text);
+  font-size: var(--fs-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.recognize-warning-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-weight: 600;
+  color: var(--warning-text);
+}
+
+.recognize-warning-list {
+  margin: 0;
+  padding-left: var(--sp-4);
+}
+
+.recognize-warning-list li {
+  margin: 2px 0;
+}
+
+.recognize-lines-table th,
+.recognize-lines-table td {
+  vertical-align: middle;
+}
+
+.recognize-lines-table input.input {
+  height: 28px;
+  font-size: var(--fs-12);
+}
+
+.recognize-lines-table select.input {
+  height: 28px;
+  font-size: var(--fs-12);
+}
+
+.recognize-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+.candidate-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  background: var(--primary-50);
+  color: var(--primary);
+  border: 1px solid var(--primary-100);
+  font-size: var(--fs-11);
+}
+
+@media (max-width: 1024px) {
+  .recognize-grid {
+    grid-template-columns: 1fr;
+  }
+}

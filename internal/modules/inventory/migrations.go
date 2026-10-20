@@ -13,6 +13,14 @@ func (*Module) Migrations() []core.Migration {
 		}
 		_, err = tx.Exec(`INSERT INTO inv_warehouses(name,type,created_at,updated_at) VALUES('自有仓','own',?,?)`, core.Now(), core.Now())
 		return err
+	}}, {Version: 2, Up: func(tx *sql.Tx) error {
+		_, err := tx.Exec(`CREATE TABLE inv_code_sequences(namespace TEXT PRIMARY KEY, last_value INTEGER NOT NULL CHECK(last_value>=0));
+INSERT INTO inv_code_sequences(namespace,last_value) SELECT 'WL',COALESCE(MAX(id),0) FROM inv_items;`)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec("INSERT OR IGNORE INTO settings(key,value,updated_at) VALUES('item_code_rule',?,?)", core.JS(core.DefaultItemCodeRule()), core.Now())
+		return err
 	}}}
 }
 

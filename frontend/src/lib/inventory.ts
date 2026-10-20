@@ -15,7 +15,7 @@ export type Batch = { id: number; item_id: number; warehouse_id: number; warehou
 export type Level = { warehouse_id: number; warehouse_name?: string; name?: string; type?: WhType; on_hand: number; qty?: number }
 export type Dropship = { warehouse_id: number; warehouse_name?: string; item_id: number; qty: number | null; unit_cost?: number | null; currency: string; updated_at: string }
 export type Reservation = { ref_type: string; ref_id: number; qty: number; ref_label?: string; ref_path?: string; created_at: string }
-export type LedgerKind = 'purchase_in' | 'sale_out' | 'return_in' | 'transfer_out' | 'transfer_in' | 'count_gain' | 'count_loss' | 'other_in' | 'other_out' | 'scrap' | 'assemble_in' | 'assemble_out'
+export type LedgerKind = 'purchase_in' | 'sale_out' | 'return_in' | 'transfer_out' | 'transfer_in' | 'count_gain' | 'count_loss' | 'other_in' | 'other_out' | 'scrap' | 'assemble_in' | 'assemble_out' | 'assembly_in' | 'assembly_out'
 export type Ledger = {
   id: number; item_id: number; code?: string; item_name?: string; name?: string; warehouse_id: number; warehouse_name?: string
   batch_id: number | null; kind: LedgerKind; qty: number; cost?: number; currency: string
@@ -29,9 +29,9 @@ export const kindName: Record<ItemKind, string> = { sku: '成品', material: '�
 export const whTypeName: Record<WhType, string> = { own: '自有仓', stall: '档口', dropship: '代发' }
 export const ledgerName: Record<LedgerKind, string> = {
   purchase_in: '采购入库', sale_out: '销售出库', return_in: '退货入库', transfer_out: '调出', transfer_in: '调入',
-  count_gain: '盘盈', count_loss: '盘亏', other_in: '手工入库', other_out: '手工出库', scrap: '报损', assemble_in: '组装产出', assemble_out: '组装消耗'
+  count_gain: '盘盈', count_loss: '盘亏', other_in: '手工入库', other_out: '手工出库', scrap: '报损', assemble_in: '组装产出', assemble_out: '组装消耗', assembly_in: '组装产出', assembly_out: '组装消耗'
 }
-export const refName: Record<string, string> = { manual: '手工', transfer: '调拨', count: '盘点', purchase_receipt: '采购到货', order: '订单', order_return: '售后退货' }
+export const refName: Record<string, string> = { manual: '手工', transfer: '调拨', count: '盘点', purchase_receipt: '采购到货', order: '订单', order_return: '售后退货', assembly: '组装加工', assembly_order: '组装加工' }
 export const countStatus: Record<Count['status'], { label: string; pill: string }> = {
   draft: { label: '盘点中', pill: 'pill-warning' }, done: { label: '已完成', pill: 'pill-success' }, canceled: { label: '已取消', pill: 'pill-neutral' }
 }

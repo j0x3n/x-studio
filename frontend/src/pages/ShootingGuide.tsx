@@ -4,6 +4,7 @@ import { useCategories } from '../lib/categories'
 import { useToast } from '../lib/toast'
 import type { Category, ShotCode } from '../lib/types'
 import { Topbar, Pill, Loading, Empty, Tabs } from '../components/ui'
+import { KnowledgeTabs } from '../components/KnowledgeTabs'
 
 type Slot = { 位?: number | string; 屏?: number | string; 名: string; 候选: string[]; 必需?: boolean; 最少?: number; 备注?: string }
 
@@ -64,15 +65,16 @@ export function ShootingGuide() {
     try { await navigator.clipboard.writeText(text); toast('已复制，可以直接发微信', 'ok') } catch { toast('复制失败，手动选中文字复制', 'error') }
   }
 
-  if (!cats) return <><Topbar crumbs={['拍摄要求']} /><Loading /></>
-  if (!cat) return <><Topbar crumbs={['拍摄要求']} /><Empty title="还没有品类" desc="先在「设置 → 品类」里建一个。" /></>
+  if (!cats) return <><Topbar crumbs={['知识库', '拍摄要求']} /><div className="scroll"><main className="content"><KnowledgeTabs /><Loading /></main></div></>
+  if (!cat) return <><Topbar crumbs={['知识库', '拍摄要求']} /><div className="scroll"><main className="content"><KnowledgeTabs /><Empty title="还没有品类" desc="先在「设置 → 品类」里建一个。" /></main></div></>
   const { main, detail } = slotsOf(cat)
   return (
     <>
-      <Topbar title="拍摄要求" sub="每个品类拍哪几张、怎么拍。必拍的缺了，出图时会提醒补拍。">
+      <Topbar crumbs={['知识库']} title="拍摄要求" sub="每个品类拍哪几张、怎么拍。必拍的缺了，出图时会提醒补拍。">
         <button className="btn btn-secondary" onClick={copy}><Copy />复制发给上游</button>
       </Topbar>
       <div className="scroll"><main className="content" style={{ maxWidth: 1080 }}>
+        <KnowledgeTabs />
         {cats.length > 1 && <Tabs value={cat.key} onChange={setKey} items={cats.map(c => ({ key: c.key, label: c.name }))} />}
         <div className="two-col">
           <section className="panel">

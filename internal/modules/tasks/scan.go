@@ -33,13 +33,14 @@ type jobRow struct {
 }
 
 type happen struct {
-	Event      string
-	TargetType string
-	Reason     string
-	TargetID   int64
-	JobUser    int64
-	At         time.Time
-	Exists     bool
+	Event           string
+	TargetType      string
+	Reason          string
+	TargetID        int64
+	JobUser         int64
+	At              time.Time
+	Exists          bool
+	TargetCreatedAt string
 }
 
 type prepared struct {
@@ -114,6 +115,37 @@ func (a *Module) interpret(row auditRow) ([]happen, []note, error) {
 		at = a.now()
 	}
 	switch row.Action {
+	case "inventory.low_stock", "purchase.receive":
+		floor, err := a.cursorInt("commerce_audit_start")
+		if err != nil {
+			return nil, nil, err
+		}
+		if row.ID <= floor {
+			return nil, nil, nil
+		}
+		typ, event := "inv_item", "inventory.low_stock"
+		if row.Action == "purchase.receive" {
+			typ, event = "purchase_order", "purchase.received"
+		}
+		if row.TargetType != typ || row.TargetID <= 0 || !a.targetExists(typ, row.TargetID) {
+			return nil, nil, nil
+		}
+		table := "inv_items"
+		if typ == "purchase_order" {
+			table = "purchase_orders"
+		}
+		var stamp string
+		if err := a.DB.QueryRow("SELECT created_at FROM "+table+" WHERE id=?", row.TargetID).Scan(&stamp); err != nil {
+			return nil, nil, err
+		}
+		created, valid := parseTS(stamp)
+		// A delayed event for a deleted incarnation must not bind to a reused id.
+		if !ok || !valid || created.After(at) {
+			return nil, nil, nil
+		}
+		ev := a.makeHappen(event, typ, row.TargetID, "", 0, at)
+		ev.TargetCreatedAt = stamp
+		return []happen{ev}, nil, nil
 	case "product.create":
 		if row.TargetType != "product" || row.TargetID <= 0 {
 			return nil, nil, nil
@@ -276,7 +308,17 @@ func (a *Module) prepareRule(rl rule, ev happen) prepared {
 			shop = ""
 		}
 	}
-	title := clip(strings.TrimSpace(fillTpl(rl.TitleTpl, product, shop, ev.Reason)), 100)
+	item, purchase := "", ""
+	if ev.TargetType == "inv_item" {
+		item, product = product, ""
+	}
+	if ev.TargetType == "purchase_order" {
+		purchase, product = product, ""
+	}
+	fill := func(tpl string) string {
+		return strings.NewReplacer("{product}", product, "{shop}", shop, "{reason}", ev.Reason, "{item}", item, "{purchase}", purchase).Replace(tpl)
+	}
+	title := clip(strings.TrimSpace(fill(rl.TitleTpl)), 100)
 	if title == "" {
 		title = "未命名任务"
 	}
@@ -284,7 +326,7 @@ func (a *Module) prepareRule(rl rule, ev happen) prepared {
 		rule:     rl,
 		ev:       ev,
 		title:    title,
-		body:     clip(fillTpl(rl.BodyTpl, product, shop, ev.Reason), 5000),
+		body:     clip(fill(rl.BodyTpl), 5000),
 		managers: a.managersFor(ev),
 	}
 	if rl.DueHours.Valid {
@@ -475,10 +517,27 @@ func (a *Module) commitPlans(plans []prepared, extra []note, after func(*sql.Tx,
 }
 
 func (a *Module) writePlan(tx *sql.Tx, p prepared, ts string) ([]outgoing, error) {
+	if commerceTarget(p.ev.TargetType) {
+		table := "inv_items"
+		if p.ev.TargetType == "purchase_order" {
+			table = "purchase_orders"
+		}
+		var stamp string
+		err := tx.QueryRow("SELECT created_at FROM "+table+" WHERE id=?", p.ev.TargetID).Scan(&stamp)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if stamp != p.ev.TargetCreatedAt {
+			return nil, nil
+		}
+	}
 	var existing int64
-	incarnation := liveTarget
+	incarnation := liveTargets(tx)
 	if !p.ev.Exists {
-		incarnation = "NOT (" + liveTarget + ")"
+		incarnation = "NOT (" + liveTargets(tx) + ")"
 	}
 	err := tx.QueryRow("SELECT id FROM tasks t WHERE rule_id=? AND target_type=? AND target_id=? AND status IN ('todo','doing','waiting') AND ("+incarnation+") ORDER BY id LIMIT 1", p.rule.ID, p.ev.TargetType, p.ev.TargetID).Scan(&existing)
 	if err == nil {
@@ -496,7 +555,7 @@ func (a *Module) writePlan(tx *sql.Tx, p prepared, ts string) ([]outgoing, error
 	if p.pick == "rr" {
 		assignee, err = nextRound(tx, p.rule.ID, p.candidates)
 	} else if p.pick == "least" {
-		assignee, err = leastLoaded(tx, p.candidates)
+		assignee, err = a.leastLoaded(tx, p.candidates)
 	}
 	if err != nil {
 		return nil, err
@@ -557,7 +616,7 @@ func nextRound(q dbx, ruleID int64, ids []int64) (int64, error) {
 	return ids[0], nil
 }
 
-func leastLoaded(q dbx, ids []int64) (int64, error) {
+func (a *Module) leastLoaded(q dbx, ids []int64) (int64, error) {
 	if len(ids) == 0 {
 		return 0, nil
 	}
@@ -565,7 +624,12 @@ func leastLoaded(q dbx, ids []int64) (int64, error) {
 	bestN := int64(-1)
 	for _, id := range ids {
 		var n int64
-		if err := q.QueryRow("SELECT count(*) FROM tasks WHERE assignee_id=? AND status IN ('todo','doing','waiting')", id).Scan(&n); err != nil {
+		u, err := core.ScanUser(q.QueryRow(core.UserQuery+" WHERE u.id=?", id))
+		if err != nil {
+			return 0, err
+		}
+		vis, args := a.visibleWhereQ(q, u)
+		if err := q.QueryRow("SELECT count(*) FROM tasks t WHERE assignee_id=? AND status IN ('todo','doing','waiting') AND ("+vis+")", append([]any{id}, args...)...).Scan(&n); err != nil {
 			return 0, err
 		}
 		if bestN < 0 || n < bestN {

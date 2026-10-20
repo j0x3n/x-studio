@@ -35,11 +35,15 @@ export function AssistantPanel() {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit() }
   }
   const onProduct = /^\/products\/\d+/.test(loc.pathname)
+  const onItem = /^\/inventory\/items\/\d+$/.test(loc.pathname)
+  const onPurchase = /^\/purchase-orders\/\d+$/.test(loc.pathname)
+  const taskSuggestion = onItem ? '提醒我明天核对这件物料的补货' : onPurchase ? '提醒我明天复核这张采购单的到货记录' : onProduct ? (can('task.manage') ? '这款派给美工修图，明天下班前' : '提醒我明天把这款的照片补齐') : '提醒我周五前把新款都拍完'
   const suggestions = [
     '今天先做什么？',
     '出图失败的是哪几款，为什么？',
     ...(onProduct ? ['这款还差哪些步骤没做？', '这款的素材里哪些是 AI 改过的？'] : ['这周哪些款还没有繁体文案？']),
-    ...(can('task.view') ? [onProduct ? (can('task.manage') ? '这款派给美工修图，明天下班前' : '提醒我明天把这款的照片补齐') : '提醒我周五前把新款都拍完'] : [])
+    ...(can('kb.view') ? ['查知识库：珍珠拍摄有哪些注意事项？'] : []),
+    ...(can('task.view') ? [taskSuggestion] : [])
   ]
 
   return (
@@ -54,7 +58,7 @@ export function AssistantPanel() {
       <div className="assist-body" ref={body}>
         {messages.length === 0 ? (
           <div className="col" style={{ gap: 12 }}>
-            <div className="bubble">我能帮你查商品、素材、出图状态和失败原因，也能帮你准备批量处理、重跑出图、写文案、派任务这些操作，你确认后才会执行。</div>
+            <div className="bubble">我能帮你查商品、素材、出图状态和失败原因{can('kb.view') ? '，也能查知识库里的做法和规范' : ''}。批量处理、重跑出图、写文案、派任务这些操作，你确认后才会执行。</div>
             <div className="col" style={{ gap: 6 }}>
               <div className="eyebrow">可以这样问</div>
               {suggestions.map(s => <button key={s} className="suggest" onClick={() => send(s)}><Sparkles />{s}<ChevronRight className="end" /></button>)}

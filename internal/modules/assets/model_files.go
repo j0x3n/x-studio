@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -252,6 +253,83 @@ func (a *Module) modelConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 	a.modelResponse(w, 201, m, &v)
 }
+func (a *Module) modelDeleteReference(w http.ResponseWriter, r *http.Request) {
+	a.Mu.Lock()
+	defer a.Mu.Unlock()
+	u, err := a.User(currentUser(r).ID)
+	if err != nil || !u.Has(core.ModelManage) {
+		fail(w, 403, "没有维护模特权限")
+		return
+	}
+	m, err := a.getModel(u, idParam(r, "id"), false)
+	if err != nil {
+		fail(w, 404, "模特不存在")
+		return
+	}
+	v, err := a.reference(m.ID, idParam(r, "ref"))
+	if err != nil {
+		fail(w, 404, "参考图不存在")
+		return
+	}
+	tx, err := a.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		fail(w, 500, "删除参考图失败")
+		return
+	}
+	defer tx.Rollback()
+	var used bool
+	if err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM jobs WHERE status IN ('queued','running') AND kind IN ('assets.model_generate','assets.tryon') AND json_extract(params,'$.model_id')=? AND (json_extract(params,'$.reference_id')=? OR json_extract(params,'$.base_reference_id')=?))`, m.ID, v.ID, v.ID).Scan(&used); err != nil {
+		fail(w, 500, "读取生成任务失败")
+		return
+	}
+	if used {
+		fail(w, 409, "参考图正在用于生成，请等任务完成后删除")
+		return
+	}
+	err = func() error {
+		m.UpdatedAt = now()
+		if _, err := tx.Exec("UPDATE model_references SET deleted_at=? WHERE id=?", m.UpdatedAt, v.ID); err != nil {
+			return err
+		}
+		if m.CoverReferenceID != nil && *m.CoverReferenceID == v.ID {
+			var cover sql.NullInt64
+			if err := tx.QueryRow("SELECT MIN(id) FROM model_references WHERE model_id=? AND deleted_at=''", m.ID).Scan(&cover); err != nil {
+				return err
+			}
+			m.CoverReferenceID, m.CoverURL = nil, ""
+			if cover.Valid {
+				m.CoverReferenceID = &cover.Int64
+				m.CoverURL = referenceURL(m.ID, cover.Int64)
+			}
+		}
+		if _, err := tx.Exec("UPDATE shop_models SET cover_reference_id=?,updated_at=? WHERE id=?", m.CoverReferenceID, m.UpdatedAt, m.ID); err != nil {
+			return err
+		}
+		// A surviving candidate can be confirmed again as a new reference with a new ID.
+		if _, err := tx.Exec(`UPDATE workbench_items SET op=json_remove(op,'$.confirmed_reference_id') WHERE json_extract(op,'$.type')='model_candidate' AND json_extract(op,'$.model_id')=? AND json_extract(op,'$.confirmed_reference_id')=?`, m.ID, v.ID); err != nil {
+			return err
+		}
+		if err := core.AuditTx(tx, r, "assets.model.reference.delete", "model", m.ID, Object{"reference_id": v.ID}); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}()
+	if err != nil {
+		fail(w, 500, "删除参考图失败")
+		return
+	}
+	// Keep a tombstone so historical reference IDs can never point to another image.
+	root, err := a.modelRoot(m.ID)
+	if err == nil {
+		err = root.Remove(v.File)
+		root.Close()
+	}
+	if err != nil && !os.IsNotExist(err) {
+		log.Printf("清理已删除模特参考图 %d: %v", v.ID, err)
+	}
+	a.modelResponse(w, 200, m, nil)
+}
+
 func (a *Module) modelFile(w http.ResponseWriter, r *http.Request) {
 	m, e := a.getModel(currentUser(r), idParam(r, "id"), false)
 	if e != nil {

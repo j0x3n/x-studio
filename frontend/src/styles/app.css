@@ -267,6 +267,37 @@ button.chip.outline:hover { border-color: var(--border-strong); color: var(--tex
 .sidebar .user-row { cursor: default; }
 .sidebar .user-row:hover { background: transparent; }
 
+/* 分组导航：品牌和账号固定，仅菜单区在高度不足时滚动。 */
+.sidebar { overflow: hidden; min-height: 0; gap: var(--sp-3); }
+.sidebar > .brand, .sidebar > .sidebar-foot { flex-shrink: 0; }
+.sidebar-nav { flex: 1; min-height: 0; width: 100%; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: var(--sp-3); scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.sidebar-nav:hover, .sidebar-nav:focus-within { scrollbar-color: var(--border-strong) transparent; }
+.sidebar-nav > .nav-group { flex-shrink: 0; }
+.nav-section-toggle { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: 28px; padding: 0 var(--sp-2); border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-3); font: inherit; font-size: var(--fs-12); text-align: left; cursor: pointer; }
+.nav-section-toggle:hover { color: var(--text); background: var(--surface-3); }
+.nav-section-toggle:focus-visible, .knowledge-tab:focus-visible { outline: none; box-shadow: var(--ring); }
+.nav-section-toggle.expanded { color: var(--text-2); }
+.nav-section-toggle .nav-section-chevron { width: 13px; height: 13px; margin-left: auto; transform: rotate(-90deg); }
+.nav-section-toggle.expanded .nav-section-chevron { transform: rotate(0); }
+.nav-section-toggle .rail-group-icon { display: none; }
+.nav-section-items { display: flex; flex-direction: column; gap: 1px; }
+.nav-section-items[hidden] { display: none; }
+.nav-section-items .nav-item { flex-shrink: 0; }
+.sidebar-foot { padding-top: var(--sp-2); border-top: 1px solid var(--divider); }
+.sidebar-admin { padding-bottom: var(--sp-1); }
+.knowledge-tabs { display: flex; gap: var(--sp-4); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-4); }
+.knowledge-tab { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 36px; padding: 0 var(--sp-1); border-bottom: 2px solid transparent; color: var(--text-3); font-weight: 500; }
+.knowledge-tab:hover { color: var(--text); }
+.knowledge-tab.active { color: var(--primary-text); border-bottom-color: var(--primary); }
+.model-ref-delete { align-self: flex-start; margin: 0 var(--sp-1) var(--sp-1); color: var(--danger-text); }
+@media (max-width: 1024px) {
+  .sidebar-nav { align-items: center; }
+  .sidebar-nav .nav-section-items { align-items: center; }
+  .sidebar .nav-section-toggle { width: 40px; height: 28px; margin: 0 auto; padding: 0; justify-content: center; }
+  .sidebar .nav-section-toggle .rail-group-icon { display: block; width: 16px; height: 16px; }
+  .sidebar .nav-section-toggle.expanded { background: var(--surface-3); }
+}
+
 /* AI 助手面板：宽屏贴在右侧，1440 以下浮在内容上面 */
 .assist { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--shell); min-height: 0; }
 @media (max-width: 1366px) { .assist { position: fixed; top: 0; right: 0; bottom: 0; z-index: 40; box-shadow: var(--shadow-pop); } }

@@ -89,7 +89,7 @@ func (a *Module) getModel(u core.User, id int64, active bool) (ShopModel, error)
 	return m, nil
 }
 func (a *Module) modelWithReferences(m ShopModel) (ShopModel, error) {
-	rows, err := a.DB.Query("SELECT "+referenceColumns+" FROM model_references WHERE model_id=? ORDER BY id", m.ID)
+	rows, err := a.DB.Query("SELECT "+referenceColumns+" FROM model_references WHERE model_id=? AND deleted_at='' ORDER BY id", m.ID)
 	if err != nil {
 		return m, err
 	}
@@ -104,7 +104,7 @@ func (a *Module) modelWithReferences(m ShopModel) (ShopModel, error) {
 	return m, rows.Err()
 }
 func (a *Module) reference(mid, rid int64) (ModelReference, error) {
-	return scanReference(a.DB.QueryRow("SELECT "+referenceColumns+" FROM model_references WHERE model_id=? AND id=?", mid, rid))
+	return scanReference(a.DB.QueryRow("SELECT "+referenceColumns+" FROM model_references WHERE model_id=? AND id=? AND deleted_at=''", mid, rid))
 }
 func (a *Module) modelRoutes(r *core.Router) {
 	r.Handle("GET /api/models", core.ModelView, a.modelsList)
@@ -112,6 +112,7 @@ func (a *Module) modelRoutes(r *core.Router) {
 	r.Handle("GET /api/models/{id}", core.ModelView, a.modelGet)
 	r.Handle("PATCH /api/models/{id}", core.ModelManage, a.modelPatch)
 	r.Handle("POST /api/models/{id}/references", core.ModelManage, a.modelUpload)
+	r.Handle("DELETE /api/models/{id}/references/{ref}", core.ModelManage, a.modelDeleteReference)
 	r.Handle("GET /api/models/{id}/references/{ref}/file", core.ModelView, a.modelFile)
 	r.Handle("POST /api/models/{id}/generate", core.ModelManage, a.modelGenerate)
 	r.Handle("POST /api/models/{id}/references/confirm", core.ModelManage, a.modelConfirm)

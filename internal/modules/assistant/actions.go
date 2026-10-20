@@ -26,8 +26,8 @@ type Ref struct {
 }
 
 var actionCatalog = []capability{
-	{"open", "", "打开前端页面；参数 {path: /、/products、/assets、/process、/copy、/templates、/review、/admin、/settings 及其子路由；/tasks 仅本身，可带查询参数，需要task.view}"},
-	{"create_task", core.TaskView, "建议新建任务，确认后调用POST /api/tasks；参数 {title:1至100字,body?:最多1000字,assignee_id?:默认自己或0暂不派人,priority?:low或normal或high或urgent,due_at?:带时区RFC3339,target_type?:product或listing或asset,target_id?:对象编号（与类型同时给）,checklist?:最多20项{text:1至100字,done:false},watcher_ids?:最多10个不重复且不含负责人的可见用户编号}；派给别人或0需要task.manage"},
+	{"open", "", "打开前端页面；参数 {path: /、/products、/assets、/process、/copy、/templates、/review、/admin、/settings 及其子路由；/tasks 仅本身，可带查询参数，需要task.view；/kb 或 /kb/{文章id} 需kb.view且非外部协作者，不支持编辑子路径}"},
+	{"create_task", core.TaskView, "建议新建任务，确认后调用POST /api/tasks；参数 {title:1至100字,body?:最多1000字,assignee_id?:默认自己或0暂不派人,priority?:low或normal或high或urgent,due_at?:带时区RFC3339,target_type?:product或listing或asset或inv_item或purchase_order,target_id?:对象编号（与类型同时给）,checklist?:最多20项{text:1至100字,done:false},watcher_ids?:最多10个不重复且不含负责人的可见用户编号}；派给别人或0需要task.manage"},
 	{"run_listing", core.RenderRun, "从头一键出图；参数 {listing_id}"},
 	{"render_listing", core.RenderRun, "按当前模板出图；参数 {listing_id}"},
 	{"render_batch", core.RenderRun, "批量出图；参数 {listing_ids:最多50个}"},
@@ -74,6 +74,14 @@ func safePath(path string) bool {
 		if part == "." || part == ".." {
 			return false
 		}
+	}
+	if u.Path == "/kb" {
+		return true
+	}
+	if strings.HasPrefix(u.Path, "/kb/") {
+		raw := strings.TrimPrefix(u.Path, "/kb/")
+		id, err := strconv.ParseInt(raw, 10, 64)
+		return err == nil && id > 0 && strconv.FormatInt(id, 10) == raw
 	}
 	if u.Path == "/" || u.Path == "/tasks" {
 		return true
@@ -182,6 +190,21 @@ func (a *Module) visiblePath(u core.User, path string) bool {
 	if parsed.Path == "/tasks" && !u.Has(core.TaskView) {
 		return false
 	}
+	if parsed.Path == "/kb" || strings.HasPrefix(parsed.Path, "/kb/") {
+		if u.Role.Scope == "shares" || !u.Has(core.KBView) {
+			return false
+		}
+		if parsed.Path != "/kb" {
+			id, err := strconv.ParseInt(strings.TrimPrefix(parsed.Path, "/kb/"), 10, 64)
+			if err != nil {
+				return false
+			}
+			_, _, ok := a.reference(u, "kb_article", id)
+			if !ok {
+				return false
+			}
+		}
+	}
 	query, err := url.ParseQuery(parsed.RawQuery)
 	if err != nil {
 		return false
@@ -251,6 +274,14 @@ func (a *Module) reference(u core.User, kind string, id int64) (path, label stri
 		return
 	}
 	switch kind {
+	case "inv_item", "purchase_order":
+		return a.commerceRef(u, kind, id)
+	case "kb_article":
+		if u.Role.Scope == "shares" || !u.Has(core.KBView) {
+			return
+		}
+		ok = a.DB.QueryRow("SELECT title FROM kb_articles WHERE id=? AND deleted_at IS NULL", id).Scan(&label) == nil
+		path = fmt.Sprintf("/kb/%d", id)
 	case "product":
 		if !a.CanProduct(u, id) {
 			return

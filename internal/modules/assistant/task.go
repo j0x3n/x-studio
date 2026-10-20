@@ -39,7 +39,7 @@ func (a *Module) taskTarget(u core.User, typ string, id int64, fields object) (s
 	if !hasType && !hasID {
 		return "", true
 	}
-	if !hasType || !hasID || id <= 0 || (typ != "product" && typ != "listing" && typ != "asset") {
+	if !hasType || !hasID || id <= 0 || (typ != "product" && typ != "listing" && typ != "asset" && typ != "inv_item" && typ != "purchase_order") {
 		return "", false
 	}
 	_, label, ok := a.reference(u, typ, id)
@@ -90,7 +90,7 @@ func (a *Module) listAssignees(u core.User, raw json.RawMessage) ([]object, erro
 	if err != nil {
 		return nil, err
 	}
-	vis, visArgs := taskCountScope(u)
+	vis, visArgs := a.taskCountScope(u)
 	items := []object{}
 	for _, row := range ids {
 		person, ok := a.taskMember(number(row["id"]), in.TargetType, in.TargetID)

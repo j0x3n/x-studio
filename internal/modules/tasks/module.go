@@ -19,6 +19,12 @@ type Module struct {
 	mu             sync.Mutex
 	bgWG           sync.WaitGroup
 	hub            *hub
+	pushMu         sync.Mutex
+	pushSetupMu    sync.Mutex
+	pushCfg        *pushConfig
+	pushFromEnv    bool
+	pushCh         chan pushJob
+	pushClient     *http.Client
 }
 
 func New(c *core.Core) *Module {
@@ -49,8 +55,16 @@ func (a *Module) Routes(r *core.Router) {
 	r.Handle("GET /api/notification-prefs", core.LoggedIn, a.getPrefs)
 	r.Handle("PUT /api/notification-prefs", core.LoggedIn, a.putPrefs)
 
+	r.Handle("GET /api/push/key", core.LoggedIn, a.pushKey)
+	r.Handle("POST /api/push/subscriptions", core.LoggedIn, a.pushSubscribe)
+	r.Handle("DELETE /api/push/subscriptions", core.LoggedIn, a.pushUnsubscribe)
+	r.Handle("POST /api/push/vapid", core.AdminSettings, a.pushGenerate)
+
+	a.initPush()
 	a.bgWG.Add(1)
 	go a.loop()
+	a.bgWG.Add(1)
+	go a.pushLoop()
 	a.OnClose(func() { a.bgWG.Wait() })
 }
 

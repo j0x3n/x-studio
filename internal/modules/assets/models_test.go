@@ -525,6 +525,61 @@ func TestModelUploadImmutableIdentityAndCover(t *testing.T) {
 	wbBinary(t, f, "GET", fmt.Sprintf("/api/models/%d/references/%d/file", mid, ref), nil, 200)
 }
 
+func TestModelReferenceDeletion(t *testing.T) {
+	f := newFixture(t, nil)
+	mid := modelCreate(t, f, 1)
+	other := modelCreate(t, f, 1)
+	dir := filepath.Join(f.c.Cfg.DataDir, "models", fmt.Sprint(mid))
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	add := func(name string) int64 {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), imageBytes(t, 12, 12), 0600); err != nil {
+			t.Fatal(err)
+		}
+		result, err := f.c.DB.Exec(`INSERT INTO model_references(model_id,body_part,source,file,orig_name,width,height,created_by,created_at) VALUES(?,'hand','original',?,?,12,12,1,?)`, mid, name, name, core.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := result.LastInsertId()
+		return id
+	}
+	first, second := add("first.png"), add("second.png")
+	path := fmt.Sprintf("/api/models/%d/references/%d", mid, first)
+	f.req(t, "PATCH", fmt.Sprintf("/api/models/%d", mid), obj{"cover_reference_id": first}, 200)
+	f.user(t, "viewer-delete", 4, 1)
+	f.user(t, "outside-delete", 2)
+	f.login(t, "viewer-delete")
+	f.req(t, "DELETE", path, nil, 403)
+	f.login(t, "outside-delete")
+	f.req(t, "DELETE", path, nil, 404)
+	f.login(t, "admin")
+	f.req(t, "DELETE", fmt.Sprintf("/api/models/%d/references/%d", other, first), nil, 404)
+	wbExec(t, f, `INSERT INTO jobs(kind,target_type,target_id,user_id,params,status,steps,created_at) VALUES('assets.tryon','user',1,1,?,'running','',?)`, core.JS(obj{"model_id": mid, "reference_id": first}), core.Now())
+	f.req(t, "DELETE", path, nil, 409)
+	wbBinary(t, f, "GET", path+"/file", nil, 200)
+	wbExec(t, f, "UPDATE jobs SET status='done' WHERE kind='assets.tryon'")
+	deleted := f.req(t, "DELETE", path, nil, 200)["model"].(obj)
+	if deleted["cover_reference_id"] != float64(second) || len(deleted["references"].([]any)) != 1 {
+		t.Fatal("deleted reference still visible or cover was not replaced", deleted)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "first.png")); !os.IsNotExist(err) {
+		t.Fatal("reference file was not removed", err)
+	}
+	f.req(t, "DELETE", path, nil, 404)
+	wbBinary(t, f, "GET", path+"/file", nil, 404)
+	f.req(t, "PATCH", fmt.Sprintf("/api/models/%d", mid), obj{"cover_reference_id": first}, 400)
+	last := f.req(t, "DELETE", fmt.Sprintf("/api/models/%d/references/%d", mid, second), nil, 200)["model"].(obj)
+	if last["cover_reference_id"] != nil || len(last["references"].([]any)) != 0 {
+		t.Fatal("last reference did not clear cover", last)
+	}
+	if added := add("new.png"); added <= second {
+		t.Fatal("deleted reference ID was reused")
+	}
+	f.assertAudit(t, "assets.model.reference.delete")
+}
+
 func TestConcurrentModelCandidateConfirmation(t *testing.T) {
 	f, ai := modelFixture(t)
 	mid := modelCreate(t, f, 1)

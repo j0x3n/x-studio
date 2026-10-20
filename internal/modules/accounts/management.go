@@ -235,7 +235,7 @@ func (a *Module) settings(w http.ResponseWriter, r *http.Request) {
 		}
 		value := core.JSONObj(v["value"].(string))
 		if key == "ai_models" {
-			for feature, model := range map[string]string{"classify": a.Cfg.VisionModel, "tag": a.Cfg.VisionModel, "copy": a.Cfg.TextModel, "copy_rewrite": a.Cfg.TextModel, "copy_check": a.Cfg.TextModel, "enhance": a.Cfg.ImageModel, "fill": a.Cfg.ImageModel, "upscale": a.Cfg.ImageModel, "process": a.Cfg.ImageModel, "model_create": a.Cfg.ImageModel, "tryon": a.Cfg.ImageModel, "tryon_analyze": a.Cfg.VisionModel, "assistant": a.Cfg.TextModel} {
+			for feature, model := range map[string]string{"classify": a.Cfg.VisionModel, "tag": a.Cfg.VisionModel, "copy": a.Cfg.TextModel, "copy_rewrite": a.Cfg.TextModel, "copy_check": a.Cfg.TextModel, "enhance": a.Cfg.ImageModel, "fill": a.Cfg.ImageModel, "upscale": a.Cfg.ImageModel, "process": a.Cfg.ImageModel, "model_create": a.Cfg.ImageModel, "tryon": a.Cfg.ImageModel, "tryon_analyze": a.Cfg.VisionModel, "assistant": a.Cfg.TextModel, "document_analyze": a.Cfg.VisionModel, "finance_explain": a.Cfg.TextModel} {
 				if s, _ := value[feature].(string); s == "" {
 					value[feature] = a.Model(feature, model)
 				}

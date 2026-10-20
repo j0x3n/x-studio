@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 	"xstudio/internal/core"
@@ -45,6 +46,51 @@ func codeKey(s string) string {
 		return key
 	}, s)
 }
+
+func nextItemCode(tx *sql.Tx) (string, error) {
+	var raw string
+	if err := tx.QueryRow("SELECT value FROM settings WHERE key='item_code_rule'").Scan(&raw); err != nil {
+		return "", err
+	}
+	rule, err := core.ParseItemCodeRule(json.RawMessage(raw))
+	if err != nil {
+		return "", err
+	}
+	return allocateItemCode(tx, rule, time.Now())
+}
+
+func allocateItemCode(tx *sql.Tx, rule core.ItemCodeRule, now time.Time) (string, error) {
+	parts := []string{}
+	if rule.Prefix != "" {
+		parts = append(parts, rule.Prefix)
+	}
+	if layout := map[string]string{"day": "20060102", "month": "200601", "year": "2006"}[rule.Date]; layout != "" {
+		parts = append(parts, now.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format(layout))
+	}
+	stem := strings.Join(parts, rule.Separator)
+	if stem != "" {
+		stem += rule.Separator
+	}
+	namespace := codeKey(stem)
+	var last int64
+	err := tx.QueryRow("SELECT last_value FROM inv_code_sequences WHERE namespace=?", namespace).Scan(&last)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+	for seq := max(last+1, rule.Start); seq <= 999999999999; seq++ {
+		code := fmt.Sprintf("%s%0*d", stem, rule.Digits, seq)
+		var exists bool
+		if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM inv_items WHERE code_key=?)", codeKey(code)).Scan(&exists); err != nil {
+			return "", err
+		}
+		if !exists {
+			_, err := tx.Exec("INSERT INTO inv_code_sequences(namespace,last_value) VALUES(?,?) ON CONFLICT(namespace) DO UPDATE SET last_value=excluded.last_value", namespace, seq)
+			return code, err
+		}
+	}
+	return "", bad(409, "当前编码序号已用完，请修改编码前缀")
+}
+
 func (a *Module) writeItem(w http.ResponseWriter, r *http.Request) (any, error) {
 	var raw map[string]json.RawMessage
 	if e := decode(w, r, &raw); e != nil {
@@ -81,6 +127,13 @@ func (a *Module) writeItem(w http.ResponseWriter, r *http.Request) (any, error) 
 			return 0, nil, bad(400, "物料字段类型不正确")
 		}
 		in.Code = strings.TrimSpace(in.Code)
+		if r.Method == "POST" && in.Code == "" {
+			var err error
+			in.Code, err = nextItemCode(tx)
+			if err != nil {
+				return 0, nil, err
+			}
+		}
 		in.Name = strings.TrimSpace(in.Name)
 		in.Unit = strings.TrimSpace(in.Unit)
 		if !length(in.Code, 1, 64) || !length(in.Name, 1, 100) || !length(in.Unit, 1, 8) || !length(in.Note, 0, 500) || len(in.Spec) > 10 || len(in.Units) > 5 || in.SafetyStock < 0 {

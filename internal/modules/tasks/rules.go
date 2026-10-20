@@ -145,6 +145,9 @@ func (a *Module) applyRuleIn(v rule, in ruleIn, partial bool) (rule, error) {
 	if !assignModes[v.AssignMode] {
 		return v, bad(400, "派活方式不正确")
 	}
+	if (v.Event == "inventory.low_stock" || v.Event == "purchase.received") && (v.AssignMode == "product_owner" || v.AssignMode == "job_user") {
+		return v, bad(400, "经营事件只能指定负责人或按角色派活")
+	}
 	if !priorities[v.Priority] {
 		return v, bad(400, "优先级不正确")
 	}
