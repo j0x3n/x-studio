@@ -9,7 +9,16 @@ func (*Module) Migrations() []core.Migration {
 	return []core.Migration{
 		{Version: 1, Up: func(tx *sql.Tx) error { _, err := tx.Exec(schema); return err }},
 		{Version: 2, Up: normalizeOrderDates},
+		{Version: 3, Up: addReturnReasonColumns},
 	}
+}
+
+func addReturnReasonColumns(tx *sql.Tx) error {
+	if _, err := tx.Exec("ALTER TABLE order_return_lines ADD COLUMN reason_code TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	_, err := tx.Exec("ALTER TABLE order_return_lines ADD COLUMN creative_set_id INTEGER")
+	return err
 }
 
 func normalizeOrderDates(tx *sql.Tx) error {
