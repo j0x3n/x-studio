@@ -26,4 +26,5 @@
 - AI 模特入口 `/models` 和 `/tryon`，契约见 `接口约定-AI模特.md`；前端类型在 `lib/tryon.ts`，模特参考永久保存，生成候选和试穿复用本人 workbench。
 - 三期经营已开发并升级本机：组装 `internal/modules/assembly`、财务 `finance`；新入口 `/assembly`、`/finance`、`/replenishment`、`/purchase-recognize`，契约见 `接口约定-三期经营.md`。库存变更仍通过 `inventory.StockIn/StockOut`，财务不写采购/订单表，事务内鉴权用同一事务避免单 SQLite 连接死锁。
 - 本轮用户要求减少测试与额度占用，全部开发完成后统一手动验证；三期已于 2026-10-21 按 `手动验收-三期经营.md` 验收通过。知识库助手/经营派活已恢复整合，不要重复合并历史暂停分支。
+- AI 工作流改造（AI 主图、模特、生图屏模板、三层复核、数据与运营）按 [AI工作流改造方案.md](AI工作流改造方案.md) 来做；这一块的分工以方案第 7 节为准。
 - 分工和并行规则见 [并行开发规则.md](并行开发规则.md)：当前模式是 Codex / Grok Build / agy 并行实施，Claude 选模块分派并审核整合（第 0 节）。
