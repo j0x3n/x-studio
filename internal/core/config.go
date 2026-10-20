@@ -27,7 +27,7 @@ func EnvConfig() (Config, error) {
 		}
 		return def
 	}
-	c := Config{Listen: get("LISTEN", ":8080"), DataDir: get("DATA_DIR", "./data"), TemplateDir: get("TEMPLATE_DIR", "./templates"), PromptDir: get("PROMPT_DIR", "./prompts"), AdminUser: os.Getenv("ADMIN_USER"), AdminPassword: os.Getenv("ADMIN_PASSWORD"), SessionSecret: os.Getenv("SESSION_SECRET"), AIBaseURL: get("AI_BASE_URL", "https://subapi.xcc.im/v1"), AIKey: os.Getenv("AI_API_KEY"), VisionModel: get("AI_MODEL_VISION", "gpt-6-sol"), TextModel: get("AI_MODEL_TEXT", "gpt-6-sol"), RembgURL: get("REMBG_URL", "http://rembg:7000"), ChromePath: os.Getenv("CHROME_PATH"), SecureCookie: os.Getenv("COOKIE_SECURE") == "1", Workers: 2, ReasoningEffort: "medium", ImageModel: get("IMAGE_MODEL", "gpt-image-2.5-burst"), ImageTimeout: 240 * time.Second, AutoUpscale: true, AutoFill: true, UpscaleMinSide: 900}
+	c := Config{Listen: get("LISTEN", ":8080"), DataDir: get("DATA_DIR", "./data"), TemplateDir: get("TEMPLATE_DIR", "./templates"), PromptDir: get("PROMPT_DIR", "./prompts"), AdminUser: os.Getenv("ADMIN_USER"), AdminPassword: os.Getenv("ADMIN_PASSWORD"), SessionSecret: os.Getenv("SESSION_SECRET"), AIBaseURL: get("AI_BASE_URL", "https://subapi.xcc.im/v1"), AIKey: os.Getenv("AI_API_KEY"), VisionModel: get("AI_MODEL_VISION", "gpt-6-sol"), TextModel: get("AI_MODEL_TEXT", "gpt-6-sol"), RembgURL: get("REMBG_URL", "http://rembg:7000"), ChromePath: os.Getenv("CHROME_PATH"), SecureCookie: os.Getenv("COOKIE_SECURE") == "1", Workers: 2, ReasoningEffort: "medium", ImageModel: get("IMAGE_MODEL", "gpt-image-2.5-sunburst"), ImageTimeout: 240 * time.Second, AutoUpscale: true, AutoFill: true, UpscaleMinSide: 900}
 	if v, exists := os.LookupEnv("AI_REASONING_EFFORT"); exists {
 		c.ReasoningEffort = v
 	}

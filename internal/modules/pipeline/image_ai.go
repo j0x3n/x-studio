@@ -38,7 +38,7 @@ func enhancementSections(doc string) map[string]string {
 		if strings.HasPrefix(line, "## ") {
 			title := strings.TrimSpace(strings.TrimPrefix(line, "## "))
 			key = ""
-			for _, candidate := range []string{"通用要求", "高清化", "A1", "E1", "E2", "E3", "D4"} {
+			for _, candidate := range []string{"通用要求", "高清化", "A1", "E1", "E2", "E3"} {
 				if strings.HasPrefix(title, candidate) {
 					key = candidate
 					break

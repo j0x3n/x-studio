@@ -43,7 +43,16 @@ const (
 	OrderManage      = "order.manage"
 	FinanceView      = "finance.view"
 	FinanceEdit      = "finance.edit"
+	CreativeRun      = "creative.run"
+	CreativeReview   = "creative.review"
+	CreativeTemplate = "creative.template"
+	MarketView       = "market.view"
+	MarketImport     = "market.import"
+	OpsAdvice        = "ops.advice"
 )
+
+// MarketIngest 只用于个人采集令牌的范围，不是角色权限点，不出现在 Permissions 里。
+const MarketIngest = "market.ingest"
 
 var Permissions = []Permission{
 	{ModelView, "看店铺模特", "模特"}, {ModelManage, "维护店铺模特", "模特"},
@@ -57,6 +66,8 @@ var Permissions = []Permission{
 	{PurchaseManage, "供应商、采购单、到货质检", "采购"},
 	{OrderView, "看订单", "订单"}, {OrderManage, "录单、发货、取消、售后", "订单"},
 	{FinanceView, "看财务数据", "财务"}, {FinanceEdit, "改财务数据", "财务"},
+	{CreativeRun, "AI 出图：生成、重画、改字、导出", "AI 出图"}, {CreativeReview, "复核 AI 出图", "AI 出图"}, {CreativeTemplate, "管理生图模板和店铺出图设置", "AI 出图"},
+	{MarketView, "看市场和店铺数据", "数据"}, {MarketImport, "导入数据、管理采集令牌", "数据"}, {OpsAdvice, "看运营建议、据此建任务", "数据"},
 }
 
 func KnownPermission(p string) bool {

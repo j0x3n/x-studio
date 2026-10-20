@@ -5,13 +5,17 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+	"xstudio/internal/media"
 )
 
 var codePattern = regexp.MustCompile(`^[A-Z][0-9]{1,2}(?:_[\p{L}\p{N}_-]+)?$`)
 
 func validatePhoto(p Photo) error {
 	if p.AIGenerated && p.Code != "" && !allowedFillCode(p.Code) {
-		return errors.New("AI 生成照片只能使用 A1、E1、E2、E3、D4 编号")
+		return errors.New("AI 生成照片只能使用 A1_AI、E1_AI、E2_AI、E3_AI 编号")
+	}
+	if !p.AIGenerated && strings.HasSuffix(p.Code, media.AISuffix) {
+		return errors.New("_AI 是 AI 补图保留后缀，请换一个拍摄编号")
 	}
 	if p.Code != "" && (!codePattern.MatchString(p.Code) || utf8.RuneCountInString(p.Code) > 60) {
 		return errors.New("拍摄编号格式不正确")

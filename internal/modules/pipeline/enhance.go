@@ -11,16 +11,21 @@ import (
 	"sort"
 	"strings"
 	"xstudio/internal/core"
+	"xstudio/internal/media"
 )
 
 const maxGeneratedPhotos = 4
 
+// allowedFillCode 只认带 _AI 后缀的补图编号；模特图（原来的 D4）改由 creative 模块出。
 func allowedFillCode(code string) bool {
-	switch code {
-	case "A1", "E1", "E2", "E3", "D4":
-		return true
-	}
-	return false
+	_, ok := media.FillBase(code)
+	return ok
+}
+
+// fillBaseCode 判断槽位候选编号能不能由 AI 补：A1、E1、E2、E3。
+func fillBaseCode(code string) bool {
+	_, ok := media.FillBase(code + media.AISuffix)
+	return ok
 }
 func codeMatches(code, candidate string) bool {
 	return code != "" && (code == candidate || strings.HasPrefix(code, candidate+"_"))
@@ -41,23 +46,35 @@ func (a *Module) slotsList(categories ...*core.Category) []slot {
 	}
 	return out
 }
+// slotHits 按候选顺序找照片，同一编号实拍排在 AI 图前面。
+// AI 生成或改过的图只能进可以补图的位置（首图、首屏、白底），实拍证据位只认实拍。
 func slotHits(s slot, photos []Photo) []Photo {
 	out := []Photo{}
+	fillable := slotAllowsFill(s)
 	for _, candidate := range s.Candidates {
+		var ai []Photo
 		for _, ph := range photos {
+			if !codeMatches(ph.Code, candidate) {
+				continue
+			}
 			if ph.AIGenerated && !allowedFillCode(ph.Code) {
 				continue
 			}
-			if codeMatches(ph.Code, candidate) {
-				out = append(out, ph)
+			if media.AIMade(ph) {
+				if fillable {
+					ai = append(ai, ph)
+				}
+				continue
 			}
+			out = append(out, ph)
 		}
+		out = append(out, ai...)
 	}
 	return out
 }
 func slotAllowsFill(s slot) bool {
 	for _, candidate := range s.Candidates {
-		if allowedFillCode(candidate) {
+		if fillBaseCode(candidate) {
 			return true
 		}
 	}
@@ -107,37 +124,19 @@ func (a *Module) fillTargets(photos []Photo, categories ...*core.Category) []str
 	}
 	out := []string{}
 	if white {
-		out = append(out, "A1")
+		out = append(out, "A1"+media.AISuffix)
 	}
 	if hero {
-		out = append(out, "E1")
-	}
-	hasD := false
-	for _, ph := range photos {
-		if len(ph.Code) >= 2 && ph.Code[0] == 'D' {
-			hasD = true
-		}
-	}
-	hasD4 := true
-	if len(categories) > 0 && categories[0] != nil {
-		hasD4 = false
-		for _, code := range categories[0].Codes {
-			if code.Code == "D4" {
-				hasD4 = true
-			}
-		}
-	}
-	if !hasD && hasD4 {
-		out = append(out, "D4")
+		out = append(out, "E1"+media.AISuffix)
 	}
 	return out
 }
 
-func selectReferences(photos []Photo, code string) []Photo {
+func selectReferences(photos []Photo) []Photo {
 	priority := []string{"A1", "A2", "F2", "E4", "B2", "B3"}
 	real := []Photo{}
 	for _, ph := range photos {
-		if !ph.AIGenerated && ph.Code != "" {
+		if !media.AIMade(ph) && ph.Code != "" {
 			real = append(real, ph)
 		}
 	}
@@ -154,25 +153,6 @@ func selectReferences(photos []Photo, code string) []Photo {
 	for _, ph := range real {
 		if len(out) < 3 {
 			out = append(out, ph)
-		}
-	}
-	if code == "D4" {
-		for _, ph := range real {
-			if codeMatches(ph.Code, "D1") || codeMatches(ph.Code, "D2") || codeMatches(ph.Code, "D3") {
-				found := false
-				for _, used := range out {
-					if used.ID == ph.ID {
-						found = true
-					}
-				}
-				if !found {
-					if len(out) == 3 {
-						out = out[:2]
-					}
-					out = append(out, ph)
-				}
-				break
-			}
 		}
 	}
 	return out
@@ -279,7 +259,8 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 		if ctx.Err() != nil {
 			return warnings, ctx.Err()
 		}
-		if !allowedFillCode(code) {
+		base, ok := media.FillBase(code)
+		if !ok {
 			continue
 		}
 		photos, err = a.photos(p.ID)
@@ -288,7 +269,7 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 		}
 		count := 0
 		reuseID := int64(0)
-		file := "原图/ai_" + code + ".png"
+		file := "原图/ai_" + base + ".png"
 		for _, ph := range photos {
 			if ph.AIGenerated {
 				count++
@@ -301,7 +282,7 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 			warnings = append(warnings, "补图已达每款 4 张上限，跳过 "+code)
 			continue
 		}
-		refs := selectReferences(photos, code)
+		refs := selectReferences(photos)
 		images := []image.Image{}
 		refIDs := []string{}
 		for _, ref := range refs {
@@ -319,7 +300,7 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 		}
 		if fillErr == nil {
 			var prompt string
-			prompt, fillErr = enhancementPrompt(parts, code, p)
+			prompt, fillErr = enhancementPrompt(parts, base, p)
 			if fillErr == nil {
 				data, fillErr = a.editImage(core.WithFeature(ctx, "fill"), prompt, images)
 			}
@@ -336,9 +317,9 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 		note := "AI 生成（参考 " + strings.Join(refIDs, "、") + "）"
 		op := js(Object{"feature": "fill", "code": code, "references": refIDs})
 		if reuseID != 0 {
-			_, err = a.DB.Exec("UPDATE assets SET code=?,width=?,height=?,ai_note=?,white_bg=?,crop='null',rotate=0,enhanced_file='',ai_enhanced=0,manual=0,source='ai_generated',source_override='',parent_id=?,created_by=?,created_at=?,op=? WHERE id=?", code, cfg.Width, cfg.Height, note, code == "A1", refs[0].ID, core.Actor(ctx).UserID, now(), op, reuseID)
+			_, err = a.DB.Exec("UPDATE assets SET code=?,width=?,height=?,ai_note=?,white_bg=?,crop='null',rotate=0,enhanced_file='',ai_enhanced=0,manual=0,source='ai_generated',source_override='',parent_id=?,created_by=?,created_at=?,op=? WHERE id=?", code, cfg.Width, cfg.Height, note, base == "A1", refs[0].ID, core.Actor(ctx).UserID, now(), op, reuseID)
 		} else {
-			_, err = a.DB.Exec("INSERT INTO assets(product_id,file,orig_name,width,height,code,white_bg,ai_note,ai_generated,source,created_by,created_at,parent_id,op) VALUES(?,?,?,?,?,?,?,?,1,'ai_generated',?,?,?,?)", p.ID, file, "ai_"+code+".png", cfg.Width, cfg.Height, code, code == "A1", note, core.Actor(ctx).UserID, now(), refs[0].ID, op)
+			_, err = a.DB.Exec("INSERT INTO assets(product_id,file,orig_name,width,height,code,white_bg,ai_note,ai_generated,source,created_by,created_at,parent_id,op) VALUES(?,?,?,?,?,?,?,?,1,'ai_generated',?,?,?,?)", p.ID, file, "ai_"+base+".png", cfg.Width, cfg.Height, code, base == "A1", note, core.Actor(ctx).UserID, now(), refs[0].ID, op)
 		}
 		if err != nil {
 			return warnings, fmt.Errorf("保存补图记录失败：%w", err)

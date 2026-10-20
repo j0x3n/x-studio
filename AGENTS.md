@@ -8,7 +8,7 @@
 |---|---|
 | `cmd/server/main.go` | 入口，模块列表在这里注册 |
 | `internal/core/` | 公共框架：配置、路由和权限（`perm.go`）、迁移、审计（`audit.go`）、后台任务、AI 调用、品类 |
-| `internal/modules/<模块>/` | 每个模块自己的路由、表、迁移、测试：`accounts` 账号和角色、`products` 商品和上架版本、`assets` 图片库、处理台、店铺模特库和试穿试戴（`models.go/model_files.go/model_jobs.go/model_workbench.go`）、`copywriting` 文案、`studio` 模板和出图审核、`pipeline` 一键出图、`assistant` AI 助手、`tasks` 任务和通知、`inventory` 库存（`stock.go` 是给采购和订单用的库存 Go 接口）、`kb` 知识库、`purchase` 采购（供应商、采购单、分批到货质检、不合格退货）、`orders` 手工销售订单（占用、发货、售后） |
+| `internal/modules/<模块>/` | 每个模块自己的路由、表、迁移、测试：`accounts` 账号和角色、`products` 商品和上架版本、`assets` 图片库、处理台、店铺模特库和试穿试戴（`models.go/model_files.go/model_jobs.go/model_workbench.go`）、`copywriting` 文案、`studio` 模板和出图审核、`pipeline` 一键出图、`assistant` AI 助手、`tasks` 任务和通知、`inventory` 库存（`stock.go` 是给采购和订单用的库存 Go 接口）、`kb` 知识库、`purchase` 采购（供应商、采购单、分批到货质检、不合格退货）、`orders` 手工销售订单（占用、发货、售后）、`creative` AI 出图、`market` 数据与运营（这两个阶段 0 只有空壳） |
 | `frontend/src/pages/` | 页面；`components/` 通用组件（`Shell` 侧栏、`ui` 基础组件、`TaskViews` 任务抽屉、`NoticeBell` 铃铛）；`lib/` 接口、类型、各模块的中文和工具函数 |
 | `frontend/src/styles/` | 样式，按 admin-design-system 规范；模块样式写在 `app.css` 末尾的分段里 |
 | `prompts/`、`templates/` | 提示词、详情页模板（不是 Go 代码） |
@@ -26,5 +26,5 @@
 - AI 模特入口 `/models` 和 `/tryon`，契约见 `接口约定-AI模特.md`；前端类型在 `lib/tryon.ts`，模特参考永久保存，生成候选和试穿复用本人 workbench。
 - 三期经营已开发并升级本机：组装 `internal/modules/assembly`、财务 `finance`；新入口 `/assembly`、`/finance`、`/replenishment`、`/purchase-recognize`，契约见 `接口约定-三期经营.md`。库存变更仍通过 `inventory.StockIn/StockOut`，财务不写采购/订单表，事务内鉴权用同一事务避免单 SQLite 连接死锁。
 - 本轮用户要求减少测试与额度占用，全部开发完成后统一手动验证；三期已于 2026-10-21 按 `手动验收-三期经营.md` 验收通过。知识库助手/经营派活已恢复整合，不要重复合并历史暂停分支。
-- AI 工作流改造（AI 主图、模特、生图屏模板、三层复核、数据与运营）按 [AI工作流改造方案.md](AI工作流改造方案.md) 来做；这一块的分工以方案第 7 节为准。
+- AI 工作流改造（AI 主图、模特、生图屏模板、三层复核、数据与运营）按 [AI工作流改造方案.md](AI工作流改造方案.md) 来做；这一块的分工以方案第 7 节为准，契约见 [接口约定-AI出图.md](接口约定-AI出图.md)、[接口约定-数据与运营.md](接口约定-数据与运营.md)。AI 补图编号带 `_AI` 后缀，实拍证据位不收 AI 生成或改过的图（`internal/media`）；生图只能用三种尺寸，生成后要核对返回尺寸。
 - 分工和并行规则见 [并行开发规则.md](并行开发规则.md)：当前模式是 Codex / Grok Build / agy 并行实施，Claude 选模块分派并审核整合（第 0 节）。

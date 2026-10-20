@@ -26,6 +26,11 @@ const FEATURES: Record<string, string> = {
   assistant: 'AI 助手',
   document_analyze: '采购单据识别（看图）',
   finance_explain: '财务·解释对账差异',
+  creative: 'AI 出图·生成和改图',
+  creative_verify: 'AI 出图·复核（看图）',
+  creative_text: 'AI 出图·图上文字核对（看图）',
+  title_suggest: '标题优化',
+  ops_advice: '运营诊断解释',
 }
 
 export function SettingsPage() {

@@ -203,7 +203,7 @@ func (a *Module) copyText(ctx context.Context, p Product) error {
 	notes := []Object{}
 	for _, ph := range photos {
 		if ph.Code != "" {
-			notes = append(notes, Object{"code": ph.Code, "file": ph.Code + ".jpg", "note": ph.AINote, "ai_generated": ph.AIGenerated, "ai_enhanced": ph.AIEnhanced})
+			notes = append(notes, Object{"code": ph.Code, "file": ph.Code + ".jpg", "note": ph.AINote, "ai_generated": ph.AIGenerated, "ai_enhanced": ph.AIEnhanced, "source": ph.EffectiveSource()})
 		}
 	}
 	entries, _ := os.ReadDir(filepath.Join(a.Dir(p.ID), "照片"))

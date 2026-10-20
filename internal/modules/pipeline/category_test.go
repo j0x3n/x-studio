@@ -165,7 +165,7 @@ func TestCategoryEnhancementSlotsCodesAndPrompt(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if targets := f.a.fillTargets(nil, p.Category); js(targets) != `["A1"]` {
+	if targets := f.a.fillTargets(nil, p.Category); js(targets) != `["A1_AI"]` {
 		t.Fatal(targets)
 	}
 	warnings, e := f.a.enhance(testActor(context.Background()), p)

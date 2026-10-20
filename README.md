@@ -25,7 +25,7 @@ $env:SESSION_SECRET = [Convert]::ToBase64String($secretBytes); $rng.Dispose()
 $env:AI_MODEL_VISION = 'gpt-6-sol'
 $env:AI_MODEL_TEXT = 'gpt-6-sol'
 $env:AI_REASONING_EFFORT = 'medium'
-$env:IMAGE_MODEL = 'gpt-image-2.5-burst'
+$env:IMAGE_MODEL = 'gpt-image-2.5-sunburst'
 $env:AI_API_KEY = ''  # 空值也能启动，AI 步骤会报中文错误
 $env:REMBG_URL = 'http://127.0.0.1:7000'
 go run ./cmd/server
@@ -49,7 +49,7 @@ AI_API_KEY=
 AI_MODEL_VISION=gpt-6-sol
 AI_MODEL_TEXT=gpt-6-sol
 AI_REASONING_EFFORT=medium
-IMAGE_MODEL=gpt-image-2.5-burst
+IMAGE_MODEL=gpt-image-2.5-sunburst
 IMAGE_TIMEOUT=240
 AUTO_UPSCALE=1
 AUTO_FILL=1
@@ -85,7 +85,7 @@ compose 为受限的容器内核设置 `CHROME_NO_SANDBOX=1`，Chrome 因而关�
 | `AI_MODEL_VISION` | `gpt-6-sol`；看图分拣 |
 | `AI_MODEL_TEXT` | `gpt-6-sol`；文案 |
 | `AI_REASONING_EFFORT` | `medium`；文本和看图请求携带 `reasoning_effort`，显式配置为空时不带 |
-| `IMAGE_MODEL` | `gpt-image-2.5-burst`；高清化和补图 |
+| `IMAGE_MODEL` | `gpt-image-2.5-sunburst`；高清化和补图 |
 | `IMAGE_TIMEOUT` | `240` 秒；每次图像请求超时，可设 1–3600 |
 | `AUTO_UPSCALE` | `1`；默认高清化，可设 `0` 关闭 |
 | `AUTO_FILL` | `1`；默认补图，可设 `0` 关闭 |

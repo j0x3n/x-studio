@@ -96,7 +96,7 @@ func (a *Core) Model(feature, fallback string) string {
 	if s, ok := models[feature].(string); ok && strings.TrimSpace(s) != "" {
 		return strings.TrimSpace(s)
 	}
-	parent := map[string]string{"model_create": "process", "tryon": "process", "tryon_analyze": "classify", "document_analyze": "classify"}[feature]
+	parent := map[string]string{"model_create": "process", "tryon": "process", "tryon_analyze": "classify", "document_analyze": "classify", "creative": "process", "creative_verify": "classify", "creative_text": "classify", "title_suggest": "copy", "ops_advice": "copy"}[feature]
 	if s, ok := models[parent].(string); parent != "" && ok && strings.TrimSpace(s) != "" {
 		return strings.TrimSpace(s)
 	}

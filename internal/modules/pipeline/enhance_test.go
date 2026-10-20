@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"xstudio/internal/media"
 )
 
 const enhanceTestPrompt = `## 通用要求
@@ -31,8 +32,6 @@ FILL_E1 product {info}
 FILL_E2 product {info}
 ## E3 场景
 FILL_E3 product {info}
-## D4 上耳
-FILL_D4 pearl {size} product {info}
 ## 规则（不发给模型）
 NEVER_SEND_RULES
 `
@@ -90,7 +89,7 @@ func readImageRequest(t *testing.T, r *http.Request) imageRequest {
 		return imageRequest{}
 	}
 	defer r.MultipartForm.RemoveAll()
-	if r.FormValue("model") != "gpt-image-2.5-burst" || r.FormValue("quality") != "high" || r.Header.Get("Authorization") != "Bearer fake" {
+	if r.FormValue("model") != "gpt-image-2.5-sunburst" || r.FormValue("quality") != "high" || r.Header.Get("Authorization") != "Bearer fake" {
 		t.Error("missing model, high quality or authorization")
 	}
 	got := imageRequest{prompt: r.FormValue("prompt"), size: r.FormValue("size")}
@@ -246,7 +245,7 @@ func TestFillRulesReferencesStorageCoverageAndLimit(t *testing.T) {
 		if len(got.dimensions) != 2 {
 			t.Error("expected two real reference images", got)
 		}
-		if !(strings.Contains(got.prompt, "FILL_A1") || strings.Contains(got.prompt, "FILL_E1") || strings.Contains(got.prompt, "FILL_D4")) {
+		if !(strings.Contains(got.prompt, "FILL_A1") || strings.Contains(got.prompt, "FILL_E1")) {
 			t.Error("forbidden generated code", got.prompt)
 		}
 		if strings.Contains(got.prompt, "{info}") || strings.Contains(got.prompt, "{size}") {
@@ -268,7 +267,7 @@ func TestFillRulesReferencesStorageCoverageAndLimit(t *testing.T) {
 	if err != nil || len(warnings) > 0 {
 		t.Fatal(warnings, err)
 	}
-	if count.Load() != 3 {
+	if count.Load() != 2 {
 		t.Fatal(count.Load())
 	}
 	photos, _ := f.a.photos(id)
@@ -278,7 +277,7 @@ func TestFillRulesReferencesStorageCoverageAndLimit(t *testing.T) {
 			continue
 		}
 		generated++
-		if !allowedFillCode(ph.Code) || ph.Source != "ai_generated" || ph.WhiteBG != (ph.Code == "A1") || !strings.Contains(ph.AINote, "AI 生成（参考 #") {
+		if !allowedFillCode(ph.Code) || ph.Source != "ai_generated" || ph.WhiteBG != (ph.Code == "A1_AI") || !strings.Contains(ph.AINote, "AI 生成（参考 #") {
 			t.Fatal(ph)
 		}
 		data, err := os.ReadFile(filepath.Join(f.a.Dir(id), filepath.FromSlash(ph.File)))
@@ -287,7 +286,7 @@ func TestFillRulesReferencesStorageCoverageAndLimit(t *testing.T) {
 		}
 		getJPEG(t, f, fmt.Sprintf("/files/products/%d/%s?w=240", id, ph.File), 240, 180)
 	}
-	if generated != 3 {
+	if generated != 2 {
 		t.Fatal(generated)
 	}
 	cov := f.a.coverage(photos)
@@ -308,31 +307,31 @@ func TestFillRulesReferencesStorageCoverageAndLimit(t *testing.T) {
 	if _, err = f.a.enhance(testActor(context.Background()), p); err != nil {
 		t.Fatal(err)
 	}
-	if count.Load() != 3 {
+	if count.Load() != 2 {
 		t.Fatal("existing generated photos were regenerated")
 	}
 	// A separate product with four AI records must never generate a fifth.
 	second := f.product(t)
 	addRealPhoto(t, f, second, "A2", 80, 120)
-	for _, code := range []string{"A1", "E1", "E2", "E3"} {
-		addGeneratedPhoto(t, f, second, code)
+	// 四张旧 AI 图都不在首图位，首图仍要补，但已到上限
+	addGeneratedPhoto(t, f, second, "A1_AI")
+	for i := 0; i < 3; i++ {
+		if _, err := f.a.DB.Exec("INSERT INTO assets(product_id,file,orig_name,width,height,code,ai_generated,source,created_by,created_at) VALUES(?,?,'old.png',64,80,'',1,'ai_generated',1,?)", second, fmt.Sprintf("原图/ai_old%d.png", i), now()); err != nil {
+			t.Fatal(err)
+		}
 	}
 	p, _ = f.a.product(second)
 	warnings, err = f.a.enhance(testActor(context.Background()), p)
-	if err != nil || len(warnings) == 0 || !strings.Contains(strings.Join(warnings, ""), "4 张上限") || count.Load() != 3 {
+	if err != nil || len(warnings) == 0 || !strings.Contains(strings.Join(warnings, ""), "4 张上限") || count.Load() != 2 {
 		t.Fatal(warnings, err, count.Load())
 	}
-	refs := selectReferences([]Photo{{ID: 1, Code: "A1"}, {ID: 2, Code: "A2"}, {ID: 3, Code: "B2"}, {ID: 4, Code: "D2"}, {ID: 5, Code: "F2", AIGenerated: true}}, "D4")
-	hasD := false
+	refs := selectReferences([]Photo{{ID: 1, Code: "D2"}, {ID: 2, Code: "A2"}, {ID: 3, Code: "B2"}, {ID: 4, Code: "A1", Source: "ai_edited"}, {ID: 5, Code: "F2", AIGenerated: true}})
 	for _, ref := range refs {
-		if ref.AIGenerated {
+		if media.AIMade(ref) {
 			t.Fatal("AI reference selected")
 		}
-		if ref.Code == "D2" {
-			hasD = true
-		}
 	}
-	if len(refs) != 3 || !hasD {
+	if len(refs) != 3 || refs[0].Code != "A2" || refs[1].Code != "B2" || refs[2].Code != "D2" {
 		t.Fatal(refs)
 	}
 }
@@ -367,7 +366,7 @@ func TestEnhanceFailuresContinueQueueAndPreserveWarnings(t *testing.T) {
 					t.Fatal(calls.Load(), photos)
 				}
 			} else {
-				if calls.Load() != 6 || len(photos) != 1 {
+				if calls.Load() != 4 || len(photos) != 1 {
 					t.Fatal(calls.Load(), photos)
 				}
 			}
@@ -401,5 +400,46 @@ func TestImageTimeoutAndInvalidBase64(t *testing.T) {
 				t.Fatal(err, calls.Load())
 			}
 		})
+	}
+}
+
+func TestEvidenceSlotsOnlyAcceptRealPhotos(t *testing.T) {
+	photos := []Photo{
+		{ID: 1, Code: "B2", Source: "ai_edited"},
+		{ID: 2, Code: "E1_AI", AIGenerated: true, Source: "ai_generated"},
+		{ID: 3, Code: "E1"},
+		{ID: 4, Code: "B1", Source: "ai_enhanced", AIEnhanced: true},
+		{ID: 5, Code: "C1", Source: "original", SourceOverride: "ai_edited"},
+	}
+	ids := func(list []Photo) string {
+		out := []string{}
+		for _, ph := range list {
+			out = append(out, fmt.Sprint(ph.ID))
+		}
+		return strings.Join(out, ",")
+	}
+	if got := ids(slotHits(slot{Candidates: []string{"B1", "B2"}}, photos)); got != "4" {
+		t.Fatal("evidence slot accepted AI-made photo", got)
+	}
+	if got := ids(slotHits(slot{Candidates: []string{"C1"}}, photos)); got != "" {
+		t.Fatal("source override to AI must leave evidence slot", got)
+	}
+	if got := ids(slotHits(slot{Candidates: []string{"D4", "E1"}}, photos)); got != "3,2" {
+		t.Fatal("real photo must come before AI fill of the same code", got)
+	}
+	for _, c := range []struct {
+		ph Photo
+		ok bool
+	}{
+		{Photo{Code: "E1_AI", AIGenerated: true}, true},
+		{Photo{Code: "D4", AIGenerated: true}, false},
+		{Photo{Code: "D4_AI", AIGenerated: true}, false},
+		{Photo{Code: "A1", AIGenerated: true}, false},
+		{Photo{Code: "B2_AI"}, false},
+		{Photo{Code: "C4_8mm"}, true},
+	} {
+		if err := validatePhoto(c.ph); (err == nil) != c.ok {
+			t.Fatal(c.ph.Code, err)
+		}
 	}
 }

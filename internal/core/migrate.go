@@ -185,6 +185,9 @@ func (a *Core) Migrate(modules []Module) (err error) {
 		return
 	}
 	defaults := map[string]any{"ai_label": Object{"text": "AI 生成", "position": "bottom-right", "size": 14, "color": "#FFFFFF", "opacity": 0.6}, "ai_models": Object{}, "ai_prices": Object{}, "quota_default": Object{"month_images": nil, "month_text": nil}}
+	for k, v := range SettingDefaults {
+		defaults[k] = v
+	}
 	for k, v := range defaults {
 		if _, err = tx.Exec("INSERT OR IGNORE INTO settings(key,value,updated_at) VALUES(?,?,?)", k, JS(v), Now()); err != nil {
 			return

@@ -11,9 +11,34 @@ import (
 
 var CodePattern = regexp.MustCompile(`^[A-Z][1-9][0-9]?(?:_[\p{L}\p{N}_-]+)?$`)
 
+// AISuffix 标出 AI 补的图，和同位置的实拍分开；实拍照片不能用这个后缀。
+const AISuffix = "_AI"
+
+// FillBase 返回 AI 补图编号对应的位置编号：A1_AI → A1。只认 A1、E1、E2、E3。
+func FillBase(code string) (string, bool) {
+	base, ok := strings.CutSuffix(code, AISuffix)
+	if !ok {
+		return "", false
+	}
+	switch base {
+	case "A1", "E1", "E2", "E3":
+		return base, true
+	}
+	return "", false
+}
+
+// AIMade 表示画面由 AI 生成或改过（高清化不算），这类图不能放进实拍证据位。
+func AIMade(p core.Photo) bool {
+	s := p.EffectiveSource()
+	return p.AIGenerated || s == "ai_generated" || s == "ai_edited"
+}
+
 func ValidatePhoto(p core.Photo) error {
-	if p.AIGenerated && p.Code != "" && p.Code != "A1" && p.Code != "E1" && p.Code != "E2" && p.Code != "E3" && p.Code != "D4" {
-		return errors.New("AI 生成照片只能使用 A1、E1、E2、E3、D4 编号")
+	if _, ok := FillBase(p.Code); p.AIGenerated && p.Code != "" && !ok {
+		return errors.New("AI 生成照片只能使用 A1_AI、E1_AI、E2_AI、E3_AI 编号")
+	}
+	if !p.AIGenerated && strings.HasSuffix(p.Code, AISuffix) {
+		return errors.New("_AI 是 AI 补图保留后缀，请换一个拍摄编号")
 	}
 	if p.Code != "" && (!CodePattern.MatchString(p.Code) || utf8.RuneCountInString(p.Code) > 60) {
 		return errors.New("拍摄编号格式不正确")

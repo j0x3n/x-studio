@@ -23,6 +23,9 @@ func validatePhoto(p core.Photo) error {
 	if strings.HasSuffix(p.Code, "_白底") || strings.HasSuffix(p.Code, "_透明") {
 		return errors.New("白底、透明是输出文件保留后缀，请换一个拍摄编号")
 	}
+	if strings.HasSuffix(p.Code, media.AISuffix) {
+		return errors.New("_AI 是 AI 补图保留后缀，请换一个拍摄编号")
+	}
 	p.Code = ""
 	return media.ValidatePhoto(p)
 }

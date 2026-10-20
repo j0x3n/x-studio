@@ -92,6 +92,10 @@ type Router struct {
 	err  error
 }
 
+// TokenRoutes 是可以用个人令牌（Authorization: Bearer）调用的接口，值是令牌必须带的范围。
+// 其他接口只认登录会话，带了令牌也不算登录。
+var TokenRoutes = map[string]string{"POST /api/market/ingest": MarketIngest}
+
 const Public = "@public"
 const LoggedIn = "@login"
 const Scoped = "@scoped"
@@ -146,7 +150,13 @@ func (a *Core) serve(w http.ResponseWriter, r *http.Request) {
 			a.mux.ServeHTTP(w, r)
 			return
 		}
-		u, e := a.authenticate(r)
+		var u User
+		var e error
+		if scope, ok := TokenRoutes[r.Method+" "+r.URL.Path]; ok && a.TokenAuth != nil && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+			u, e = a.TokenAuth(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), scope)
+		} else {
+			u, e = a.authenticate(r)
+		}
 		if e != nil {
 			Fail(w, 401, "请先登录")
 			return

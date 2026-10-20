@@ -26,7 +26,7 @@ func TestConfigImageDefaultsAndReasoning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.VisionModel != "gpt-6-sol" || c.TextModel != "gpt-6-sol" || c.ReasoningEffort != "medium" || c.ImageModel != "gpt-image-2.5-burst" || c.ImageTimeout != 240*time.Second || !c.AutoFill || !c.AutoUpscale || c.UpscaleMinSide != 900 {
+	if c.VisionModel != "gpt-6-sol" || c.TextModel != "gpt-6-sol" || c.ReasoningEffort != "medium" || c.ImageModel != "gpt-image-2.5-sunburst" || c.ImageTimeout != 240*time.Second || !c.AutoFill || !c.AutoUpscale || c.UpscaleMinSide != 900 {
 		t.Fatal("wrong defaults")
 	}
 	t.Setenv("AI_REASONING_EFFORT", "")
@@ -323,7 +323,7 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 			aiReply(w, js([]Object{{"photo_id": ids[0], "code": "B2"}, {"photo_id": ids[1], "code": "F2"}, {"photo_id": ids[2], "code": "C1"}}))
 			return
 		}
-		aiReply(w, js(Object{"content": Object{"name": "测试增强流程", "photos": Object{"hero": Object{"f": "E1.jpg"}, "pack": Object{"f": "F2.jpg"}}, "wear": Object{"big": Object{"f": "D4.jpg"}}, "details": []Object{{"photo": Object{"f": "B2.jpg"}, "title": "细节"}}}, "main": Object{"imgs": []Object{{"n": 1, "f": "D4.jpg"}}}, "listing": Object{"title": "测试耳饰"}}))
+		aiReply(w, js(Object{"content": Object{"name": "测试增强流程", "photos": Object{"hero": Object{"f": "E1_AI.jpg"}, "pack": Object{"f": "F2.jpg"}}, "details": []Object{{"photo": Object{"f": "B2.jpg"}, "title": "细节"}}}, "main": Object{"imgs": []Object{{"n": 1, "f": "E1_AI.jpg"}}}, "listing": Object{"title": "测试耳饰"}}))
 	}))
 	defer s.Close()
 	f := newFixture(t, func(c *Config) {
@@ -348,8 +348,8 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 	if job.Status != "done" || job.Progress != 100 || job.Steps != "check,classify,enhance,retouch,copy,render" {
 		t.Fatal(job)
 	}
-	if imageCalls.Load() != 6 {
-		t.Fatal("expected 3 upscales and 3 fills", imageCalls.Load())
+	if imageCalls.Load() != 5 {
+		t.Fatal("expected 3 upscales and 2 fills", imageCalls.Load())
 	}
 	p, _ := f.a.product(id)
 	if p.Status != "ready" || p.Step != "render" {
@@ -362,7 +362,7 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 		t.Fatal(p.Content)
 	}
 	photos, _ := f.a.photos(id)
-	if len(photos) != 6 {
+	if len(photos) != 5 {
 		t.Fatal(len(photos))
 	}
 	for _, ph := range photos {

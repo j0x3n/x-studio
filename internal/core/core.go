@@ -54,6 +54,9 @@ type Core struct {
 	jobHandlers     map[string]JobHandler
 	closers         []func()
 	moves           [][2]string
+
+	// TokenAuth 由 market 模块设置：按个人令牌找用户，scope 不在令牌范围内要报错。只对 TokenRoutes 里的接口生效。
+	TokenAuth func(token, scope string) (User, error)
 }
 
 func New(c Config, web fs.FS, slots []byte) (*Core, error) {
@@ -67,7 +70,7 @@ func New(c Config, web fs.FS, slots []byte) (*Core, error) {
 		return nil, errors.New("WORKERS 必须在 1–32 之间")
 	}
 	if c.ImageModel == "" {
-		c.ImageModel = "gpt-image-2.5-burst"
+		c.ImageModel = "gpt-image-2.5-sunburst"
 	}
 	if c.ImageTimeout <= 0 {
 		c.ImageTimeout = 240 * time.Second

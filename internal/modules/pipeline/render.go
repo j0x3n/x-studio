@@ -284,7 +284,8 @@ func (a *Module) render(ctx context.Context, p Product) error {
 			}
 		}
 	}
-	for _, c := range []string{"A1", "A2"} {
+	// 实拍抠图优先，没有才用 AI 补的白底
+	for _, c := range []string{"A1", "A2", "A1_AI"} {
 		b, e := os.ReadFile(filepath.Join(a.Dir(p.ID), "照片", c+"_白底.jpg"))
 		if e == nil {
 			if e = os.WriteFile(filepath.Join(tmp, "白底.jpg"), b, 0600); e != nil {
