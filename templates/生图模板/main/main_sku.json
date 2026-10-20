@@ -1,0 +1,35 @@
+{
+  "key": "main_sku",
+  "name": "SKU 图",
+  "kind": "main",
+  "slot": "sku",
+  "categories": [],
+  "purpose": "每个规格一张；礼盒装用实拍包装照（photo 模式由程序判断）",
+  "prompt": "SKU image. The product ({商品}) on a matte mid-grey stone surface with fine natural texture, centered, front view, cool white side light, soft contact shadow, simple and clean, product filling about 55% of the frame.",
+  "style_refs": [],
+  "texts": [],
+  "photo_codes": [
+    "A3",
+    "A1",
+    "A2"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.2,
+    0.3,
+    0.6,
+    0.4
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "800",
+      "w": 800,
+      "h": 800
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true
+}

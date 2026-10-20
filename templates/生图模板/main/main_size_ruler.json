@@ -1,0 +1,30 @@
+{
+  "key": "main_size_ruler",
+  "name": "主图4·刻度尺实拍",
+  "kind": "main",
+  "slot": "main4",
+  "categories": [],
+  "purpose": "只有一个尺寸时：刻度尺实拍，只做高清化和裁切",
+  "prompt": "",
+  "style_refs": [],
+  "texts": [],
+  "photo_codes": [
+    "C1",
+    "C2",
+    "C3"
+  ],
+  "product_mode": "photo",
+  "product_box": null,
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "3x4",
+      "w": 1440,
+      "h": 1920
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true
+}

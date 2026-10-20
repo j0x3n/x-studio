@@ -1,0 +1,19 @@
+/* 数据与运营：/market 数据页、/advice 运营建议 */
+
+.mk-spark { width: 60px; height: 20px; display: block; }
+.mk-spark polyline { fill: none; stroke: var(--primary); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.mk-thumb { width: 40px; height: 40px; border-radius: var(--r-xs); object-fit: cover; background: var(--surface-3); display: block; }
+.mk-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px 12px; }
+.mk-errors { max-height: 180px; overflow-y: auto; padding: 8px 10px; border: 1px solid var(--divider); border-radius: var(--r-md); background: var(--surface-2); display: flex; flex-direction: column; gap: 2px; }
+
+.mk-advice { display: flex; flex-direction: column; }
+.mk-card { display: flex; flex-direction: column; gap: 10px; padding: 12px var(--card-p); }
+.mk-card + .mk-card { border-top: 1px solid var(--divider); }
+.mk-cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; }
+.mk-col { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.mk-col ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-13); }
+.mk-explain { padding: 8px 10px; border-left: 2px solid var(--primary); background: var(--surface-2); border-radius: 0 var(--r-sm) var(--r-sm) 0; line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .mk-cols { grid-template-columns: 1fr; }
+}

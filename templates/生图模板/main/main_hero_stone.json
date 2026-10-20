@@ -1,0 +1,41 @@
+{
+  "key": "main_hero_stone",
+  "name": "首图·中灰石材",
+  "kind": "main",
+  "slot": "main1",
+  "categories": [],
+  "purpose": "首图 A/B，商品居中偏下，画面不加字；角上的小水印导出时由程序加",
+  "prompt": "Hero image. The exact product ({商品}) lies on a matte mid-grey stone surface with fine natural texture, seen from a slightly elevated three-quarter angle. Cool white light from the left side, crisp but soft directional shadow falling to the right, the far edge of the stone falling off into darkness. Plenty of calm empty space above the product. Shallow depth of field on the far background only; the product is fully sharp.",
+  "style_refs": [],
+  "texts": [],
+  "photo_codes": [
+    "A1",
+    "A2",
+    "E4",
+    "B2"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.22,
+    0.34,
+    0.56,
+    0.36
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "3x4",
+      "w": 1440,
+      "h": 1920
+    },
+    {
+      "name": "1x1",
+      "w": 1440,
+      "h": 1440
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true
+}

@@ -1,0 +1,34 @@
+{
+  "key": "main_wear",
+  "name": "主图2·上身",
+  "kind": "main",
+  "slot": "main2",
+  "categories": [],
+  "purpose": "上身效果：项链下巴到胸口，耳饰耳朵到下颌，手链手腕到小臂",
+  "prompt": "On-body image. The model wears the product ({商品}). {模特} Charcoal knit sweater, dark blue-grey backdrop, side light, low-key and calm. The pose is relaxed and natural, as if caught between movements. Crop: necklace from chin to chest, earrings from ear to jawline, bracelet from wrist to forearm, ring on a relaxed hand.",
+  "style_refs": [],
+  "texts": [],
+  "photo_codes": [
+    "A1",
+    "A2",
+    "B2"
+  ],
+  "product_mode": "model",
+  "product_box": null,
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "3x4",
+      "w": 1440,
+      "h": 1920
+    }
+  ],
+  "count": 1,
+  "wear": {
+    "slot": "female_main",
+    "body_part": "auto",
+    "framing": "half_body"
+  },
+  "version": 1,
+  "enabled": true
+}

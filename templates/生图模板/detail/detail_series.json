@@ -1,0 +1,41 @@
+{
+  "key": "detail_series",
+  "name": "第6屏·同系列",
+  "kind": "detail",
+  "slot": "d6",
+  "categories": [],
+  "purpose": "搭配推荐；同系列商品的关联做好前先不启用",
+  "prompt": "Series screen. The exact product lies on a matte mid-grey stone surface with fine natural texture together with empty space for its matching pieces, cool side light, calm arrangement. A short line of text in a Song serif typeface at the top.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "lead",
+      "from": "content.relatedLead",
+      "max": 24,
+      "critical": false
+    }
+  ],
+  "photo_codes": [
+    "A1",
+    "A2"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.15,
+    0.4,
+    0.4,
+    0.3
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": false
+}

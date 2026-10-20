@@ -1,0 +1,36 @@
+{
+  "key": "main_spec",
+  "name": "主图5·规格并排",
+  "kind": "main",
+  "slot": "main5",
+  "categories": [],
+  "purpose": "SKU 并排或包装，商品像素锁定",
+  "prompt": "All variants of the product ({商品}, colors: {颜色}) lie side by side on a matte mid-grey stone surface with fine natural texture, evenly spaced, seen from above at a slight angle. Cool white side light, soft shadows, calm and orderly composition, generous margin around the group.",
+  "style_refs": [],
+  "texts": [],
+  "photo_codes": [
+    "A3",
+    "F2",
+    "F1",
+    "E4"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.12,
+    0.3,
+    0.76,
+    0.4
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "3x4",
+      "w": 1440,
+      "h": 1920
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true
+}

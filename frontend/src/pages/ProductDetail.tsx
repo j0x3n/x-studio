@@ -12,10 +12,11 @@ import { fmtAgo, money, productStatus, pipelineStatus, listingStatus, sourceName
 import { useCategories, missingAttrs, emptyValue, attrText } from '../lib/categories'
 import { AttrFields } from '../components/AttrFields'
 import { useLightbox } from '../components/Lightbox'
+import { CreativeTab } from '../components/CreativeTab'
 
 type Detail = { product: Product; assets: Asset[] }
 type ListingDetail = { listing: Listing; job: Job | null; outputs: { main34: string[]; main11: string[]; detail: string[]; white: string; zip: string } }
-type TabKey = 'assets' | 'listings' | 'info' | 'stock' | 'tasks'
+type TabKey = 'assets' | 'listings' | 'creative' | 'info' | 'stock' | 'tasks'
 
 const STEP: Record<string, string> = { check: '检查照片', classify: 'AI 分拣', enhance: '补图和高清化', retouch: '修图', copy: '写文案', render: '出图' }
 
@@ -72,6 +73,7 @@ export function ProductDetail() {
         <Tabs value={tab} onChange={setTab} items={[
           { key: 'assets', label: '素材', count: photos.length },
           { key: 'listings', label: '店铺版本', count: p.listings.length },
+          ...(can('creative.run') && me?.role.scope !== 'shares' ? [{ key: 'creative' as const, label: 'AI 出图' }] : []),
           { key: 'info', label: '基础信息' },
           ...(can('inventory.view') ? [{ key: 'stock' as const, label: '库存' }] : []),
           ...(canTasks ? [{ key: 'tasks' as const, label: '任务', count: tasks?.filter(t => t.status !== 'done' && t.status !== 'canceled').length }] : [])
@@ -88,6 +90,7 @@ export function ProductDetail() {
             )}
           </div>
         )}
+        {tab === 'creative' && <CreativeTab product={p} />}
         {tab === 'info' && <InfoTab product={p} onChange={load} />}
         {tab === 'stock' && <ProductStock product={p} />}
         {tab === 'tasks' && <TasksTab product={p} tasks={tasks} onChange={loadTasks} />}

@@ -1,0 +1,51 @@
+{
+  "key": "detail_care",
+  "name": "第8屏·保养售后",
+  "kind": "detail",
+  "slot": "d8",
+  "categories": [],
+  "purpose": "不放商品；保养要点、发货退换、「以实物为准」",
+  "prompt": "Care and service screen without any product. A quiet charcoal background with a very subtle fabric texture. Two short sections of text set like a printed booklet: a section title in a Song serif typeface, then short lines in light sans-serif with generous line spacing. A thin hairline between the two sections.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "care_title",
+      "from": "literal:保养",
+      "max": 4,
+      "critical": false
+    },
+    {
+      "key": "care",
+      "from": "content.care",
+      "max": 120,
+      "critical": false
+    },
+    {
+      "key": "service_title",
+      "from": "literal:发货与售后",
+      "max": 6,
+      "critical": false
+    },
+    {
+      "key": "service",
+      "from": "content.service",
+      "max": 120,
+      "critical": false
+    }
+  ],
+  "photo_codes": [],
+  "product_mode": "none",
+  "product_box": null,
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true
+}

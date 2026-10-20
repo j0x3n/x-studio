@@ -1,0 +1,49 @@
+{
+  "key": "detail_pack",
+  "name": "第7屏·包装",
+  "kind": "detail",
+  "slot": "d7",
+  "categories": [],
+  "purpose": "包装实拍矩形锁定；99 元以下束口袋，以上抽屉盒，礼盒 SKU 用礼盒（拍什么用什么）",
+  "prompt": "Packaging screen. The locked real photograph of the packaging (do not touch it) sits in the upper two thirds. Below it, on a charcoal background, one line of text in a Song serif typeface and a short list of what is included in small light sans-serif text, separated by thin dots.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "lead",
+      "from": "content.pack.lead",
+      "max": 24,
+      "critical": false
+    },
+    {
+      "key": "items",
+      "from": "content.pack.items",
+      "max": 30,
+      "critical": false
+    }
+  ],
+  "photo_codes": [
+    "F2",
+    "F1",
+    "E4"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.06,
+    0.04,
+    0.88,
+    0.62
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true,
+  "lock_shape": "rect"
+}

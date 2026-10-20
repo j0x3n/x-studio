@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LayoutTemplate, Star, Ban, RotateCcw, Sparkles, Check, ExternalLink, Layers } from 'lucide-react'
 import { api, qs } from '../lib/api'
@@ -8,10 +8,20 @@ import { useListingRefs } from '../lib/listings'
 import { useCategories } from '../lib/categories'
 import type { DetailTemplate, RenderState } from '../lib/types'
 import { Topbar, Pill, Loading, Empty, Drawer } from '../components/ui'
+import { CreativeTemplates } from '../components/CreativeTemplates'
 
 type Templates = { detail: DetailTemplate[]; main: { key: string; name: string; file: string }[] }
 
+// 模板中心：生图模板（AI 出图用，默认）和旧的 HTML 详情页模板（停用但保留）
 export function TemplateCenter() {
+  const { can } = useAuth()
+  const ai = can('creative.run')
+  const [mode, setMode] = useState<'ai' | 'html'>(ai ? 'ai' : 'html')
+  const switcher = ai ? <div className="segmented"><button className={mode === 'ai' ? 'active' : ''} onClick={() => setMode('ai')}>生图模板</button><button className={mode === 'html' ? 'active' : ''} onClick={() => setMode('html')}>HTML 模板（旧）</button></div> : null
+  return mode === 'ai' ? <CreativeTemplates switcher={switcher} /> : <HtmlTemplates switcher={switcher} />
+}
+
+function HtmlTemplates({ switcher }: { switcher: ReactNode }) {
   const { me, can } = useAuth()
   const toast = useToast()
   const nav = useNavigate()
@@ -67,7 +77,7 @@ export function TemplateCenter() {
   const effective = state?.settings.effective_detail_template
   return (
     <>
-      <Topbar crumbs={['模板中心', ...(t ? [t.name] : [])]} />
+      <Topbar crumbs={['模板中心', ...(t ? [t.name] : [])]}>{switcher}</Topbar>
       <div className="lib">
         <aside className="sidebar lib-filters">
           {shops.length > 0 && (

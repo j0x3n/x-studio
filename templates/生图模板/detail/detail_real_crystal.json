@@ -1,0 +1,62 @@
+{
+  "key": "detail_real_crystal",
+  "name": "第2屏·水晶真假",
+  "kind": "detail",
+  "slot": "d2",
+  "categories": [
+    "crystal"
+  ],
+  "purpose": "水晶的材质对比屏，内容由水晶品类规则写进 content.real",
+  "prompt": "Comparison screen. The upper half is the locked real macro photograph of the crystal beads (do not touch it). The lower half is a calm charcoal background with a clean three-column comparison laid out like a printed magazine table with thin hairline dividers, no boxes, no icons. Title at the top of the lower half in a Song serif typeface.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "title",
+      "from": "content.real.title",
+      "max": 10,
+      "critical": false
+    },
+    {
+      "key": "cols",
+      "from": "content.real.cols",
+      "max": 40,
+      "critical": false
+    },
+    {
+      "key": "row1",
+      "from": "content.real.rows.0",
+      "max": 50,
+      "critical": false
+    },
+    {
+      "key": "row2",
+      "from": "content.real.rows.1",
+      "max": 50,
+      "critical": false
+    }
+  ],
+  "photo_codes": [
+    "E5",
+    "B1"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.06,
+    0.04,
+    0.88,
+    0.46
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true,
+  "lock_shape": "rect"
+}

@@ -1,0 +1,49 @@
+{
+  "key": "detail_size",
+  "name": "第5屏·尺寸参数",
+  "kind": "detail",
+  "slot": "d5",
+  "categories": [],
+  "purpose": "刻度尺实拍矩形锁定加参数表；参数逐字核对，不过不能导出",
+  "prompt": "Size and specification screen. The upper part is the locked real photograph of the product next to a ruler (do not touch it). Below it, on a charcoal background, a clean two-column specification list with hairline dividers, label on the left in light grey, value on the right in off-white, set like a printed spec sheet. One line of small caption text at the bottom.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "params",
+      "from": "content.params",
+      "max": 120,
+      "critical": true
+    },
+    {
+      "key": "tip",
+      "from": "content.sizeTip",
+      "max": 40,
+      "critical": false
+    }
+  ],
+  "photo_codes": [
+    "C1",
+    "C2",
+    "C3"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.06,
+    0.04,
+    0.88,
+    0.44
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true,
+  "lock_shape": "rect"
+}

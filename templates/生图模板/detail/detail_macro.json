@@ -1,0 +1,51 @@
+{
+  "key": "detail_macro",
+  "name": "第3屏·细节微距",
+  "kind": "detail",
+  "slot": "d3",
+  "categories": [],
+  "purpose": "2–3 张微距，每张一个细节，含 925 钢印；照片矩形锁定",
+  "prompt": "Detail screen. The locked real macro photograph fills most of the frame (do not touch it). Below it, on a charcoal background, a short title in a Song serif typeface and one line of small light sans-serif text, left aligned, generous margins.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "title",
+      "from": "content.details.{i}.title",
+      "max": 8,
+      "critical": false
+    },
+    {
+      "key": "text",
+      "from": "content.details.{i}.text",
+      "max": 40,
+      "critical": false
+    }
+  ],
+  "photo_codes": [
+    "B2",
+    "B3",
+    "B4",
+    "B5",
+    "B6"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.0,
+    0.0,
+    1.0,
+    0.78
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 3,
+  "wear": null,
+  "version": 1,
+  "enabled": true,
+  "lock_shape": "rect"
+}

@@ -1,0 +1,39 @@
+{
+  "key": "detail_about",
+  "name": "第9屏·关于我们",
+  "kind": "detail",
+  "slot": "d9",
+  "categories": [],
+  "purpose": "深蓝 #1A2340 品牌屏，不放商品",
+  "prompt": "Brand screen without any product. Solid deep navy background (#1A2340) with very subtle paper grain. Centered: a small gold \"MYSTIC LUSTRE\" wordmark in letterspaced capitals, a thin gold hairline under it, then three short lines of off-white text in a Song serif typeface with generous line spacing. Everything else is empty.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "brand",
+      "from": "literal:MYSTIC LUSTRE",
+      "max": 14,
+      "critical": false
+    },
+    {
+      "key": "about",
+      "from": "content.about",
+      "max": 60,
+      "critical": false
+    }
+  ],
+  "photo_codes": [],
+  "product_mode": "none",
+  "product_box": null,
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true
+}

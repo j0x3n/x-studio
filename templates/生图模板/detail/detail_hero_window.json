@@ -1,0 +1,49 @@
+{
+  "key": "detail_hero_window",
+  "name": "首屏·窗边氛围",
+  "kind": "detail",
+  "slot": "d1",
+  "categories": [],
+  "purpose": "窗台上的炭灰毛衣，阴天冷光",
+  "prompt": "Opening screen. The exact product rests on a folded charcoal-grey knit sweater on a windowsill, overcast cool daylight from the window on the left, rain-grey sky softly out of focus, muted dark tones, quiet mood. The product name {款名} is set in a large Song serif typeface in off-white in the upper empty area, the one-line description in small light sans-serif text below it.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "name",
+      "from": "content.name",
+      "max": 6,
+      "critical": false
+    },
+    {
+      "key": "one_liner",
+      "from": "content.oneLiner",
+      "max": 30,
+      "critical": false
+    }
+  ],
+  "photo_codes": [
+    "A1",
+    "A2",
+    "E4"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.25,
+    0.55,
+    0.5,
+    0.3
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true,
+  "hero_style": "window"
+}

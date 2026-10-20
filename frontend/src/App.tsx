@@ -32,6 +32,9 @@ import { Finance } from './pages/Finance'
 import { Assembly } from './pages/Assembly'
 import { Replenishment } from './pages/Replenishment'
 import { DocumentImport } from './pages/DocumentImport'
+import { CreativeReview } from './pages/CreativeReview'
+import { Market } from './pages/Market'
+import { Advice } from './pages/Advice'
 
 // 占位页（目前只用于地址不存在）
 function Soon({ title, desc }: { title: string; desc: string }) {
@@ -62,6 +65,9 @@ export function App() {
         <Route path="copy" element={<CopyCenter />} />
         <Route path="templates" element={<TemplateCenter />} />
         <Route path="review" element={<Review />} />
+        <Route path="creative/review" element={<CreativeReview />} />
+        <Route path="market" element={<Market />} />
+        <Route path="advice" element={<Advice />} />
         <Route path="tasks/:id?" element={<Tasks />} />
         <Route path="guide" element={<Navigate to="/kb/shooting-guide" replace />} />
         <Route path="inventory" element={<Inventory />} />

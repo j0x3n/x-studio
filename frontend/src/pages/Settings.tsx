@@ -5,6 +5,7 @@ import { useToast, errText } from '../lib/toast'
 import { Topbar, Loading, Field, Tabs } from '../components/ui'
 import { CategoriesTab } from './Categories'
 import { TaskRulesTab } from './TaskRules'
+import { CreativeSettingsTab, MarketSettingsTab } from '../components/CreativeSettings'
 
 type Settings = { ai_models?: Record<string, string>; ai_prices?: Record<string, number>; quota_default?: { month_images: number | null; month_text: number | null } }
 type ItemCodeRule = { prefix: string; date: 'none' | 'day' | 'month' | 'year'; separator: string; digits: number; start: number }
@@ -34,9 +35,11 @@ const FEATURES: Record<string, string> = {
 }
 
 export function SettingsPage() {
-  const [tab, setTab] = useState<'general' | 'codes' | 'categories' | 'rules'>('general')
-  const tabs = <Tabs value={tab} onChange={setTab} items={[{ key: 'general', label: '通用' }, { key: 'codes', label: '编码' }, { key: 'categories', label: '品类' }, { key: 'rules', label: '自动派活' }]} />
+  const [tab, setTab] = useState<'general' | 'codes' | 'categories' | 'rules' | 'creative' | 'market'>('general')
+  const tabs = <Tabs value={tab} onChange={setTab} items={[{ key: 'general', label: '通用' }, { key: 'codes', label: '编码' }, { key: 'categories', label: '品类' }, { key: 'rules', label: '自动派活' }, { key: 'creative', label: 'AI 出图' }, { key: 'market', label: '数据与运营' }]} />
   if (tab === 'codes') return <CodeSettings tabs={tabs} />
+  if (tab === 'creative') return <CreativeSettingsTab tabs={tabs} />
+  if (tab === 'market') return <MarketSettingsTab tabs={tabs} />
   if (tab === 'categories') return (
     <>
       <Topbar title="设置" sub="品类改完立即生效，新的分拣、文案和出图按新设置来" />

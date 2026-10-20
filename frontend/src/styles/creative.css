@@ -1,0 +1,55 @@
+/* AI 出图：商品详情「AI 出图」标签页、复核队列、生图模板。按 clean 预设，扁平、紧凑 */
+
+.cr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; }
+.cr-grid.sm { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+.cr-card { display: flex; flex-direction: column; gap: 4px; padding: 0 0 6px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); overflow: hidden; text-align: left; font: inherit; color: inherit; cursor: pointer; min-width: 0; }
+.cr-card:hover { border-color: var(--border-strong); }
+.cr-card.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.cr-card.old { opacity: .72; }
+.cr-img { position: relative; aspect-ratio: 3 / 4; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
+.cr-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cr-variant { position: absolute; left: 6px; top: 6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: var(--r-xs); background: rgba(17, 24, 39, .72); color: #fff; font-size: var(--fs-11); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.cr-flag { position: absolute; right: 6px; top: 6px; height: 20px; padding: 0 6px; border-radius: var(--r-xs); background: var(--danger); color: #fff; font-size: var(--fs-11); display: inline-flex; align-items: center; gap: 3px; }
+.cr-flag svg { width: 12px; height: 12px; }
+.cr-meta { display: flex; align-items: center; gap: 6px; padding: 0 8px; min-width: 0; }
+.cr-mid { color: var(--warning-text); }
+.cr-low { color: var(--danger-text); }
+
+.cr-compare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; align-items: start; }
+.cr-compare figure { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cr-compare figcaption { font-size: var(--fs-12); color: var(--text-3); min-height: 20px; }
+.cr-srcs { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.cr-srcs:has(> :nth-child(2)) { grid-template-columns: 1fr 1fr; }
+.cr-srcs img { width: 100%; display: block; border-radius: var(--r-sm); background: var(--surface-2); }
+.cr-out { position: relative; border-radius: var(--r-sm); overflow: hidden; background: var(--surface-2); }
+.cr-out img { width: 100%; display: block; cursor: zoom-in; }
+.cr-box { position: absolute; border: 2px solid var(--danger); border-radius: 2px; pointer-events: none; }
+.cr-box em { position: absolute; left: -2px; top: -18px; height: 16px; min-width: 16px; padding: 0 3px; background: var(--danger); color: #fff; font-size: 10px; font-style: normal; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; border-radius: 2px 2px 0 0; }
+.cr-none { aspect-ratio: 3 / 4; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--border); border-radius: var(--r-sm); padding: 12px; text-align: center; }
+
+.cr-checks td, .cr-checks th { padding-top: 6px; padding-bottom: 6px; }
+.cr-issues { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-13); }
+.cr-issues li .tag { margin-right: 6px; }
+.cr-text { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid var(--divider); border-radius: var(--r-md); }
+
+/* 复核队列 */
+.cr-queue { width: 280px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; scrollbar-width: thin; }
+.cr-q { display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border: 0; border-bottom: 1px solid var(--divider); background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.cr-q:hover { background: var(--surface-2); }
+.cr-q.active { background: var(--primary-50); box-shadow: inset 2px 0 0 var(--primary); }
+.cr-q img, .cr-q-ph { width: 48px; height: 64px; object-fit: cover; border-radius: var(--r-xs); background: var(--surface-3); flex-shrink: 0; }
+.cr-stage { padding: 16px var(--page-x); max-width: 1100px; }
+.cr-inspector { width: 380px; }
+.cr-inspector .btn .kbd { margin-left: 4px; }
+
+/* 生图模板 */
+.cr-tpl-box { position: relative; width: 120px; aspect-ratio: 2 / 3; background: var(--surface-3); border-radius: var(--r-sm); }
+.cr-tpl-box span { position: absolute; border: 1.5px dashed var(--primary); background: var(--primary-50); }
+.cr-prompt { font-family: var(--font-mono); font-size: var(--fs-12); line-height: 1.55; min-height: 180px; }
+
+@media (max-width: 1100px) {
+  .cr-compare { grid-template-columns: 1fr; }
+  .cr-queue { width: 220px; }
+}
+
+.input.input-sm { height: var(--h-control-sm); font-size: var(--fs-12); padding: 0 8px; }

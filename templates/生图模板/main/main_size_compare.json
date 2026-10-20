@@ -1,0 +1,41 @@
+{
+  "key": "main_size_compare",
+  "name": "主图4·多尺寸上身对比",
+  "kind": "main",
+  "slot": "main4",
+  "categories": [],
+  "purpose": "有 2 个以上尺寸时：同一位模特同一侧，每个尺寸一张，图上写 mm；强制人工审",
+  "prompt": "Size comparison image. The same model, the same ear (or neck, or wrist), the same pose, camera distance and lighting as the other images of this series, wearing the product in size {尺寸}. {模特} Dark blue-grey backdrop, charcoal knit, side light. The product size must be physically correct relative to the body: {佩戴位置} In the lower left corner, small light sans-serif label with the size.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "mm",
+      "from": "size.label",
+      "max": 12,
+      "critical": true
+    }
+  ],
+  "photo_codes": [
+    "A1",
+    "A2"
+  ],
+  "product_mode": "model",
+  "product_box": null,
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "3x4",
+      "w": 1440,
+      "h": 1920
+    }
+  ],
+  "count": 1,
+  "wear": {
+    "slot": "female_main",
+    "body_part": "auto",
+    "framing": "closeup"
+  },
+  "version": 1,
+  "enabled": true,
+  "size_compare": true
+}

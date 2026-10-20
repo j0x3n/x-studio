@@ -1,0 +1,56 @@
+{
+  "key": "detail_hero_vertical",
+  "name": "首屏·竖排大字",
+  "kind": "detail",
+  "slot": "d1",
+  "categories": [],
+  "purpose": "深色石头配硬侧光，款名竖排大字压在暗部",
+  "prompt": "Opening screen, poster style. The exact product lies on a dark slate stone in the lower right third, hit by a hard narrow side light from the right, the rest of the frame falling into deep shadow. In the dark empty upper left area, the product name {款名} is set vertically in a large elegant Song serif typeface in off-white, with the English name {英文名} in small letterspaced capitals beside it, and the one-line description in small light sans-serif text below. Subtle film grain.",
+  "style_refs": [],
+  "texts": [
+    {
+      "key": "name",
+      "from": "content.name",
+      "max": 6,
+      "critical": false
+    },
+    {
+      "key": "name_en",
+      "from": "content.nameEn",
+      "max": 24,
+      "critical": false
+    },
+    {
+      "key": "one_liner",
+      "from": "content.oneLiner",
+      "max": 30,
+      "critical": false
+    }
+  ],
+  "photo_codes": [
+    "A1",
+    "A2",
+    "E4",
+    "B2"
+  ],
+  "product_mode": "pixel_lock",
+  "product_box": [
+    0.45,
+    0.55,
+    0.45,
+    0.32
+  ],
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true,
+  "hero_style": "vertical"
+}

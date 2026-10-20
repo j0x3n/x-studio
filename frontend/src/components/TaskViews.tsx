@@ -73,12 +73,12 @@ export function TaskMiniList({ items, onOpen, empty }: { items: Task[]; onOpen: 
 }
 
 // ---------- 新建 ----------
-export function NewTaskDrawer({ target, onClose, onCreated }: { target?: Target | null; onClose: () => void; onCreated: (t: Task) => void }) {
+export function NewTaskDrawer({ target, initial, onClose, onCreated }: { target?: Target | null; initial?: { title?: string; body?: string }; onClose: () => void; onCreated: (t: Task) => void }) {
   const { me, can, isAdmin } = useAuth()
   const toast = useToast()
   const manage = isAdmin || can('task.manage')
   const people = useAssignees(target)
-  const [f, setF] = useState({ title: '', body: '', priority: 'normal' as TaskPriority, assignee_id: String(me?.user.id || ''), due: '', checklist: '' })
+  const [f, setF] = useState({ title: initial?.title || '', body: initial?.body || '', priority: 'normal' as TaskPriority, assignee_id: String(me?.user.id || ''), due: '', checklist: '' })
   const [busy, setBusy] = useState(false)
   const set = (k: keyof typeof f, v: string) => setF(x => ({ ...x, [k]: v }))
   const save = async () => {

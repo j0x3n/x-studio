@@ -4,7 +4,7 @@ import { api, qs } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import { fenToInput, toFen, type InvItem, type Batch } from '../lib/inventory'
-import { chinaDate, money, returnAction, type Order, type ReturnAction } from '../lib/commerce'
+import { chinaDate, money, returnAction, returnReason, type Order, type ReturnAction } from '../lib/commerce'
 import { Drawer, Field } from './ui'
 import { ItemPicker, useWarehouses } from './InventoryForms'
 
@@ -86,7 +86,7 @@ export function ReturnForm({ value, onClose, onDone }: { value: Order; onClose: 
   const warehouses = (items || []).filter(w => w.type !== 'dropship')
   const [refund, setRefund] = useState('')
   const [reason, setReason] = useState('')
-  const [rows, setRows] = useState(value.lines.map(l => ({ line_id: l.id, qty: '0', action: 'restock' as ReturnAction, warehouse_id: 0 })))
+  const [rows, setRows] = useState(value.lines.map(l => ({ line_id: l.id, qty: '0', action: 'restock' as ReturnAction, warehouse_id: 0, reason_code: '' })))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const refunded = value.returns.reduce((s, r) => s + r.refund_amount, 0)
@@ -97,7 +97,7 @@ export function ReturnForm({ value, onClose, onDone }: { value: Order; onClose: 
   return <Drawer title={`登记售后 · ${value.no}`} width={780} onClose={() => { if (!busy) onClose() }} foot={<><button className="btn btn-secondary" disabled={busy} onClick={onClose}>取消</button><button className="btn btn-primary" disabled={busy || !valid} onClick={submit}>{busy ? '登记中…' : '确认登记售后'}</button></>}>
     <Field label={`本次退款（${value.currency}）`} hint={`已退 ${money(refunded, value.currency)}，最多还可退 ${money(maxRefund, value.currency)}`}><input className="input mono" type="number" min={0} max={maxRefund / 100} step="0.01" value={refund} onChange={e => setRefund(e.target.value)} /></Field>
     <div className="help">只退款时，各行数量留 0 即可。填写数量时会累计售后件数；回仓按原发货成本与等级入库，报损和不退货退款不增加库存。</div>
-    {value.lines.map((l, i) => <section className="commerce-receipt" key={l.id}><div className="inline"><span className="mono">{l.code}</span><strong>{l.title}</strong><span className="grow" /><span className="t3 mono">剩余可处理 {l.qty - l.returned_qty}</span></div><div className="commerce-form-three"><Field label="本次数量"><input className="input mono" type="number" min={0} max={l.qty - l.returned_qty} step={1} value={rows[i].qty} onChange={e => upd(i, { qty: e.target.value })} /></Field><Field label="处理方式"><select className="input" value={rows[i].action} onChange={e => upd(i, { action: e.target.value as ReturnAction })}>{Object.entries(returnAction).map(([k, label]) => <option key={k} value={k}>{label}</option>)}</select></Field><Field label="回仓仓库"><select className="input" disabled={rows[i].action !== 'restock'} value={rows[i].warehouse_id} onChange={e => upd(i, { warehouse_id: Number(e.target.value) })}><option value={0}>选择仓库</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field></div></section>)}
+    {value.lines.map((l, i) => <section className="commerce-receipt" key={l.id}><div className="inline"><span className="mono">{l.code}</span><strong>{l.title}</strong><span className="grow" /><span className="t3 mono">剩余可处理 {l.qty - l.returned_qty}</span><select className="input" style={{ width: 130 }} aria-label={`第${i + 1}行退货原因`} value={rows[i].reason_code} onChange={e => upd(i, { reason_code: e.target.value })}><option value="">退货原因（选填）</option>{Object.entries(returnReason).map(([k, label]) => <option key={k} value={k}>{label}</option>)}</select></div><div className="commerce-form-three"><Field label="本次数量"><input className="input mono" type="number" min={0} max={l.qty - l.returned_qty} step={1} value={rows[i].qty} onChange={e => upd(i, { qty: e.target.value })} /></Field><Field label="处理方式"><select className="input" value={rows[i].action} onChange={e => upd(i, { action: e.target.value as ReturnAction })}>{Object.entries(returnAction).map(([k, label]) => <option key={k} value={k}>{label}</option>)}</select></Field><Field label="回仓仓库"><select className="input" disabled={rows[i].action !== 'restock'} value={rows[i].warehouse_id} onChange={e => upd(i, { warehouse_id: Number(e.target.value) })}><option value={0}>选择仓库</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field></div></section>)}
     <Field label="售后原因"><textarea className="textarea" rows={3} maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></Field>{error && <div className="form-err" role="alert">{error}</div>}
   </Drawer>
 }

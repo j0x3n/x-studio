@@ -28,3 +28,4 @@
 - 本轮用户要求减少测试与额度占用，全部开发完成后统一手动验证；三期已于 2026-10-21 按 `手动验收-三期经营.md` 验收通过。知识库助手/经营派活已恢复整合，不要重复合并历史暂停分支。
 - AI 工作流改造（AI 主图、模特、生图屏模板、三层复核、数据与运营）按 [AI工作流改造方案.md](AI工作流改造方案.md) 来做；这一块的分工以方案第 7 节为准，契约见 [接口约定-AI出图.md](接口约定-AI出图.md)、[接口约定-数据与运营.md](接口约定-数据与运营.md)。AI 补图编号带 `_AI` 后缀，实拍证据位不收 AI 生成或改过的图（`internal/media`）；生图只能用三种尺寸，生成后要核对返回尺寸。
 - 分工和并行规则见 [并行开发规则.md](并行开发规则.md)：当前模式是 Codex / Grok Build / agy 并行实施，Claude 选模块分派并审核整合（第 0 节）。
+- AI 出图 / 数据与运营（阶段 1 进行中，见交接说明 2.8）：契约 `接口约定-AI出图.md`、`接口约定-数据与运营.md`；前端 `lib/creative.ts`、`lib/market.ts`（含假数据，`localStorage xs-mock=1`）、`components/Creative*.tsx`、`pages/{CreativeReview,Market,Advice}.tsx`；生图模板 `templates/生图模板/`（字段扩展见其 README）；提示词 `prompts/生图-*.md`。

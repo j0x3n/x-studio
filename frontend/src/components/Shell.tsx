@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, ChevronDown, BookOpen, Boxes, ShoppingCart, Truck, Contact, UserRound, Shirt, Hammer, Wallet, PackagePlus, ScanLine, type LucideIcon } from 'lucide-react'
+import { Gem, Sun, ListTodo, Package, Images, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, ChevronDown, BookOpen, Boxes, ShoppingCart, Truck, Contact, UserRound, Shirt, Hammer, Wallet, PackagePlus, ScanLine, ScanEye, LineChart, Lightbulb, type LucideIcon } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { AssistantProvider, useAssistant } from '../lib/assistant'
@@ -28,9 +28,12 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     { to: '/tryon', label: 'AI 试穿试戴', icon: Shirt, allPerm: ['model.view', 'asset.process', 'asset.upload'], internal: true },
     { to: '/copy', label: '文案', icon: PenLine, perm: 'copy.view' },
     { to: '/templates', label: '模板', icon: LayoutTemplate, perm: 'product.view' },
+    { to: '/creative/review', label: '复核队列', icon: ScanEye, perm: 'creative.review', internal: true },
     { to: '/review', label: '出图审核', icon: ClipboardCheck, perm: 'render.review', badge: 'review' }
   ] },
   { label: '经营', items: [
+    { to: '/market', label: '数据', icon: LineChart, perm: 'market.view', internal: true },
+    { to: '/advice', label: '运营建议', icon: Lightbulb, perm: 'ops.advice', internal: true },
     { to: '/inventory', label: '库存', icon: Boxes, perm: 'inventory.view' },
     { to: '/replenishment', label: '补货建议', icon: PackagePlus, perm: 'inventory.view', internal: true },
     { to: '/assembly', label: '组装加工', icon: Hammer, perm: 'inventory.view', internal: true },

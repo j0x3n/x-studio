@@ -1,0 +1,34 @@
+{
+  "key": "detail_wear",
+  "name": "第4屏·上身",
+  "kind": "detail",
+  "slot": "d4",
+  "categories": [],
+  "purpose": "正面、侧面、搭配，模特图",
+  "prompt": "On-body screen, full-bleed photograph. The model wears the product ({商品}). {模特} Charcoal or black knit, dark blue-grey backdrop, cool side light, low-key, editorial magazine feel. Image {i} of the series: 1 = front view, 2 = side view at 45 degrees, 3 = styled with a simple dark outfit. Never show the full face.",
+  "style_refs": [],
+  "texts": [],
+  "photo_codes": [
+    "A1",
+    "A2",
+    "B2"
+  ],
+  "product_mode": "model",
+  "product_box": null,
+  "gen_size": "1024x1536",
+  "export": [
+    {
+      "name": "750",
+      "w": 750,
+      "h": 0
+    }
+  ],
+  "count": 2,
+  "wear": {
+    "slot": "female_main",
+    "body_part": "auto",
+    "framing": "half_body"
+  },
+  "version": 1,
+  "enabled": true
+}
