@@ -30,7 +30,7 @@ func TestCreativeResponseImagesJobsAndStats(t *testing.T) {
 	f.exec(t, "INSERT INTO creative_calibration(category,total,agree,open,updated_at) VALUES('earring',10,9,0,?)", core.Now())
 	f.exec(t, "INSERT INTO creative_suggestions(listing_id,set_id,slot,reason_code,count,created_at,updated_at) VALUES(?,?,'d1','smaller',2,?,?)", f.listingID, set.ID, core.Now(), core.Now())
 	stats := f.request(t, "GET", "/api/creative/stats", nil, 200)
-	if len(stats) != 2 || stats["categories"] == nil || stats["suggestions"] == nil {
+	if stats["categories"] == nil || stats["suggestions"] == nil || stats["by_model"] == nil {
 		t.Fatal(stats)
 	}
 	for _, value := range stats["categories"].([]any) {

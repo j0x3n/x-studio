@@ -146,7 +146,7 @@ func (a *Module) execute(ctx context.Context, job core.Job) (executionErr error)
 	}
 	kind := strings.TrimPrefix(job.Kind, "creative.")
 	for _, item := range items {
-		if item.TemplateSnapshot.Kind != kind || (item.OutputAssetID != 0 && item.Route != "auto_redraw") || item.Human == "discard" {
+		if item.TemplateSnapshot.Kind != kind || (item.OutputAssetID != 0 && item.Route != "auto_redraw") || item.Human == "discard" || contains(item.RouteReasons, "缺少素材，未生成") {
 			continue
 		}
 		if item.OutputAssetID != 0 {
@@ -155,9 +155,10 @@ func (a *Module) execute(ctx context.Context, job core.Job) (executionErr error)
 				return err
 			}
 		}
-		if err = a.generateLoop(ctx, item, job); errors.Is(err, errLimit) {
-			return err
-		} else if err != nil {
+		if err = a.generateLoop(ctx, item, job); stopGeneration(ctx, err) {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			return err
 		}
 	}
@@ -175,7 +176,10 @@ func (a *Module) execute(ctx context.Context, job core.Job) (executionErr error)
 			if replaceErr != nil {
 				return replaceErr
 			}
-			if err = a.generateLoop(ctx, next, job); err != nil {
+			if err = a.generateLoop(ctx, next, job); stopGeneration(ctx, err) {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				return err
 			}
 			redrawn = true
@@ -185,6 +189,9 @@ func (a *Module) execute(ctx context.Context, job core.Job) (executionErr error)
 		}
 	}
 	if err = a.refreshSet(ctx, set.ID); err != nil {
+		return err
+	}
+	if err = a.failureMessage(ctx, set.ID, kind, job.ID); err != nil {
 		return err
 	}
 	if kind == "main" && contains(set.Parts, "detail") {
@@ -212,6 +219,35 @@ func (a *Module) execute(ctx context.Context, job core.Job) (executionErr error)
 	}
 	return nil
 }
+func stopGeneration(ctx context.Context, err error) bool {
+	if ctx.Err() != nil || errors.Is(err, errLimit) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var status *statusError
+	return errors.As(err, &status) && (status.status == 403 || status.status == 404)
+}
+func (a *Module) failureMessage(ctx context.Context, setID int64, kind string, jobID int64) error {
+	items, err := a.currentItems(ctx, setID)
+	if err != nil {
+		return err
+	}
+	failures := []string{}
+	for _, item := range items {
+		if item.TemplateSnapshot.Kind != kind || item.Error == "" {
+			continue
+		}
+		message := []rune(item.Slot + item.Variant + " " + item.Error)
+		if len(message) > 60 {
+			message = append(message[:59], '…')
+		}
+		failures = append(failures, string(message))
+	}
+	if len(failures) == 0 {
+		return nil
+	}
+	_, err = a.DB.ExecContext(ctx, "UPDATE jobs SET message=? WHERE id=?", fmt.Sprintf("%d 张生成失败：%s", len(failures), strings.Join(failures, "；")), jobID)
+	return err
+}
 func contains(values []string, value string) bool {
 	for _, candidate := range values {
 		if candidate == value {
@@ -222,11 +258,16 @@ func contains(values []string, value string) bool {
 }
 func (a *Module) generateLoop(ctx context.Context, item Item, job core.Job) error {
 	for {
-		if err := a.reserve(ctx, item, job.UserID, job.ID); err != nil {
-			return err
-		}
-		if err := a.generateOne(ctx, &item, job.UserID); err != nil {
-			a.recordError(ctx, item, job.UserID, err)
+		if err := a.generateOne(ctx, &item, job); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if !errors.Is(err, errLimit) {
+				if _, authErr := a.authorize(ctx, job.UserID, item.ListingID, core.CreativeRun); authErr != nil {
+					return authErr
+				}
+				a.recordError(ctx, item, job.UserID, err)
+			}
 			return err
 		}
 		if item.Route != "auto_redraw" {
@@ -289,7 +330,7 @@ func (a *Module) selectedPhotos(product core.Product, t Template) ([]core.Photo,
 		}
 	}
 	if t.ProductMode != "none" && len(selected) == 0 {
-		return nil, fmt.Errorf("%s 缺少实拍参考图（%s）", t.Slot, strings.Join(codes, "、"))
+		return nil, problem(409, fmt.Sprintf("缺少实拍参考图（%s）", strings.Join(codes, "、")))
 	}
 	return selected, nil
 }
@@ -467,6 +508,9 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 	prompt += "\n" + params.Note
 	if item.Variant == "B" {
 		prompt += "\nThis is an alternative version B: use a clearly different camera angle and composition from version A while keeping the same style."
+		if item.ProductMode == "redraw" && len(item.SourceAssetIDs) == 1 {
+			prompt += "\nShow the product from a different angle than variant A."
+		}
 	}
 	if item.SizeCompare {
 		prompt += "\n多尺寸对比：所有图使用同一模特同一侧，构图距离固定，按本图尺寸真实还原。耳饰统一左耳，腕饰统一左腕，戒指统一左手中指，项链统一正面角度。"
@@ -479,7 +523,25 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 	}
 	return prompt, nil
 }
-func (a *Module) generateOne(ctx context.Context, item *Item, uid int64) error {
+func (a *Module) imageContext(ctx context.Context, item Item, info *core.ImageInfo) (context.Context, error) {
+	ctx = core.WithFeature(ctx, "creative")
+	if item.AutoAttempt > 0 && item.SetID != nil {
+		var previousModel string
+		var previousAutoAttempt int
+		err := a.DB.QueryRowContext(ctx, `SELECT model,auto_attempt FROM creative_items WHERE set_id=? AND slot=? AND seq=? AND variant=? AND attempt<? ORDER BY attempt DESC,id DESC LIMIT 1`, *item.SetID, item.Slot, item.Seq, item.Variant, item.Attempt).Scan(&previousModel, &previousAutoAttempt)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		primary, alternate := a.ImageModels(ctx)
+		if err == nil && item.AutoAttempt > previousAutoAttempt && previousModel == primary && alternate != "" {
+			ctx = core.WithImageModel(ctx, alternate)
+		}
+	}
+	return core.WithImageInfo(ctx, info), nil
+}
+
+func (a *Module) generateOne(ctx context.Context, item *Item, job core.Job) error {
+	uid := job.UserID
 	if _, err := a.authorize(ctx, uid, item.ListingID, core.CreativeRun); err != nil {
 		return err
 	}
@@ -499,23 +561,48 @@ func (a *Module) generateOne(ctx context.Context, item *Item, uid int64) error {
 	if err != nil {
 		return err
 	}
+	photos = variantPhotos(*item, photos)
 	refs := []image.Image{}
 	item.SourceAssetIDs = []int64{}
+	var mask *image.Alpha
+	var cutout *CutoutCheck
+	cutoutErrors := []string{}
 	for _, ph := range photos {
 		im, err := a.sourceImage(ph)
 		if err != nil {
 			return err
 		}
+		if item.ProductMode == "pixel_lock" && t.LockShape != "rect" {
+			var mode string
+			mask, mode = a.ProductMask(ctx, nrgba(im))
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+			coverage := maskCoverage(mask)
+			if !trustedCutout(mode, coverage) {
+				algorithm := "rembg"
+				if mode == "fallback" {
+					algorithm = "兜底算法"
+				}
+				cutoutErrors = append(cutoutErrors, fmt.Sprintf("%s 识别出的商品区域占画面 %.1f%%（%s）", ph.Code, coverage*100, algorithm))
+				continue
+			}
+			cutout = &CutoutCheck{Mode: mode, Coverage: coverage, Code: ph.Code}
+		}
 		refs = append(refs, im)
 		item.SourceAssetIDs = append(item.SourceAssetIDs, ph.ID)
+		if item.ProductMode == "pixel_lock" {
+			break
+		}
+	}
+	if item.ProductMode == "pixel_lock" && len(refs) == 0 {
+		return fmt.Errorf("抠图失败：%s，请配置 REMBG_URL 或补拍背景干净的白底实拍", strings.Join(cutoutErrors, "；"))
 	}
 	if item.ProductMode == "model" {
-		obj, _ := a.one(ctx, "SELECT models FROM creative_shop_settings WHERE shop_id=?", product.ShopID)
-		models, _ := typed[map[string]int64](obj["models"])
-		if t.Wear == nil || models[t.Wear.Slot] == 0 {
-			return problem(400, "先在 AI 出图设置里给店铺选模特")
+		item.ModelID, err = a.configuredModel(ctx, product, t)
+		if err != nil {
+			return err
 		}
-		item.ModelID = models[t.Wear.Slot]
 		if item.SizeCompare && item.SetID != nil {
 			var fixedID int64
 			if a.DB.QueryRowContext(ctx, "SELECT model_id FROM creative_items WHERE set_id=? AND slot=? AND superseded=0 AND model_id>0 ORDER BY seq LIMIT 1", *item.SetID, item.Slot).Scan(&fixedID) == nil {
@@ -559,20 +646,24 @@ func (a *Module) generateOne(ctx context.Context, item *Item, uid int64) error {
 	}
 	aiRefs := append(append([]image.Image{}, refs...), styles...)
 	width, height := imageSize(t.GenSize)
-	featureCtx := core.WithFeature(ctx, "creative")
+	info := core.ImageInfo{}
+	featureCtx, err := a.imageContext(ctx, *item, &info)
+	if err != nil {
+		return err
+	}
 	pixel := PixelCheck{Pass: true}
 	var output *image.NRGBA
 	var data []byte
 	op := core.Object{"item_id": item.ID, "template_key": t.Key, "template_version": t.Version, "prompt_sha256": fmt.Sprintf("%x", sha256.Sum256([]byte(prompt)))}
+	if err = a.reserve(ctx, *item, uid, job.ID); err != nil {
+		return err
+	}
 	switch item.ProductMode {
 	case "pixel_lock":
 		src := nrgba(refs[0])
-		var mask *image.Alpha
 		if t.LockShape == "rect" {
 			mask = image.NewAlpha(src.Rect)
 			draw.Draw(mask, mask.Rect, image.NewUniform(color.Alpha{A: 255}), image.Point{}, draw.Src)
-		} else {
-			mask, _ = a.ProductMask(ctx, src)
 		}
 		canvas, alpha, err := lockCanvas(src, mask, t.ProductBox, width, height, t.LockShape)
 		if err != nil {
@@ -631,10 +722,12 @@ func (a *Module) generateOne(ctx context.Context, item *Item, uid int64) error {
 			return err
 		}
 	}
+	item.Model, item.ModelReturned = info.Model, info.Returned
 	if _, err = a.authorize(ctx, uid, item.ListingID, core.CreativeRun); err != nil {
 		return err
 	}
 	hard, hardErr := a.hardChecks(ctx, *item, product, output, pixel)
+	hard.Cutout = cutout
 	item.Hard = hard
 	if hardErr != nil {
 		item.Error = a.SafeAIError(hardErr.Error())
@@ -712,7 +805,7 @@ func decodePNG(data []byte) (*image.NRGBA, error) {
 	return nrgba(im), nil
 }
 func saveItemResult(ctx context.Context, tx *sql.Tx, item Item) error {
-	_, err := tx.ExecContext(ctx, `UPDATE creative_items SET source_asset_ids=?,model_id=?,model_ref_ids=?,wear_type=?,prompt=?,texts=?,output_asset_id=?,canvas_file=?,hard=?,review_a=?,review_b=?,route=?,route_reasons=?,risk=?,error=? WHERE id=?`, core.JS(item.SourceAssetIDs), item.ModelID, core.JS(item.ModelRefIDs), item.WearType, item.Prompt, core.JS(item.Texts), item.OutputAssetID, item.CanvasFile, core.JS(item.Hard), core.JS(item.ReviewA), core.JS(item.ReviewB), item.Route, core.JS(item.RouteReasons), item.Risk, item.Error, item.ID)
+	_, err := tx.ExecContext(ctx, `UPDATE creative_items SET source_asset_ids=?,model_id=?,model_ref_ids=?,wear_type=?,prompt=?,texts=?,output_asset_id=?,canvas_file=?,hard=?,review_a=?,review_b=?,route=?,route_reasons=?,risk=?,error=?,model=?,model_returned=? WHERE id=?`, core.JS(item.SourceAssetIDs), item.ModelID, core.JS(item.ModelRefIDs), item.WearType, item.Prompt, core.JS(item.Texts), item.OutputAssetID, item.CanvasFile, core.JS(item.Hard), core.JS(item.ReviewA), core.JS(item.ReviewB), item.Route, core.JS(item.RouteReasons), item.Risk, item.Error, item.Model, item.ModelReturned, item.ID)
 	return err
 }
 func (a *Module) replaceItem(ctx context.Context, old Item, uid int64, automatic bool, note string) (Item, error) {
@@ -750,11 +843,14 @@ func (a *Module) replaceItem(ctx context.Context, old Item, uid int64, automatic
 	}
 	next.Prompt = note
 	next.OutputAssetID = 0
+	next.Model = ""
+	next.ModelReturned = ""
 	next.CanvasFile = ""
 	next.Hard = Hard{}
 	next.ReviewA = Review{}
 	next.ReviewB = Review{}
 	next.Route = "pending"
+	next.RouteReasons = []string{}
 	next.Human = ""
 	next.Error = ""
 	next.CreatedBy = uid
@@ -775,7 +871,13 @@ func (a *Module) replaceItem(ctx context.Context, old Item, uid int64, automatic
 	return next, tx.Commit()
 }
 func insertItem(ctx context.Context, tx *sql.Tx, item Item) (int64, error) {
-	result, err := tx.ExecContext(ctx, `INSERT INTO creative_items(set_id,listing_id,slot,seq,template_key,template_version,template_snapshot,attempt,auto_attempt,variant,product_mode,prompt,texts,size_compare,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, item.SetID, item.ListingID, item.Slot, item.Seq, item.TemplateKey, item.TemplateVersion, core.JS(item.TemplateSnapshot), item.Attempt, item.AutoAttempt, item.Variant, item.ProductMode, item.Prompt, core.JS(item.Texts), item.SizeCompare, item.CreatedBy, core.Now())
+	if item.Route == "" {
+		item.Route = "pending"
+	}
+	if item.RouteReasons == nil {
+		item.RouteReasons = []string{}
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO creative_items(set_id,listing_id,slot,seq,template_key,template_version,template_snapshot,attempt,auto_attempt,variant,product_mode,prompt,texts,size_compare,created_by,created_at,error,route,route_reasons) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, item.SetID, item.ListingID, item.Slot, item.Seq, item.TemplateKey, item.TemplateVersion, core.JS(item.TemplateSnapshot), item.Attempt, item.AutoAttempt, item.Variant, item.ProductMode, item.Prompt, core.JS(item.Texts), item.SizeCompare, item.CreatedBy, core.Now(), item.Error, item.Route, core.JS(item.RouteReasons))
 	if err != nil {
 		return 0, err
 	}

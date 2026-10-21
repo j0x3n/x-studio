@@ -26,14 +26,19 @@ import (
 )
 
 type fakeAI struct {
-	images  atomic.Int64
-	texts   atomic.Int64
-	reviews atomic.Int64
-	mu      sync.Mutex
-	read    []OCRText
-	review  *Review
-	before  func()
-	orders  []string
+	images         atomic.Int64
+	failImage      atomic.Int64
+	failImageFrom  atomic.Int64
+	texts          atomic.Int64
+	reviews        atomic.Int64
+	mu             sync.Mutex
+	read           []OCRText
+	review         *Review
+	before         func()
+	orders         []string
+	models         []string
+	returnedSize   string
+	firstReference []uint8
 }
 
 func (fake *fakeAI) serve(w http.ResponseWriter, r *http.Request) {
@@ -68,14 +73,18 @@ func (fake *fakeAI) serve(w http.ResponseWriter, r *http.Request) {
 		core.WriteJSON(w, 200, core.Object{"choices": []core.Object{{"message": core.Object{"content": core.JS(response)}}}})
 		return
 	}
-	fake.images.Add(1)
+	imageCall := fake.images.Add(1)
 	size := ""
+	model := ""
+	var firstReference *image.NRGBA
 	if r.URL.Path == "/images/generations" {
 		var req struct {
-			Size string `json:"size"`
+			Size  string `json:"size"`
+			Model string `json:"model"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		size = req.Size
+		model = req.Model
 	} else if r.URL.Path == "/images/edits" {
 		reader, err := r.MultipartReader()
 		if err != nil {
@@ -95,6 +104,12 @@ func (fake *fakeAI) serve(w http.ResponseWriter, r *http.Request) {
 			if part.FormName() == "size" {
 				size = string(data)
 			}
+			if part.FormName() == "model" {
+				model = string(data)
+			}
+			if part.FormName() == "image" && firstReference == nil {
+				firstReference, _ = decodePNG(data)
+			}
 			part.Close()
 		}
 	} else {
@@ -103,11 +118,23 @@ func (fake *fakeAI) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	fake.mu.Lock()
 	before := fake.before
+	fake.models = append(fake.models, model)
+	if firstReference != nil {
+		fake.firstReference = append(fake.firstReference, firstReference.NRGBAAt(firstReference.Rect.Dx()/2, firstReference.Rect.Dy()/2).R)
+	}
+	if fake.returnedSize != "" {
+		size = fake.returnedSize
+	}
 	fake.mu.Unlock()
 	if before != nil {
 		before()
 	}
-	width, height := imageSize(size)
+	if imageCall >= max(1, fake.failImageFrom.Load()) && imageCall <= fake.failImage.Load() {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var width, height int
+	_, _ = fmt.Sscanf(size, "%dx%d", &width, &height)
 	if width == 0 || height == 0 {
 		w.WriteHeader(400)
 		return

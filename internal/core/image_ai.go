@@ -19,6 +19,23 @@ import (
 	"golang.org/x/image/draw"
 )
 
+type imageModelKey struct{}
+type imageInfoKey struct{}
+
+type ImageInfo struct {
+	Model    string
+	Returned string
+	Fallback bool
+}
+
+func WithImageModel(ctx context.Context, model string) context.Context {
+	return context.WithValue(ctx, imageModelKey{}, model)
+}
+
+func WithImageInfo(ctx context.Context, info *ImageInfo) context.Context {
+	return context.WithValue(ctx, imageInfoKey{}, info)
+}
+
 func FitToSize(im image.Image, size string) image.Image {
 	var width, height int
 	if im == nil || !validImageSize(size) {
@@ -90,12 +107,17 @@ func (a *Core) EditImageMask(ctx context.Context, prompt string, refs []image.Im
 		refs = append([]image.Image(nil), refs...)
 		refs[0] = FitToSize(refs[0], size)
 	}
-	model := a.Model(Actor(ctx).Feature, a.Cfg.ImageModel)
+	return a.imageRequest(ctx, "/images/edits", size, func(model string) (string, []byte, error) {
+		return imageEditBody(model, prompt, size, refs, mask)
+	})
+}
+
+func imageEditBody(model, prompt, size string, refs []image.Image, mask image.Image) (string, []byte, error) {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
 	for _, v := range []struct{ k, v string }{{"model", model}, {"prompt", prompt}, {"size", size}, {"quality", "high"}} {
 		if err := mw.WriteField(v.k, v.v); err != nil {
-			return nil, fmt.Errorf("准备图像编辑请求失败")
+			return "", nil, fmt.Errorf("准备图像编辑请求失败")
 		}
 	}
 	for i, im := range refs {
@@ -105,10 +127,10 @@ func (a *Core) EditImageMask(ctx context.Context, prompt string, refs []image.Im
 		h.Set("Content-Type", "image/png")
 		part, err := mw.CreatePart(h)
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 		if err = png.Encode(part, im); err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
 	if mask != nil {
@@ -117,20 +139,16 @@ func (a *Core) EditImageMask(ctx context.Context, prompt string, refs []image.Im
 		header.Set("Content-Type", "image/png")
 		part, err := mw.CreatePart(header)
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 		if err = png.Encode(part, mask); err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
 	if err := mw.Close(); err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	finish, err := a.beginUsage(ctx, "image", model)
-	if err != nil {
-		return nil, err
-	}
-	return a.imageRequest(ctx, "/images/edits", mw.FormDataContentType(), body.Bytes(), size, finish)
+	return mw.FormDataContentType(), body.Bytes(), nil
 }
 
 func validImageSize(size string) bool {
@@ -148,22 +166,13 @@ func (a *Core) GenerateImage(ctx context.Context, prompt, size string, styleRefs
 	if a.Cfg.AIKey == "" {
 		return nil, fmt.Errorf("未配置 AI_API_KEY，无法生成照片")
 	}
-	model := a.Model(Actor(ctx).Feature, a.Cfg.ImageModel)
-	finish, err := a.beginUsage(ctx, "image", model)
-	if err != nil {
-		return nil, err
-	}
-	body := []byte(JS(Object{"model": model, "prompt": prompt, "size": size, "quality": "high", "n": 1}))
-	return a.imageRequest(ctx, "/images/generations", "application/json", body, size, finish)
+	return a.imageRequest(ctx, "/images/generations", size, func(model string) (string, []byte, error) {
+		return "application/json", []byte(JS(Object{"model": model, "prompt": prompt, "size": size, "quality": "high", "n": 1})), nil
+	})
 }
 
-func (a *Core) imageRequest(ctx context.Context, endpoint, contentType string, body []byte, size string, finish func(bool) error) ([]byte, error) {
-	charged := false
-	defer func() {
-		if !charged {
-			_ = finish(false)
-		}
-	}()
+func (a *Core) imageRequest(ctx context.Context, endpoint, size string, build func(string) (string, []byte, error)) ([]byte, error) {
+	primary, alternate := a.ImageModels(ctx)
 	client := *a.Client
 	client.Timeout = a.Cfg.ImageTimeout
 	var last error
@@ -171,7 +180,20 @@ func (a *Core) imageRequest(ctx context.Context, endpoint, contentType string, b
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		model := primary
+		if attempt > 0 && alternate != "" {
+			model = alternate
+		}
+		contentType, body, err := build(model)
+		if err != nil {
+			return nil, err
+		}
+		finish, err := a.beginUsage(ctx, "image", model)
+		if err != nil {
+			return nil, err
+		}
 		requestCtx, cancel := context.WithTimeout(ctx, a.Cfg.ImageTimeout)
+		returned := ""
 		data, err := func() ([]byte, error) {
 			req, err := http.NewRequestWithContext(requestCtx, "POST", strings.TrimRight(a.Cfg.AIBaseURL, "/")+endpoint, bytes.NewReader(body))
 			if err != nil {
@@ -206,24 +228,60 @@ func (a *Core) imageRequest(ctx context.Context, endpoint, contentType string, b
 			if cfg, format, err := image.DecodeConfig(bytes.NewReader(decoded)); err != nil || format != "png" || int64(cfg.Width)*int64(cfg.Height) > 40_000_000 {
 				return nil, fmt.Errorf("图像回复不是有效的 PNG 或像素超限")
 			}
-			if _, err = png.Decode(bytes.NewReader(decoded)); err != nil {
+			im, err := png.Decode(bytes.NewReader(decoded))
+			if err != nil {
 				return nil, fmt.Errorf("图像服务返回的 PNG 已损坏")
 			}
 			cfg, _, _ := image.DecodeConfig(bytes.NewReader(decoded))
-			if fmt.Sprintf("%dx%d", cfg.Width, cfg.Height) != size {
+			returned = fmt.Sprintf("%dx%d", cfg.Width, cfg.Height)
+			if returned != size {
+				var width, height int
+				_, _ = fmt.Sscanf(size, "%dx%d", &width, &height)
+				if compatibleImageSize(width, height, cfg.Width, cfg.Height) {
+					normalized := resizeImageOutput(im, width, height)
+					var encoded bytes.Buffer
+					if err := png.Encode(&encoded, normalized); err != nil {
+						return nil, fmt.Errorf("图像回复编码失败")
+					}
+					return encoded.Bytes(), nil
+				}
 				return nil, fmt.Errorf("图像服务返回的尺寸不对：请求 %s，返回 %d×%d", strings.ReplaceAll(size, "x", "×"), cfg.Width, cfg.Height)
 			}
 			return decoded, nil
 		}()
 		cancel()
 		if err == nil {
-			charged = true
 			if e := finish(true); e != nil {
 				return nil, e
 			}
+			if info, _ := ctx.Value(imageInfoKey{}).(*ImageInfo); info != nil {
+				*info = ImageInfo{Model: model, Returned: returned, Fallback: model != primary}
+			}
 			return data, nil
 		}
+		_ = finish(false)
 		last = err
 	}
 	return nil, last
+}
+
+func compatibleImageSize(width, height, returnedWidth, returnedHeight int) bool {
+	if (width < height && returnedWidth > returnedHeight) || (width > height && returnedWidth < returnedHeight) || min(returnedWidth, returnedHeight)*10 < min(width, height)*9 {
+		return false
+	}
+	difference := int64(returnedWidth)*int64(height) - int64(width)*int64(returnedHeight)
+	if difference < 0 {
+		difference = -difference
+	}
+	return difference*100 <= int64(width)*int64(returnedHeight)
+}
+
+func resizeImageOutput(source image.Image, width, height int) image.Image {
+	scale := math.Max(float64(width)/float64(source.Bounds().Dx()), float64(height)/float64(source.Bounds().Dy()))
+	scaledWidth := int(math.Ceil(float64(source.Bounds().Dx()) * scale))
+	scaledHeight := int(math.Ceil(float64(source.Bounds().Dy()) * scale))
+	left, top := (width-scaledWidth)/2, (height-scaledHeight)/2
+	output := image.NewNRGBA(image.Rect(0, 0, width, height))
+	draw.CatmullRom.Scale(output, image.Rect(left, top, left+scaledWidth, top+scaledHeight), source, source.Bounds(), draw.Src, nil)
+	return output
 }

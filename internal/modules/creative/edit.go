@@ -59,7 +59,9 @@ func (a *Module) inspect(ctx context.Context, item *Item, output *image.NRGBA, u
 	if err != nil {
 		return err
 	}
+	cutout := item.Hard.Cutout
 	item.Hard, err = a.hardChecks(ctx, *item, product, output, pixel)
+	item.Hard.Cutout = cutout
 	item.Error = ""
 	if err != nil {
 		item.Error = a.SafeAIError(err.Error())
@@ -202,6 +204,7 @@ func (a *Module) retextItem(ctx context.Context, old Item, job core.Job) error {
 	item.Texts[index].Text = text
 	item.Texts[index].Critical = item.Texts[index].Critical || critical(text)
 	item.CanvasFile = old.CanvasFile
+	item.Hard.Cutout = old.Hard.Cutout
 	item.SourceAssetIDs = old.SourceAssetIDs
 	item.ModelID = old.ModelID
 	item.ModelRefIDs = old.ModelRefIDs
@@ -210,11 +213,13 @@ func (a *Module) retextItem(ctx context.Context, old Item, job core.Job) error {
 	if err = a.reserve(ctx, item, job.UserID, job.ID); err != nil {
 		return err
 	}
-	data, err := a.EditImageMask(core.WithFeature(ctx, "creative"), prompt, []image.Image{output}, mask, item.TemplateSnapshot.GenSize)
+	info := core.ImageInfo{}
+	data, err := a.EditImageMask(core.WithImageInfo(core.WithFeature(ctx, "creative"), &info), prompt, []image.Image{output}, mask, item.TemplateSnapshot.GenSize)
 	if err != nil {
 		a.recordError(ctx, item, job.UserID, err)
 		return err
 	}
+	item.Model, item.ModelReturned = info.Model, info.Returned
 	edited, err := decodePNG(data)
 	if err != nil {
 		return err

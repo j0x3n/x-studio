@@ -263,6 +263,16 @@ func (a *Module) setsCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	allowance := int(number(a.settings()["max_images_per_listing"]))
 	uid := core.CurrentUser(r).ID
+	planned := planItems(0, lid, uid, templates, in.Params, product)
+	missing, err := a.preflight(r.Context(), product, planned)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if len(missing) > 0 && (!in.Params.SkipMissing || len(missing) == len(planned)) {
+		writeMissing(w, missing)
+		return
+	}
 	tx, err := a.DB.BeginTx(r.Context(), nil)
 	if err != nil {
 		fail(w, err)
@@ -284,7 +294,8 @@ func (a *Module) setsCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := result.LastInsertId()
-	for _, item := range planItems(id, lid, uid, templates, in.Params, product) {
+	for _, item := range planned {
+		item.SetID = &id
 		itemID, err := insertItem(r.Context(), tx, item)
 		if err != nil {
 			fail(w, err)
@@ -460,6 +471,9 @@ func (a *Module) itemRedraw(w http.ResponseWriter, r *http.Request) {
 	}
 	if len([]rune(in.Note)) > 4000 {
 		core.Fail(w, 400, "补充要求不能超过4000字")
+		return
+	}
+	if !a.preflightItem(w, r, item) {
 		return
 	}
 	a.enqueueItem(w, r, item, core.Object{"note": strings.TrimSpace(in.Note)})
