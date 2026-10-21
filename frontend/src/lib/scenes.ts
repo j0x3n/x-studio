@@ -1,6 +1,6 @@
 import { api } from './api'
 
-// 场景库（接口约定-素材场景店铺.md 第 2 节）：静物台面 + 上身穿搭 + 光线色调 + 道具 + 参考图
+// 场景库：静物台面 + 上身穿搭 + 光线色调 + 道具 + 参考图
 export type SceneRef = { id: number; use: 'still' | 'wear'; url: string; width: number; height: number }
 export type Scene = {
   id: number; shop_id: number | null; name: string; categories: string[]
@@ -31,7 +31,7 @@ export const sceneApi = {
   addRef: (id: number, file: File, use: 'still' | 'wear') => { const form = new FormData(); form.append('file', file); form.append('use', use); return api(`/api/scenes/${id}/refs`, { form }) },
   removeRef: (id: number, ref: number) => api(`/api/scenes/${id}/refs/${ref}`, { method: 'DELETE' }),
   bindings: (listingIds: number[]) => api<{ listings: Binding[]; shops: ShopBinding[] }>('/api/scenes/bindings?listing_ids=' + listingIds.join(',')).then(r => ({ listings: r.listings || [], shops: r.shops || [] })),
-  // 店铺默认场景（bindings?shop_ids=，接口约定 2.4 补充）
+  // 店铺默认场景（bindings?shop_ids=）
   shopBinding: (shopId: number) => api<{ shops: ShopBinding[] }>('/api/scenes/bindings?shop_ids=' + shopId).then(r => (r.shops || []).find(x => x.shop_id === shopId)?.scene_id || null),
   bind: (body: { listing_ids: number[]; scene_id: number | null } | { shop_id: number; scene_id: number | null }) => api('/api/scenes/bindings', { method: 'PUT', body })
 }

@@ -1,4 +1,4 @@
-// AI 出图（creative）的类型、中文名和接口封装。契约见 接口约定-AI出图.md。
+// AI 出图（creative）的类型、中文名和接口封装。
 // 后端还没合并时，浏览器里 localStorage.setItem('xs-mock', '1') 用假数据看页面。
 import { api, qs, type Page } from './api'
 
@@ -62,7 +62,7 @@ export type CreativeTemplate = {
   wear: { slot: string; body_part: string; framing: string } | null
   version: number; enabled: boolean; source: 'file' | 'custom'; updated_at?: string
 }
-// main_ratios / detail_width / about_text：店铺自己的导出比例、详情图宽度、「关于我们」写法（接口约定-素材场景店铺.md 2.6）
+// main_ratios / detail_width / about_text：店铺自己的导出比例、详情图宽度、「关于我们」写法
 export type ShopCreative = { models: { female_main?: number | null; male?: number | null; hand?: number | null }; template_set: Record<string, string>; main_ratios?: string[]; detail_width?: number; about_text?: string }
 export type CalibrationRow = { category: string; total: number; agree: number; open: boolean; tightened: boolean; tightened_reason?: string; auto_pass_rate?: number; override_rate?: number; return_links?: number }
 export type Suggestion = { id: number; listing_id: number; set_id: number | null; item_id: number | null; slot: string; reason_code: string; count: number; status: 'open' | 'done' | 'ignored'; product_name?: string; created_at: string }

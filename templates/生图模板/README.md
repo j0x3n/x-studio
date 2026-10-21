@@ -1,6 +1,6 @@
 # 生图模板
 
-creative 模块启动时从这里读模板种子（表里没有的 key 插入，已有的只补空字段）。字段说明见 [接口约定-AI出图.md](../../接口约定-AI出图.md) 第 3.1 节；提示词前缀在 `prompts/生图-主图.md`、`prompts/生图-详情.md`。
+creative 模块启动时从这里读模板种子（表里没有的 key 插入，已有的只补空字段）。字段见下面「文件格式」；提示词前缀在 `prompts/生图-主图.md`、`prompts/生图-详情.md`。
 
 ## 默认用哪套
 
@@ -18,7 +18,51 @@ creative 模块启动时从这里读模板种子（表里没有的 key 插入，
 
 **商品模式默认怎么选（2026-10-21 用户定）**：首图、规格、SKU、详情页首屏和同系列用 `redraw`（GPT 照实拍直接出）；细节、真假对比、尺寸、包装这些证据屏用 `pixel_lock` + `rect`（实拍整张贴回）；上身和模特首图用 `model`。`pixel_lock` 抠图模式保留，模板里可以改回去。
 
-## 约定以外多出来的字段（阶段 2 由 Claude 和 Codex 接进后端）
+## 文件格式
+
+一个文件一个模板，风格参考图放 `参考图/`：
+
+```json
+{
+  "key": "main_hero_stone",
+  "name": "首图·中灰石材",
+  "kind": "main",
+  "slot": "main1",
+  "categories": ["pearl", "crystal"],
+  "purpose": "首图，商品居中，画面不加字",
+  "prompt": "……{款名}……{商品}……",
+  "style_refs": ["参考图/hero_stone.jpg"],
+  "texts": [
+    {"key": "title", "from": "content.name", "max": 6, "critical": false}
+  ],
+  "photo_codes": ["A1", "A2", "E4", "B2"],
+  "product_mode": "pixel_lock",
+  "product_box": [0.2, 0.3, 0.6, 0.45],
+  "gen_size": "1024x1536",
+  "export": [{"name": "3x4", "w": 1440, "h": 1920}],
+  "count": 1,
+  "wear": null,
+  "version": 1,
+  "enabled": true
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `kind` | `main` / `detail` |
+| `slot` | 位置：主图 `main1`（首图）`main2`（上身）`main3`（细节）`main4`（尺寸）`main5`（规格包装）`white`（白底）`sku`；详情 `d1`…`d9` |
+| `categories` | 适用品类 key；空数组 = 全部 |
+| `prompt` | 占位符：`{款名}` `{英文名}` `{一句话}` `{商品}`（info 拼成一行）`{尺寸}` `{颜色}` `{品类}` `{文字}`（本模板要写在图上的字，逐条带引号）`{模特}`（模特描述）`{佩戴位置}`。没值的占位符换成空串 |
+| `texts` | 图上的字：`from` 是取值路径（`content.*`、`listing.*`、`info.*`，或 `literal:原文`）；`max` 字数上限；`critical`=true 表示参数、mm、925、价格这类，比对不过就不能导出。**内容含数字、mm、cm、925、元、¥ 的一律按 critical 处理**，不管模板怎么写 |
+| `photo_codes` | 选商品参考图的编号优先级（只取实拍和只做过高清化的，`media.AIMade` 为真的不要） |
+| `product_mode` | `pixel_lock` 像素锁定 / `redraw` 参考图重画 / `model` 模特 / `none` 不放商品 / `photo` 实拍原图直接用（只高清化或缩放） |
+| `product_box` | 像素锁定时商品放在哪：生成画布上的比例 `[x,y,w,h]`，商品按长边 contain 进去、居中 |
+| `gen_size` | `1024x1024` / `1024x1536` / `1536x1024` 三种之一，生成后会核对返回尺寸 |
+| `export` | 导出尺寸列表；主图 3:4 是 1440×1920，1:1 是 1440×1440，详情页是宽 750（`h` 写 0 = 按比例） |
+| `count` | 这一屏出几张（1–3） |
+| `wear` | 模特模式才有：`{"slot": "female_main", "body_part": "ear", "framing": "closeup"}`，`slot` 是店铺模特位 `female_main` / `male` / `hand` |
+
+## 补充字段
 
 | 字段 / 写法 | 含义 |
 |---|---|

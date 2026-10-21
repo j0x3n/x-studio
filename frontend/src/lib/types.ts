@@ -24,7 +24,7 @@ export type Asset = {
   title?: string; note?: string; archived?: boolean; updated_at?: string
   product?: { id: number; name: string }; effective_source?: string; thumb_url?: string; version_count?: number
   op?: AssetOp; folder_id?: number | null
-  // 视频和旧版本（接口约定-素材场景店铺.md 第 1 节）
+  // 视频和旧版本
   media?: 'image' | 'video'; duration_ms?: number; poster_url?: string; stale?: boolean
 }
 // 素材文件夹：团队共用的整理层级，一张素材最多在一个文件夹里；删文件夹不删图
@@ -85,7 +85,7 @@ export type QueueItem = {
   outputs: Outputs; preview_url: string
 }
 
-// 首页和 AI 助手（接口约定-AI助手.md）
+// 首页和 AI 助手
 export type AssistAction = { type: 'open' | 'run_listing' | 'render_listing' | 'render_batch' | 'process_assets' | 'generate_copy' | 'review' | 'create_task'; label: string; summary: string; params: Record<string, unknown>; cost_hint?: string; preview?: { assignee: string; due: string; target: string } }
 export type AssistRef = { type: 'product' | 'listing' | 'asset' | 'job' | 'kb_article' | 'inv_item' | 'purchase_order'; id: number; label: string; path?: string }
 export type AssistReply = { reply: string; actions: AssistAction[]; refs: AssistRef[]; dropped: number; rounds: number }
@@ -96,7 +96,7 @@ export type Home = {
   recent_assets: { id: number; product_id: number; product_name: string; title: string; source: string; thumb_url: string; created_at: string }[]
 }
 
-// 多品类（接口约定-多品类.md）
+// 多品类
 export type AttrType = 'text' | 'textarea' | 'number' | 'select' | 'multi' | 'bool'
 export type AttrField = { key: string; label: string; type: AttrType; options?: string[]; free?: boolean; unit?: string; hint?: string; required?: boolean }
 export type ShotCode = { code: string; group: string; name: string; use?: string; desc?: string; suffix?: string }
@@ -106,7 +106,7 @@ export type Category = {
   product_count?: number; created_at: string; updated_at: string
 }
 
-// 任务和通知（接口约定-任务和通知.md）
+// 任务和通知
 export type TaskStatus = 'todo' | 'doing' | 'waiting' | 'done' | 'canceled'
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent'
 export type PersonRef = { id: number; name: string }

@@ -1,6 +1,6 @@
 import type { Shop } from './types'
 
-// 店铺和渠道（接口约定-素材场景店铺.md 第 3 节）：同一平台可以开多个店，直播间也算一个渠道
+// 店铺和渠道：同一平台可以开多个店，直播间也算一个渠道
 export const PLATFORMS: { key: string; name: string; sites?: boolean; kind: 'shop' | 'live' | 'other' }[] = [
   { key: 'taobao', name: '淘宝', kind: 'shop' },
   { key: 'tmall', name: '天猫', kind: 'shop' },

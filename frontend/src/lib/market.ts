@@ -1,4 +1,4 @@
-// 数据与运营（market）的类型、中文名、接口和浏览器端 CSV 解析。契约见 接口约定-数据与运营.md。
+// 数据与运营（market）的类型、中文名、接口和浏览器端 CSV 解析。
 // 金额是整数分，比例是整数万分比（bps）。localStorage xs-mock=1 时走假数据。
 import { api, qs, type Page } from './api'
 import { mockOn } from './creative'
