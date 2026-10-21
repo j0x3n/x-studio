@@ -351,7 +351,7 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 		t.Fatal(job)
 	}
 	if imageCalls.Load() != 5 {
-		t.Fatal("expected 3 upscales and 2 fills", imageCalls.Load())
+		t.Fatal("expected 3 upscales and 2 fills; A1_AI white background reuses the fill without another call", imageCalls.Load())
 	}
 	p, _ := f.a.product(id)
 	if p.Status != "ready" || p.Step != "render" {

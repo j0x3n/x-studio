@@ -57,6 +57,11 @@ func TestRenderFullPipelineDimensionsAndZip(t *testing.T) {
 	t.Setenv("CHROME_NO_SANDBOX", "1")
 	ids := []int64{}
 	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/images/edits" {
+			got := readImageRequest(t, r)
+			imageReply(w, sizedPhotoBytes(t, got.size))
+			return
+		}
 		var req Object
 		if e := json.NewDecoder(r.Body).Decode(&req); e != nil {
 			t.Error(e)
@@ -79,7 +84,7 @@ func TestRenderFullPipelineDimensionsAndZip(t *testing.T) {
 		c.TextModel = "text"
 		c.ChromePath = chrome
 	})
-	writePrompts(t, f.a)
+	writeEnhancePrompt(t, f.a)
 	f.login(t, "admin")
 	id := f.product(t)
 	for i := 0; i < 3; i++ {
