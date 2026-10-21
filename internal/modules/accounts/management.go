@@ -19,34 +19,79 @@ func (a *Module) shops(w http.ResponseWriter, r *http.Request) {
 type shopInput struct {
 	Name     string      `json:"name"`
 	Platform string      `json:"platform"`
+	Site     string      `json:"site"`
+	Currency string      `json:"currency"`
 	Language string      `json:"language"`
 	Settings core.Object `json:"settings"`
 	Archived bool        `json:"archived"`
 }
 
-func validShop(s shopInput) bool {
-	return len([]rune(s.Name)) > 0 && len([]rune(s.Name)) <= 120 && (s.Platform == "taobao" || s.Platform == "shopee_tw" || s.Platform == "x" || s.Platform == "other") && (s.Language == "zh-CN" || s.Language == "zh-TW" || s.Language == "en")
+var shopPlatformOK = map[string]bool{
+	"taobao": true, "tmall": true, "pdd": true, "douyin": true, "xiaohongshu": true,
+	"shopee": true, "lazada": true, "tiktok": true, "website": true, "live": true, "x": true, "other": true,
+}
+var shopSiteOK = map[string]bool{
+	"tw": true, "my": true, "sg": true, "th": true, "ph": true, "vn": true, "id": true, "br": true,
+}
+var shopCurrencyOK = map[string]bool{
+	"CNY": true, "TWD": true, "MYR": true, "SGD": true, "THB": true, "PHP": true, "VND": true, "IDR": true, "BRL": true, "USD": true,
+}
+
+func shopNeedsSite(platform string) bool {
+	return platform == "shopee" || platform == "lazada" || platform == "tiktok"
+}
+func shopError(s *shopInput) string {
+	if n := len([]rune(s.Name)); n == 0 || n > 120 {
+		return "店铺名称必填，且不超过 120 个字"
+	}
+	if s.Platform == "shopee_tw" {
+		if s.Site != "" && s.Site != "tw" {
+			return "虾皮台湾店的站点只能是 tw"
+		}
+		s.Platform = "shopee"
+		s.Site = "tw"
+	}
+	if !shopPlatformOK[s.Platform] {
+		return "平台不正确，可选淘宝、天猫、拼多多、抖音小店、小红书、虾皮、Lazada、TikTok Shop、独立站、直播间、X 或其他"
+	}
+	if shopNeedsSite(s.Platform) {
+		if s.Site == "" {
+			return "虾皮、Lazada、TikTok Shop 必须填写站点"
+		}
+		if !shopSiteOK[s.Site] {
+			return "站点只能是 tw、my、sg、th、ph、vn、id、br"
+		}
+	} else if s.Site != "" {
+		return "这个平台不用填写站点"
+	}
+	if s.Currency != "" && !shopCurrencyOK[s.Currency] {
+		return "币种留空，或填写 CNY、TWD、MYR、SGD、THB、PHP、VND、IDR、BRL、USD"
+	}
+	if s.Language != "zh-CN" && s.Language != "zh-TW" && s.Language != "en" {
+		return "语言只能是 zh-CN、zh-TW 或 en"
+	}
+	return ""
 }
 func (a *Module) createShop(w http.ResponseWriter, r *http.Request) {
 	var in shopInput
 	if !core.Decode(w, r, &in) {
 		return
 	}
-	if !validShop(in) {
-		core.Fail(w, 400, "店铺名称、平台或语言不正确")
+	if msg := shopError(&in); msg != "" {
+		core.Fail(w, 400, msg)
 		return
 	}
 	if in.Settings == nil {
 		in.Settings = core.Object{}
 	}
-	res, e := a.DB.Exec("INSERT INTO shops(name,platform,language,settings,archived,created_at) VALUES(?,?,?,?,?,?)", in.Name, in.Platform, in.Language, core.JS(in.Settings), in.Archived, core.Now())
+	res, e := a.DB.Exec("INSERT INTO shops(name,platform,site,currency,language,settings,archived,created_at) VALUES(?,?,?,?,?,?,?,?)", in.Name, in.Platform, in.Site, in.Currency, in.Language, core.JS(in.Settings), in.Archived, core.Now())
 	if e != nil {
 		core.Fail(w, 500, "创建店铺失败")
 		return
 	}
 	id, _ := res.LastInsertId()
 	a.Audit(r, "shop.create", "shop", id, in)
-	core.WriteJSON(w, 201, core.Object{"shop": core.Object{"id": id, "name": in.Name, "platform": in.Platform, "language": in.Language, "settings": in.Settings, "archived": in.Archived}})
+	core.WriteJSON(w, 201, core.Object{"shop": core.Object{"id": id, "name": in.Name, "platform": in.Platform, "site": in.Site, "currency": in.Currency, "language": in.Language, "settings": in.Settings, "archived": in.Archived}})
 }
 func (a *Module) patchShop(w http.ResponseWriter, r *http.Request) {
 	a.Mu.Lock()
@@ -65,17 +110,21 @@ func (a *Module) patchShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for k := range patch {
-		if k != "name" && k != "platform" && k != "language" && k != "settings" && k != "archived" {
+		if k != "name" && k != "platform" && k != "site" && k != "currency" && k != "language" && k != "settings" && k != "archived" {
 			core.Fail(w, 400, "不支持的店铺字段")
 			return
 		}
 	}
 	b, _ = json.Marshal(patch)
-	if json.Unmarshal(b, &in) != nil || !validShop(in) {
+	if json.Unmarshal(b, &in) != nil {
 		core.Fail(w, 400, "店铺字段不正确")
 		return
 	}
-	if _, e = a.DB.Exec("UPDATE shops SET name=?,platform=?,language=?,settings=?,archived=? WHERE id=?", in.Name, in.Platform, in.Language, core.JS(in.Settings), in.Archived, id); e != nil {
+	if msg := shopError(&in); msg != "" {
+		core.Fail(w, 400, msg)
+		return
+	}
+	if _, e = a.DB.Exec("UPDATE shops SET name=?,platform=?,site=?,currency=?,language=?,settings=?,archived=? WHERE id=?", in.Name, in.Platform, in.Site, in.Currency, in.Language, core.JS(in.Settings), in.Archived, id); e != nil {
 		core.Fail(w, 500, "保存店铺失败")
 		return
 	}

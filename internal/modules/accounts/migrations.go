@@ -91,7 +91,21 @@ CREATE TABLE IF NOT EXISTS shares(id INTEGER PRIMARY KEY,product_id INTEGER NOT 
 			}
 		}
 		return nil
-	}}, {Version: 5, Up: modelPermissionsMigration}, {Version: 6, Up: creativePermissionsMigration}}
+	}}, {Version: 5, Up: modelPermissionsMigration}, {Version: 6, Up: creativePermissionsMigration}, {Version: 7, Up: shopChannelMigration}}
+}
+
+func shopChannelMigration(tx *sql.Tx) error {
+	if e := core.AddColumns(tx, "shops", [][2]string{{"site", "TEXT NOT NULL DEFAULT ''"}, {"currency", "TEXT NOT NULL DEFAULT ''"}}); e != nil {
+		return e
+	}
+	if _, e := tx.Exec("UPDATE shops SET platform='shopee', site='tw' WHERE platform='shopee_tw'"); e != nil {
+		return e
+	}
+	if _, e := tx.Exec("UPDATE shops SET currency='TWD' WHERE platform='shopee' AND site='tw' AND currency=''"); e != nil {
+		return e
+	}
+	_, e := tx.Exec("UPDATE shops SET currency='CNY' WHERE platform='taobao' AND currency=''")
+	return e
 }
 
 func appendBuiltinPerms(tx *sql.Tx, role string, add ...string) error {
