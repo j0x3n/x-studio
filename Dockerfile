@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /server ./cm
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium fonts-noto-cjk ca-certificates \
+    chromium fonts-noto-cjk ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --create-home app
 WORKDIR /app

@@ -166,12 +166,12 @@ func (a *Module) batch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, Object{"items": items, "total": len(items)})
 }
 func (a *Module) cleanupFiles(p Asset) {
-	for _, file := range []string{p.File, p.EnhancedFile} {
+	for _, file := range []string{p.File, p.EnhancedFile, p.PosterFile} {
 		if file == "" || !validAssetFile(file) {
 			continue
 		}
 		var n int
-		if a.DB.QueryRow("SELECT count(*) FROM assets WHERE product_id=? AND (file=? OR enhanced_file=?)", p.ProductID, file, file).Scan(&n) == nil && n == 0 {
+		if a.DB.QueryRow("SELECT count(*) FROM assets WHERE product_id=? AND (file=? OR enhanced_file=? OR poster_file=?)", p.ProductID, file, file, file).Scan(&n) == nil && n == 0 {
 			_ = os.Remove(filepath.Join(a.Dir(p.ProductID), filepath.FromSlash(file)))
 		}
 	}
@@ -225,11 +225,25 @@ func (a *Module) move(p Asset, dst int64) error {
 			return err
 		}
 	}
-	_, err = a.DB.Exec("UPDATE assets SET product_id=?,file=?,enhanced_file=?,updated_at=? WHERE id=?", dst, file, enhanced, now(), p.ID)
+	poster := ""
+	if p.PosterFile != "" {
+		poster, err = a.copyToProduct(p, p.PosterFile, dst)
+		if err != nil {
+			os.Remove(filepath.Join(a.Dir(dst), filepath.FromSlash(file)))
+			if enhanced != "" {
+				os.Remove(filepath.Join(a.Dir(dst), filepath.FromSlash(enhanced)))
+			}
+			return err
+		}
+	}
+	_, err = a.DB.Exec("UPDATE assets SET product_id=?,file=?,enhanced_file=?,poster_file=?,updated_at=? WHERE id=?", dst, file, enhanced, poster, now(), p.ID)
 	if err != nil {
 		os.Remove(filepath.Join(a.Dir(dst), filepath.FromSlash(file)))
 		if enhanced != "" {
 			os.Remove(filepath.Join(a.Dir(dst), filepath.FromSlash(enhanced)))
+		}
+		if poster != "" {
+			os.Remove(filepath.Join(a.Dir(dst), filepath.FromSlash(poster)))
 		}
 		return fmt.Errorf("保存素材移动失败")
 	}

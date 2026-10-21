@@ -52,7 +52,7 @@ func (a *Module) backfillHashBatch(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	a.Mu.Lock()
-	items, err := a.readAssets("SELECT " + assetColumns + " FROM assets WHERE phash='' ORDER BY id LIMIT 50")
+	items, err := a.readAssets("SELECT " + assetColumns + " FROM assets WHERE phash='' AND media='image' ORDER BY id LIMIT 50")
 	a.Mu.Unlock()
 	if err != nil {
 		return 0, fmt.Errorf("读取待补算素材失败")

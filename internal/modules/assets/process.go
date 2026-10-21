@@ -51,6 +51,10 @@ func (a *Module) process(w http.ResponseWriter, r *http.Request) {
 	}
 	pid := items[0].ProductID
 	for _, p := range items {
+		if err = videoBlocked(p, "做图片处理"); err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
 		if p.ProductID != pid {
 			fail(w, 400, "一次处理的图片必须属于同一商品")
 			return
@@ -68,6 +72,10 @@ func (a *Module) process(w http.ResponseWriter, r *http.Request) {
 		}
 		if ref.ProductID != pid {
 			fail(w, 400, "校色参考图必须是本批同一款的图")
+			return
+		}
+		if err = videoBlocked(ref, "做图片处理"); err != nil {
+			fail(w, 400, err.Error())
 			return
 		}
 	}
@@ -217,6 +225,9 @@ func (a *Module) executeProcess(ctx context.Context, j core.Job) error {
 		if p.ProductID != j.TargetID {
 			return fmt.Errorf("校色参考图必须是本批同一款的图")
 		}
+		if e = videoBlocked(p, "做图片处理"); e != nil {
+			return e
+		}
 		im, ex, e := a.load(p)
 		if e != nil {
 			return e
@@ -262,6 +273,9 @@ func (a *Module) executeProcess(ctx context.Context, j core.Job) error {
 	return a.saveResults(j, results)
 }
 func (a *Module) processOne(ctx context.Context, p Asset, in ProcessRequest, prompts processPrompts, ref *image.NRGBA) (*stagedProcess, error) {
+	if err := videoBlocked(p, "做图片处理"); err != nil {
+		return nil, err
+	}
 	started := time.Now()
 	c, e := a.ProductCategory(p.ProductID)
 	if e != nil {

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"xstudio/internal/core"
 	"xstudio/internal/imaging"
 )
 
@@ -47,8 +49,6 @@ func imageConfig(b []byte) (image.Config, string, error) {
 	return c, f, nil
 }
 func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
-	a.Mu.Lock()
-	defer a.Mu.Unlock()
 	var folderID *int64
 	if values, ok := r.URL.Query()["folder_id"]; ok {
 		if !folderWriteAllowed(w, r) {
@@ -65,7 +65,11 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 	if _, ok := a.authorizedProduct(w, r, id, true); !ok {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 256<<20)
+	bodyLimit := maxVideoBytes
+	if bodyLimit < maxPhotoBytes {
+		bodyLimit = maxPhotoBytes
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 32*bodyLimit+1<<20)
 	if !a.requireFolder(w, r, folderID) {
 		return
 	}
@@ -79,13 +83,17 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type pending struct {
-		p   Asset
-		tmp string
+		p      Asset
+		tmp    string
+		poster string
 	}
 	files := []pending{}
 	defer func() {
 		for _, v := range files {
 			_ = os.Remove(v.tmp)
+			if v.poster != "" {
+				_ = os.Remove(v.poster)
+			}
 		}
 	}()
 	for {
@@ -102,25 +110,48 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if len(files) >= 32 {
+			_ = part.Close()
 			fail(w, 413, "一次最多上传 32 张照片")
 			return
 		}
-		b, e := io.ReadAll(io.LimitReader(part, maxPhotoBytes+1))
+		name := safeName(part.FileName())
+		head, e := readPrefix(part, 32)
+		if e != nil {
+			_ = part.Close()
+			fail(w, 400, "读取上传文件失败")
+			return
+		}
+		if ext, _, ok := core.SniffVideo(head); ok {
+			saved, status, msg := a.saveIncomingVideo(id, head, part, ext)
+			_ = part.Close()
+			if status != 0 {
+				fail(w, status, msg)
+				return
+			}
+			p := Asset{Photo: Photo{ProductID: id, File: saved.file, OrigName: name, Width: saved.width, Height: saved.height, Metrics: saved.metrics, RetouchLog: Object{}, Source: "original", Media: "video", DurationMS: saved.dur, PosterFile: saved.posterFile}}
+			files = append(files, pending{p: p, tmp: saved.tmp, poster: saved.posterTmp})
+			continue
+		}
+		rest, e := io.ReadAll(io.LimitReader(part, maxPhotoBytes+1))
 		_ = part.Close()
 		if e != nil {
 			fail(w, 400, "读取上传照片失败")
 			return
 		}
+		b := append(append([]byte{}, head...), rest...)
 		if int64(len(b)) > maxPhotoBytes {
 			fail(w, 413, "单张照片不能超过 25 MB")
 			return
 		}
 		c, f, e := imageConfig(b)
 		if e != nil {
-			fail(w, 400, e.Error())
+			if strings.Contains(e.Error(), "像素") {
+				fail(w, 400, e.Error())
+			} else {
+				fail(w, 400, "只接受真实的 JPG、PNG、WebP 图片，或 MP4、MOV、WebM 视频")
+			}
 			return
 		}
-		// Decode as well as sniffing the header: reject truncated or corrupt images.
 		decoded, _, decodeErr := image.Decode(bytes.NewReader(b))
 		if decodeErr != nil {
 			fail(w, 400, "图片损坏，无法解码")
@@ -132,22 +163,22 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		e1 := func() error { defer tmp.Close(); _, e := tmp.Write(b); return e }()
-		files = append(files, pending{p: Asset{Photo: Photo{ProductID: id, OrigName: safeName(part.FileName()), Width: c.Width, Height: c.Height, Metrics: Object{}, RetouchLog: Object{}, Source: "original"}}, tmp: tmp.Name()})
-		if e1 != nil {
-			fail(w, 500, "保存上传照片失败")
-			return
-		}
 		ext := f
 		if f == "jpeg" {
 			ext = "jpg"
 		}
-		files[len(files)-1].p.File = ext
-		files[len(files)-1].p.PHash = fmt.Sprintf("%016x", imaging.Hash(imaging.Geometry(decoded, imaging.ReadExif(b).Orientation, 0, nil)))
+		files = append(files, pending{p: Asset{Photo: Photo{ProductID: id, File: ext, OrigName: name, Width: c.Width, Height: c.Height, Metrics: Object{}, RetouchLog: Object{}, Source: "original", Media: "image"}, PHash: fmt.Sprintf("%016x", imaging.Hash(imaging.Geometry(decoded, imaging.ReadExif(b).Orientation, 0, nil)))}, tmp: tmp.Name()})
+		if e1 != nil {
+			fail(w, 500, "保存上传照片失败")
+			return
+		}
 	}
 	if len(files) == 0 {
 		fail(w, 400, "没有收到 files 照片")
 		return
 	}
+	a.Mu.Lock()
+	defer a.Mu.Unlock()
 	tx, e := a.DB.Begin()
 	if e != nil {
 		fail(w, 500, "保存照片失败")
@@ -164,6 +195,7 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	photos := []Asset{}
+	medias := []string{}
 	for _, v := range files {
 		p := v.p
 		p.FolderID = folderID
@@ -173,26 +205,41 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 		p.Kind = "photo"
 		p.Tags = []string{}
 		p.Op = Object{}
-		res, e := tx.Exec("INSERT INTO assets(product_id,file,orig_name,width,height,created_by,created_at,folder_id) VALUES(?,'',?,?,?,?,?,?)", id, p.OrigName, p.Width, p.Height, currentUser(r).ID, now(), folderID)
+		if p.Media == "" {
+			p.Media = "image"
+		}
+		res, e := tx.Exec("INSERT INTO assets(product_id,file,orig_name,width,height,metrics,created_by,created_at,folder_id,media,duration_ms,poster_file) VALUES(?,'',?,?,?,?,?,?,?,?,?,?)", id, p.OrigName, p.Width, p.Height, js(p.Metrics), currentUser(r).ID, p.CreatedAt, folderID, p.Media, p.DurationMS, p.PosterFile)
 		if e != nil {
 			fail(w, 500, "保存照片失败")
 			return
 		}
 		p.ID, _ = res.LastInsertId()
-		base := strings.TrimSuffix(p.OrigName, filepath.Ext(p.OrigName))
-		p.File = fmt.Sprintf("原图/%06d_%s.%s", p.ID, base, p.File)
+		if p.Media != "video" {
+			base := strings.TrimSuffix(p.OrigName, filepath.Ext(p.OrigName))
+			p.File = fmt.Sprintf("原图/%06d_%s.%s", p.ID, base, p.File)
+		}
 		dst := filepath.Join(a.Dir(id), filepath.FromSlash(p.File))
 		if e = os.Rename(v.tmp, dst); e != nil {
 			fail(w, 500, "保存照片文件失败")
 			return
 		}
 		renamed = append(renamed, dst)
+		if v.poster != "" {
+			posterDst := filepath.Join(a.Dir(id), filepath.FromSlash(p.PosterFile))
+			if e = os.Rename(v.poster, posterDst); e != nil {
+				fail(w, 500, "保存视频封面失败")
+				return
+			}
+			renamed = append(renamed, posterDst)
+			p.PosterURL = fmt.Sprintf("/api/assets/%d/poster", p.ID)
+		}
 		if _, e = tx.Exec("UPDATE assets SET file=?,phash=?,updated_at=? WHERE id=?", p.File, p.PHash, p.UpdatedAt, p.ID); e != nil {
 			fail(w, 500, "保存照片失败")
 			return
 		}
 		p.URL = fmt.Sprintf("/files/products/%d/%s", id, p.File)
 		photos = append(photos, p)
+		medias = append(medias, p.Media)
 	}
 	if e = tx.Commit(); e != nil {
 		fail(w, 500, "保存照片失败")
@@ -204,6 +251,6 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 		ids = append(ids, photos[i].ID)
 		photos[i] = a.decorate(photos[i], currentUser(r), photos)
 	}
-	a.Audit(r, "assets.upload", "product", id, Object{"asset_ids": ids})
+	a.Audit(r, "assets.upload", "product", id, Object{"asset_ids": ids, "media": medias})
 	writeJSON(w, 201, Object{"items": photos, "total": len(photos)})
 }

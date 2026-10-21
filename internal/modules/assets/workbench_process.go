@@ -77,6 +77,9 @@ func (a *Module) workbenchSources(u core.User, in workbenchRequest) ([]workbench
 			if err != nil || !a.CanProduct(u, p.ProductID) {
 				return nil, fmt.Errorf("素材不存在")
 			}
+			if err = videoBlocked(p, "导入处理台"); err != nil {
+				return nil, err
+			}
 			s.asset = p
 		} else {
 			p, err := a.workbenchItem(u.ID, *v.InputID)
@@ -125,7 +128,11 @@ func (a *Module) workbenchProcess(w http.ResponseWriter, r *http.Request) {
 	a.Mu.Lock()
 	defer a.Mu.Unlock()
 	if _, err = a.workbenchSources(currentUser(r), in); err != nil {
-		fail(w, 404, err.Error())
+		status := 404
+		if strings.HasPrefix(err.Error(), "视频不能用来") {
+			status = 400
+		}
+		fail(w, status, err.Error())
 		return
 	}
 	uid := currentUser(r).ID

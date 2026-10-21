@@ -71,6 +71,9 @@ func GenerateWorn(ctx context.Context, c *core.Core, req WornRequest) ([]byte, c
 		if e != nil || ph.ProductID != req.ProductID || ph.Archived || seen[id] {
 			return nil, nil, wornError(404, "商品参考图不存在")
 		}
+		if ph.Media == "video" {
+			return nil, nil, wornError(400, "视频不能用来试穿试戴")
+		}
 		if media.AIMade(ph.Photo) {
 			return nil, nil, wornError(400, "商品参考必须是实拍或抠图")
 		}
@@ -118,7 +121,7 @@ func GenerateWorn(ctx context.Context, c *core.Core, req WornRequest) ([]byte, c
 	}
 	for _, id := range req.SourceAssets {
 		ph, e := a.asset(id)
-		if e != nil || ph.ProductID != req.ProductID || ph.Archived || media.AIMade(ph.Photo) {
+		if e != nil || ph.ProductID != req.ProductID || ph.Archived || ph.Media == "video" || media.AIMade(ph.Photo) {
 			return nil, nil, wornError(404, "商品参考图已变化或不存在")
 		}
 	}
@@ -258,6 +261,9 @@ func validateWornOutputTx(ctx context.Context, tx *sql.Tx, u core.User, req Outp
 		ph, err := core.ScanPhoto(tx.QueryRowContext(ctx, "SELECT "+core.PhotoColumns+" FROM assets WHERE id=? AND product_id=? AND archived=0", id, req.ProductID))
 		if err != nil || media.AIMade(ph) {
 			return wornError(404, "商品参考图已变化或不存在")
+		}
+		if ph.Media == "video" {
+			return wornError(400, "视频不能用来试穿试戴")
 		}
 	}
 	return nil
