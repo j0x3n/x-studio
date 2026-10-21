@@ -51,7 +51,7 @@ func imageTestActor() context.Context {
 	return WithAIActor(context.Background(), AIActor{UserID: 1, JobID: 9, Feature: "model_create"})
 }
 
-func TestEditImageFitsFirstPortraitReferenceToLandscape(t *testing.T) {
+func TestEditImageFitsAllReferencesToRequestedSize(t *testing.T) {
 	portrait := image.NewNRGBA(image.Rect(0, 0, 24, 36))
 	other := image.NewNRGBA(image.Rect(0, 0, 12, 18))
 	refs := []image.Image{portrait, other}
@@ -69,10 +69,7 @@ func TestEditImageFitsFirstPortraitReferenceToLandscape(t *testing.T) {
 			}
 			cfg, _, err := image.DecodeConfig(file)
 			file.Close()
-			want := image.Pt(1536, 1024)
-			if index == 1 {
-				want = other.Bounds().Size()
-			}
+			want := image.Pt(1536, 1024) // 没有 mask 时每张参考都补边到目标尺寸
 			if err != nil || image.Pt(cfg.Width, cfg.Height) != want {
 				t.Errorf("reference %d: %+v, %v", index, cfg, err)
 			}

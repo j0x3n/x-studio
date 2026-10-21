@@ -243,7 +243,7 @@ func TestModelsCandidateConfirmAndManualTryon(t *testing.T) {
 	wbExec(t, f, "UPDATE products SET info=? WHERE id=?", core.JS(obj{"style": "蝴蝶结", "material": "银", "cost": "SECRET_COST", "supplier": "SECRET_SUPPLIER"}), pid)
 	result := wbResult(t, modelJob(t, f, "/api/tryon/generate", modelTryon(mid, ref, obj{"asset_id": a1}, obj{"asset_id": a2})))
 	tr = modelTrace(t, ai)
-	if tr.Size != "1024x1536" || fmt.Sprint(tr.Widths) != "[1024 40 1536]" || strings.Contains(tr.Prompt, "SECRET") || !strings.Contains(tr.Prompt, "蝴蝶结") || !strings.Contains(tr.Prompt, "第3张：模特参考图") {
+	if tr.Size != "1024x1536" || fmt.Sprint(tr.Widths) != "[1024 1024 1024]" || strings.Contains(tr.Prompt, "SECRET") || !strings.Contains(tr.Prompt, "蝴蝶结") || !strings.Contains(tr.Prompt, "第3张：模特参考图") {
 		t.Fatal(tr)
 	}
 	saved := f.req(t, "POST", fmt.Sprintf("/api/workbench/items/%d/save", result), obj{"set_current": true}, 200)["asset"].(obj)

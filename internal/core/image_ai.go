@@ -103,9 +103,13 @@ func (a *Core) EditImageMask(ctx context.Context, prompt string, refs []image.Im
 	if mask != nil && mask.Bounds().Size() != refs[0].Bounds().Size() {
 		return nil, fmt.Errorf("mask 必须与第一张参考图同尺寸")
 	}
-	if mask == nil {
-		refs = append([]image.Image(nil), refs...)
-		refs[0] = FitToSize(refs[0], size)
+	// 返回图的方向会跟着参考图走（任何一张横图都可能让竖版请求返回横图），所以每张参考都补边到目标尺寸；
+	// 带 mask 时第一张必须和 mask 同尺寸，不动它
+	refs = append([]image.Image(nil), refs...)
+	for i := range refs {
+		if i > 0 || mask == nil {
+			refs[i] = FitToSize(refs[i], size)
+		}
 	}
 	return a.imageRequest(ctx, "/images/edits", size, func(model string) (string, []byte, error) {
 		return imageEditBody(model, prompt, size, refs, mask)
