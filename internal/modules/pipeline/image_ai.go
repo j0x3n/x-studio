@@ -55,7 +55,7 @@ func enhancementSections(doc string) map[string]string {
 func enhancementPrompt(parts map[string]string, kind string, p Product) (string, error) {
 	common, section := strings.TrimSpace(parts["通用要求"]), strings.TrimSpace(parts[kind])
 	if common == "" || section == "" {
-		return "", fmt.Errorf("补图.md 缺少通用要求或 %s 段落", kind)
+		return "", fmt.Errorf("补图.md 缺少通用要求或 %s 段落", photoCodeLabels(p.Category, kind))
 	}
 	fields := []string{"款名=" + p.Name}
 	if p.Category != nil && p.Category.Name != "" {

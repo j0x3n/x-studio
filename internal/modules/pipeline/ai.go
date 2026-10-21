@@ -106,7 +106,7 @@ func (a *Module) classify(ctx context.Context, p Product) error {
 				codeValid = true
 			}
 		}
-		validationError := validatePhoto(ph)
+		validationError := validatePhoto(ph, p.Category)
 		if !codeValid {
 			validationError = fmt.Errorf("编号不属于当前品类")
 		}

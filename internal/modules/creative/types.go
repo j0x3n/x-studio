@@ -1,5 +1,7 @@
 package creative
 
+import "xstudio/internal/modules/scenes"
+
 type TextSpec struct {
 	Key      string `json:"key"`
 	From     string `json:"from"`
@@ -51,6 +53,7 @@ type Size struct {
 	MM    float64 `json:"mm"`
 }
 type Params struct {
+	SceneID     int64  `json:"scene_id"`
 	HeroStyle   string `json:"hero_style"`
 	HeroB       *bool  `json:"hero_b"`
 	Sizes       []Size `json:"sizes"`
@@ -58,6 +61,7 @@ type Params struct {
 	SkipMissing bool   `json:"skip_missing"`
 }
 type Set struct {
+	Scene           *SceneSummary     `json:"scene"`
 	ID              int64             `json:"id"`
 	ListingID       int64             `json:"listing_id"`
 	Version         int               `json:"version"`
@@ -71,39 +75,41 @@ type Set struct {
 	CreatedBy       int64             `json:"created_by"`
 }
 type Item struct {
-	ID               int64          `json:"id"`
-	SetID            *int64         `json:"set_id"`
-	ListingID        int64          `json:"listing_id"`
-	Slot             string         `json:"slot"`
-	Seq              int            `json:"seq"`
-	TemplateKey      string         `json:"template_key"`
-	TemplateVersion  int            `json:"template_version"`
-	TemplateSnapshot Template       `json:"template_snapshot"`
-	Attempt          int            `json:"attempt"`
-	AutoAttempt      int            `json:"auto_attempt"`
-	Superseded       bool           `json:"superseded"`
-	Variant          string         `json:"variant"`
-	ProductMode      string         `json:"product_mode"`
-	Model            string         `json:"model"`
-	ModelReturned    string         `json:"model_returned"`
-	SourceAssetIDs   []int64        `json:"source_asset_ids"`
-	ModelID          int64          `json:"model_id"`
-	ModelRefIDs      []int64        `json:"model_ref_ids"`
-	WearType         string         `json:"wear_type"`
-	SizeCompare      bool           `json:"size_compare"`
-	Prompt           string         `json:"prompt"`
-	Texts            []ExpectedText `json:"texts"`
-	OutputAssetID    int64          `json:"output_asset_id"`
-	CanvasFile       string         `json:"canvas_file"`
-	Hard             Hard           `json:"hard"`
-	ReviewA          Review         `json:"review_a"`
-	ReviewB          Review         `json:"review_b"`
-	Route            string         `json:"route"`
-	RouteReasons     []string       `json:"route_reasons"`
-	Risk             int            `json:"risk"`
-	Human            string         `json:"human"`
-	Error            string         `json:"error"`
-	CreatedBy        int64          `json:"created_by"`
+	SceneSnapshot    scenes.Snapshot `json:"scene_snapshot"`
+	Scene            *SceneSummary   `json:"scene"`
+	ID               int64           `json:"id"`
+	SetID            *int64          `json:"set_id"`
+	ListingID        int64           `json:"listing_id"`
+	Slot             string          `json:"slot"`
+	Seq              int             `json:"seq"`
+	TemplateKey      string          `json:"template_key"`
+	TemplateVersion  int             `json:"template_version"`
+	TemplateSnapshot Template        `json:"template_snapshot"`
+	Attempt          int             `json:"attempt"`
+	AutoAttempt      int             `json:"auto_attempt"`
+	Superseded       bool            `json:"superseded"`
+	Variant          string          `json:"variant"`
+	ProductMode      string          `json:"product_mode"`
+	Model            string          `json:"model"`
+	ModelReturned    string          `json:"model_returned"`
+	SourceAssetIDs   []int64         `json:"source_asset_ids"`
+	ModelID          int64           `json:"model_id"`
+	ModelRefIDs      []int64         `json:"model_ref_ids"`
+	WearType         string          `json:"wear_type"`
+	SizeCompare      bool            `json:"size_compare"`
+	Prompt           string          `json:"prompt"`
+	Texts            []ExpectedText  `json:"texts"`
+	OutputAssetID    int64           `json:"output_asset_id"`
+	CanvasFile       string          `json:"canvas_file"`
+	Hard             Hard            `json:"hard"`
+	ReviewA          Review          `json:"review_a"`
+	ReviewB          Review          `json:"review_b"`
+	Route            string          `json:"route"`
+	RouteReasons     []string        `json:"route_reasons"`
+	Risk             int             `json:"risk"`
+	Human            string          `json:"human"`
+	Error            string          `json:"error"`
+	CreatedBy        int64           `json:"created_by"`
 }
 type OCRText struct {
 	Text string    `json:"text"`

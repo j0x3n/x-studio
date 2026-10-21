@@ -8,9 +8,16 @@ import (
 	"slices"
 	"strings"
 	"xstudio/internal/core"
+	"xstudio/internal/modules/scenes"
 )
 
 func (a *Module) enrichItem(ctx context.Context, item core.Object) error {
+	snapshot, err := typed[scenes.Snapshot](item["scene_snapshot"])
+	if err != nil {
+		return err
+	}
+	item["scene"] = sceneSummary(snapshot)
+	delete(item, "scene_snapshot")
 	listing, err := a.one(ctx, `SELECT l.product_id,l.shop_id,p.name AS product_name FROM listings l JOIN products p ON p.id=l.product_id WHERE l.id=?`, item["listing_id"])
 	if err != nil {
 		return err
@@ -62,6 +69,11 @@ func (a *Module) setObject(ctx context.Context, id int64, all bool) (core.Object
 		return nil, err
 	}
 	obj["items"] = items
+	snapshot, err := a.setScene(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	obj["scene"] = sceneSummary(snapshot)
 	jobs, err := objects(ctx, a.DB, `SELECT id,kind,status,progress,message FROM jobs WHERE (target_type='creative_set' AND target_id=?) OR (target_type='creative_item' AND target_id IN (SELECT id FROM creative_items WHERE set_id=?)) ORDER BY CASE WHEN status IN ('queued','running') THEN 0 ELSE 1 END,id DESC`, id, id)
 	if err != nil {
 		return nil, err

@@ -14,6 +14,9 @@ import (
 )
 
 func (a *Module) AfterMigrate() error {
+	if err := a.backfillStale(); err != nil {
+		return err
+	}
 	if err := a.seedTemplates(); err != nil {
 		return err
 	}
@@ -130,6 +133,21 @@ func (a *Module) seedTemplates() error {
 				continue
 			}
 			existing, findErr := a.one(context.Background(), "SELECT * FROM creative_templates WHERE key=?", t.Key)
+			if findErr == nil && stringValue(existing["source"]) == "custom" {
+				continue
+			}
+			if findErr == nil && stringValue(existing["source"]) == "file" && t.Version > int(number(existing["version"])) {
+				if err = validateTemplate(t); err != nil {
+					log.Printf("creative 跳过无效模板：%s", name)
+					continue
+				}
+				t.Source = "file"
+				if err = a.storeTemplate(context.Background(), t, 0); err != nil {
+					return err
+				}
+				a.AuditUser(0, "", "creative.seed_upgrade", "creative_template", int64(number(existing["id"])), core.Object{"key": t.Key, "version": t.Version})
+				continue
+			}
 			filled := core.Object{}
 			if findErr == nil {
 				for key, value := range existing {
@@ -180,7 +198,10 @@ func (a *Module) seedTemplates() error {
 }
 
 func (a *Module) storeTemplate(ctx context.Context, t Template, uid int64) error {
-	_, err := a.DB.ExecContext(ctx, `INSERT INTO creative_templates(key,name,kind,slot,categories,purpose,prompt,style_refs,texts,photo_codes,product_mode,product_box,gen_size,export,count,wear,version,enabled,source,updated_by,updated_at,lock_shape,size_compare,hero_style) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET name=excluded.name,kind=excluded.kind,slot=excluded.slot,categories=excluded.categories,purpose=excluded.purpose,prompt=excluded.prompt,style_refs=excluded.style_refs,texts=excluded.texts,photo_codes=excluded.photo_codes,product_mode=excluded.product_mode,product_box=excluded.product_box,gen_size=excluded.gen_size,export=excluded.export,count=excluded.count,wear=excluded.wear,version=excluded.version,enabled=excluded.enabled,updated_by=excluded.updated_by,updated_at=excluded.updated_at,lock_shape=excluded.lock_shape,size_compare=excluded.size_compare,hero_style=excluded.hero_style`, t.Key, t.Name, t.Kind, t.Slot, core.JS(t.Categories), t.Purpose, t.Prompt, core.JS(t.StyleRefs), core.JS(t.Texts), core.JS(t.PhotoCodes), t.ProductMode, core.JS(t.ProductBox), t.GenSize, core.JS(t.Export), t.Count, core.JS(t.Wear), t.Version, t.Enabled, t.Source, uid, core.Now(), t.LockShape, t.SizeCompare, t.HeroStyle)
+	if t.Source == "" {
+		t.Source = "custom"
+	}
+	_, err := a.DB.ExecContext(ctx, `INSERT INTO creative_templates(key,name,kind,slot,categories,purpose,prompt,style_refs,texts,photo_codes,product_mode,product_box,gen_size,export,count,wear,version,enabled,source,updated_by,updated_at,lock_shape,size_compare,hero_style) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET name=excluded.name,kind=excluded.kind,slot=excluded.slot,categories=excluded.categories,purpose=excluded.purpose,prompt=excluded.prompt,style_refs=excluded.style_refs,texts=excluded.texts,photo_codes=excluded.photo_codes,product_mode=excluded.product_mode,product_box=excluded.product_box,gen_size=excluded.gen_size,export=excluded.export,count=excluded.count,wear=excluded.wear,version=excluded.version,enabled=excluded.enabled,updated_by=excluded.updated_by,updated_at=excluded.updated_at,lock_shape=excluded.lock_shape,size_compare=excluded.size_compare,hero_style=excluded.hero_style,source=excluded.source`, t.Key, t.Name, t.Kind, t.Slot, core.JS(t.Categories), t.Purpose, t.Prompt, core.JS(t.StyleRefs), core.JS(t.Texts), core.JS(t.PhotoCodes), t.ProductMode, core.JS(t.ProductBox), t.GenSize, core.JS(t.Export), t.Count, core.JS(t.Wear), t.Version, t.Enabled, t.Source, uid, core.Now(), t.LockShape, t.SizeCompare, t.HeroStyle)
 	return err
 }
 func (a *Module) template(ctx context.Context, key string) (Template, error) {

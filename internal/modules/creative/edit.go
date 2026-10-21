@@ -103,6 +103,9 @@ func (a *Module) verifyExisting(ctx context.Context, item Item, job core.Job) er
 	if _, err = tx.ExecContext(ctx, "UPDATE creative_items SET human='',human_by=NULL,human_at='' WHERE id=? AND superseded=0", item.ID); err != nil {
 		return err
 	}
+	if err = assets.MarkStale(ctx, tx, []int64{item.OutputAssetID}, false); err != nil {
+		return err
+	}
 	if item.SetID != nil {
 		if _, err = tx.ExecContext(ctx, "UPDATE creative_sets SET glanced_at='',glanced_by=NULL WHERE id=?", *item.SetID); err != nil {
 			return err

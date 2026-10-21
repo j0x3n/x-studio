@@ -74,6 +74,7 @@ func (a *Module) templatePatch(w http.ResponseWriter, r *http.Request) {
 		version++
 	}
 	t.Version = version
+	t.Source = "custom"
 	if err = a.storeTemplate(r.Context(), t, core.CurrentUser(r).ID); err != nil {
 		fail(w, err)
 		return
@@ -175,7 +176,7 @@ func (a *Module) shopGet(w http.ResponseWriter, r *http.Request) {
 	}
 	obj, err := a.one(r.Context(), "SELECT * FROM creative_shop_settings WHERE shop_id=?", core.ID(r, "id"))
 	if err != nil {
-		obj = core.Object{"shop_id": core.ID(r, "id"), "models": core.Object{}, "template_set": core.Object{}}
+		obj = core.Object{"shop_id": core.ID(r, "id"), "models": core.Object{}, "template_set": core.Object{}, "main_ratios": []string{}, "detail_width": 0, "about_text": ""}
 	}
 	core.WriteJSON(w, 200, obj)
 }
@@ -183,14 +184,33 @@ func (a *Module) shopPut(w http.ResponseWriter, r *http.Request) {
 	if !a.shopScope(w, r) {
 		return
 	}
-	var in struct {
-		Models      map[string]int64  `json:"models"`
-		TemplateSet map[string]string `json:"template_set"`
-	}
-	if !core.Decode(w, r, &in) {
+	var patch core.Object
+	if !core.Decode(w, r, &patch) {
 		return
 	}
 	id := core.ID(r, "id")
+	current, err := a.shopSettings(r.Context(), id)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	merged, _ := typed[core.Object](current)
+	for key, value := range patch {
+		if !slices.Contains([]string{"models", "template_set", "main_ratios", "detail_width", "about_text"}, key) || value == nil {
+			core.Fail(w, 400, "店铺出图设置字段不正确："+key)
+			return
+		}
+		merged[key] = value
+	}
+	in, err := typed[ShopSettings](merged)
+	if err != nil {
+		core.Fail(w, 400, "店铺出图设置格式不正确")
+		return
+	}
+	if err = validateShopSettings(in); err != nil {
+		fail(w, err)
+		return
+	}
 	for slot, mid := range in.Models {
 		if !slices.Contains([]string{"female_main", "male", "hand"}, slot) {
 			core.Fail(w, 400, "模特位不正确")
@@ -221,7 +241,7 @@ func (a *Module) shopPut(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_, err := a.DB.ExecContext(r.Context(), `INSERT INTO creative_shop_settings(shop_id,models,template_set,updated_by,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(shop_id) DO UPDATE SET models=excluded.models,template_set=excluded.template_set,updated_by=excluded.updated_by,updated_at=excluded.updated_at`, id, core.JS(in.Models), core.JS(in.TemplateSet), core.CurrentUser(r).ID, core.Now())
+	_, err = a.DB.ExecContext(r.Context(), `INSERT INTO creative_shop_settings(shop_id,models,template_set,main_ratios,detail_width,about_text,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(shop_id) DO UPDATE SET models=excluded.models,template_set=excluded.template_set,main_ratios=excluded.main_ratios,detail_width=excluded.detail_width,about_text=excluded.about_text,updated_by=excluded.updated_by,updated_at=excluded.updated_at`, id, core.JS(in.Models), core.JS(in.TemplateSet), core.JS(in.MainRatios), in.DetailWidth, in.AboutText, core.CurrentUser(r).ID, core.Now())
 	if err != nil {
 		fail(w, err)
 		return

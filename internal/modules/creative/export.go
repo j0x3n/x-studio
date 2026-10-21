@@ -164,7 +164,7 @@ func (a *Module) whiteImage(product core.Product) (*image.NRGBA, error) {
 			}
 		}
 	}
-	return nil, problem(409, "缺少一键出图的 A1/A2 白底图，请先完成抠图")
+	return nil, problem(409, "缺少一键出图的 "+photoCodeNames(product.Category, []string{"A1", "A2"})+" 白底图，请先完成抠图")
 }
 func (a *Module) makeExport(ctx context.Context, set Set, items []Item) (map[string][]byte, string, error) {
 	product, err := a.PipelineProduct(set.ListingID)
@@ -172,6 +172,10 @@ func (a *Module) makeExport(ctx context.Context, set Set, items []Item) (map[str
 		return nil, "", err
 	}
 	files := map[string][]byte{}
+	shop, err := a.shopSettings(ctx, product.ShopID)
+	if err != nil {
+		return nil, "", err
+	}
 	var record bytes.Buffer
 	record.Write([]byte{0xef, 0xbb, 0xbf})
 	writer := csv.NewWriter(&record)
@@ -182,7 +186,7 @@ func (a *Module) makeExport(ctx context.Context, set Set, items []Item) (map[str
 		if ctx.Err() != nil {
 			return nil, "", ctx.Err()
 		}
-		for _, size := range item.TemplateSnapshot.Export {
+		for _, size := range exportSizes(item, shop) {
 			im, width, height, err := a.exportImage(item, size)
 			if err != nil {
 				return nil, "", err
@@ -341,6 +345,9 @@ func (a *Module) exportPost(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail(w, err)
 		return
+	}
+	for index := range latestItems {
+		latestItems[index].Scene = sceneSummary(latestItems[index].SceneSnapshot)
 	}
 	var latestGlance string
 	if err = tx.QueryRowContext(r.Context(), "SELECT glanced_at FROM creative_sets WHERE id=?", set.ID).Scan(&latestGlance); err != nil {

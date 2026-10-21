@@ -48,7 +48,7 @@ func TestStartSetPipelineSourcePermissionAndSkip(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.exec(t, `UPDATE creative_templates SET product_mode='redraw', photo_codes='["A1","A2"]'`)
-	if _, err = StartSet(context.Background(), f.c, f.listingID, 1, []string{"main"}, Params{SkipMissing: true}); err == nil || !strings.Contains(err.Error(), "缺少实拍参考图（A1、A2）") {
+	if _, err = StartSet(context.Background(), f.c, f.listingID, 1, []string{"main"}, Params{SkipMissing: true}); err == nil || !strings.Contains(err.Error(), "一对平放正面（A1）、一对立起 45°（A2）") {
 		t.Fatal(err)
 	}
 }

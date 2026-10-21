@@ -71,7 +71,7 @@ func (a *Module) retouch(ctx context.Context, p Product) error {
 		if ph.Code == "" {
 			continue
 		}
-		if e = validatePhoto(ph); e != nil {
+		if e = validatePhoto(ph, p.Category); e != nil {
 			return e
 		}
 		count++

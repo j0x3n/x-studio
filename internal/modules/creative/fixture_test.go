@@ -23,6 +23,7 @@ import (
 	"xstudio/internal/modules/accounts"
 	"xstudio/internal/modules/assets"
 	"xstudio/internal/modules/products"
+	"xstudio/internal/modules/scenes"
 )
 
 type fakeAI struct {
@@ -177,7 +178,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	a := New(c)
-	if err = c.Start(accounts.New(c), products.New(c), assets.New(c), a); err != nil {
+	if err = c.Start(accounts.New(c), products.New(c), assets.New(c), scenes.New(c), a); err != nil {
 		c.Close()
 		t.Fatal(err)
 	}
