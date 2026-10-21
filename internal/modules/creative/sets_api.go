@@ -199,6 +199,7 @@ func planItems(setID, lid, uid int64, templates []Template, params Params, produ
 				count = len(sku)
 			}
 		}
+		count = min(count, max(1, indexedTextCount(t, product, count)))
 		for seq := 1; seq <= count; seq++ {
 			variants := []string{""}
 			if t.Slot == "main1" {
@@ -415,4 +416,34 @@ func (a *Module) itemRetext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.enqueueItem(w, r, item, core.Object{"operation": "retext", "key": in.Key, "text": in.Text})
+}
+
+// indexedTextCount 数模板里按 {i} 取第几条文案的位置，前几张有文案可写；模板没有 {i} 时不限制。
+// 文案只有 1 条细节时，细节屏不再展开成 3 张一样的图。
+func indexedTextCount(t Template, product core.Product, count int) int {
+	indexed := false
+	for _, spec := range t.Texts {
+		if strings.Contains(spec.From, "{i}") {
+			indexed = true
+		}
+	}
+	if !indexed {
+		return count
+	}
+	n := 0
+	for seq := 1; seq <= count; seq++ {
+		for _, text := range makeTexts(t, product, seq, nil) {
+			spec := ""
+			for _, s := range t.Texts {
+				if s.Key == text.Key {
+					spec = s.From
+				}
+			}
+			if strings.Contains(spec, "{i}") {
+				n = seq
+				break
+			}
+		}
+	}
+	return n
 }

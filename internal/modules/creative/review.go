@@ -273,6 +273,29 @@ func validReview(value Review) bool {
 	}
 	return true
 }
+
+// fillNotApplicable 补齐不放商品（none）和实拍裁切（photo）的复核：商品项不适用，模型常回 na 或漏写
+// 尺寸、人体、佩戴和数组字段；后面本来就会改成 pass / na，这里先补齐，免得整次复核判成格式不对。
+func fillNotApplicable(value *Review, mode string) {
+	if mode != "photo" && mode != "none" {
+		return
+	}
+	if value.Checks == nil {
+		value.Checks = map[string]string{}
+	}
+	value.Checks["product"] = "pass"
+	for _, key := range []string{"size", "body", "placement"} {
+		if value.Checks[key] == "" {
+			value.Checks[key] = "na"
+		}
+	}
+	if value.Issues == nil {
+		value.Issues = []Issue{}
+	}
+	if value.SizeMM == nil {
+		value.SizeMM = []float64{}
+	}
+}
 func unsureReview() Review {
 	return Review{Checks: map[string]string{"product": "unsure", "size": "unsure", "body": "unsure", "placement": "unsure", "style": "unsure"}, Score: 60, SizeMM: []float64{}, Issues: []Issue{}}
 }
@@ -313,6 +336,9 @@ func (a *Module) reviewOnce(ctx context.Context, item Item, product core.Product
 		if err == nil {
 			value, decodeErr := typed[Review](raw)
 			_, hasScore := raw["score"]
+			if decodeErr == nil {
+				fillNotApplicable(&value, item.ProductMode)
+			}
 			if decodeErr == nil && hasScore && validReview(value) {
 				if item.ProductMode != "model" {
 					value.Checks["size"] = "na"

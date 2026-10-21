@@ -12,8 +12,10 @@ import (
 	"image/color"
 	"image/draw"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 	"xstudio/internal/core"
 	"xstudio/internal/media"
 	"xstudio/internal/modules/assets"
@@ -402,9 +404,12 @@ func makeTexts(t Template, product core.Product, seq int, size *Size) []Expected
 			text = strings.TrimPrefix(spec.From, "literal:")
 		}
 		isCritical := spec.Critical || critical(text)
-		runes := []rune(text)
-		if spec.Max > 0 && len(runes) > spec.Max {
-			text = string(runes[:spec.Max])
+		if spec.Max > 0 && len([]rune(text)) > spec.Max {
+			if isCritical {
+				text = string([]rune(text)[:spec.Max])
+			} else {
+				text = shortenText(text, spec.Max)
+			}
 		}
 		if text != "" {
 			out = append(out, ExpectedText{Key: spec.Key, Text: text, Critical: isCritical})
@@ -412,6 +417,57 @@ func makeTexts(t Template, product core.Product, seq int, size *Size) []Expected
 	}
 	return out
 }
+
+var bracketText = regexp.MustCompile(`（[^）]*）|\([^)]*\)|【[^】]*】|\[[^\]]*\]`)
+
+// shortenText 把装饰性文字缩到 max 个字以内：先去掉括号里的补充，再按语言缩。
+// 中文款名核心词在后（锁骨链、手串），去掉夹在里面的英文规格后保留末尾；英文按单词截。
+func shortenText(text string, max int) string {
+	text = strings.TrimSpace(bracketText.ReplaceAllString(text, ""))
+	if len([]rune(text)) <= max {
+		return text
+	}
+	hasCJK := false
+	for _, r := range text {
+		if unicode.Is(unicode.Han, r) {
+			hasCJK = true
+			break
+		}
+	}
+	if !hasCJK {
+		out := ""
+		for _, word := range strings.Fields(text) {
+			next := strings.TrimSpace(out + " " + word)
+			if len([]rune(next)) > max {
+				break
+			}
+			out = next
+		}
+		if out == "" {
+			out = string([]rune(text)[:max])
+		}
+		return out
+	}
+	kept := []string{}
+	for _, word := range strings.Fields(text) {
+		ascii := true
+		for _, r := range word {
+			if r > unicode.MaxASCII {
+				ascii = false
+				break
+			}
+		}
+		if !ascii {
+			kept = append(kept, word)
+		}
+	}
+	runes := []rune(strings.Join(kept, ""))
+	if len(runes) > max {
+		runes = runes[len(runes)-max:]
+	}
+	return string(runes)
+}
+
 func (a *Module) generationPrompt(item *Item, product core.Product, params Params) (string, error) {
 	t := item.TemplateSnapshot
 	if item.ProductMode == "photo" {
@@ -501,7 +557,10 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 	if section := promptSection(mainDoc, "比例"); section != "" && scale != "" && (item.ProductMode == "model" || item.ProductMode == "redraw") {
 		sections = append(sections, strings.ReplaceAll(section, "{比例}", scale))
 	}
-	if t.Kind == "detail" {
+	if t.Kind == "detail" && len(textLines) == 0 {
+		// 模板版式里写了标题条，没有文案时模型会自己编字，这里明确不要
+		sections = append(sections, "This image has no text. Leave the area the layout reserves for text as plain background: no title band, no characters, no letters, no numbers, no placeholder text.")
+	} else if t.Kind == "detail" {
 		sections = append(sections, promptSection(wrapper, "图上的字"))
 	} else if len(textLines) > 0 {
 		sections = append(sections, "Render the following Chinese text exactly, character by character, no extra characters, no typos, crisp and legible: {文字}")
