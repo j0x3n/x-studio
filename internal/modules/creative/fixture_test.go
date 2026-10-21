@@ -26,14 +26,16 @@ import (
 )
 
 type fakeAI struct {
-	images  atomic.Int64
-	texts   atomic.Int64
-	reviews atomic.Int64
-	mu      sync.Mutex
-	read    []OCRText
-	review  *Review
-	before  func()
-	orders  []string
+	images        atomic.Int64
+	failImage     atomic.Int64
+	failImageFrom atomic.Int64
+	texts         atomic.Int64
+	reviews       atomic.Int64
+	mu            sync.Mutex
+	read          []OCRText
+	review        *Review
+	before        func()
+	orders        []string
 }
 
 func (fake *fakeAI) serve(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +70,7 @@ func (fake *fakeAI) serve(w http.ResponseWriter, r *http.Request) {
 		core.WriteJSON(w, 200, core.Object{"choices": []core.Object{{"message": core.Object{"content": core.JS(response)}}}})
 		return
 	}
-	fake.images.Add(1)
+	imageCall := fake.images.Add(1)
 	size := ""
 	if r.URL.Path == "/images/generations" {
 		var req struct {
@@ -106,6 +108,10 @@ func (fake *fakeAI) serve(w http.ResponseWriter, r *http.Request) {
 	fake.mu.Unlock()
 	if before != nil {
 		before()
+	}
+	if imageCall >= max(1, fake.failImageFrom.Load()) && imageCall <= fake.failImage.Load() {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	width, height := imageSize(size)
 	if width == 0 || height == 0 {

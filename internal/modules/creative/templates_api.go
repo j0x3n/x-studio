@@ -111,13 +111,26 @@ func (a *Module) templateTrial(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	item := Item{ListingID: in.ListingID, Slot: t.Slot, Seq: 1, TemplateKey: t.Key, TemplateVersion: t.Version, TemplateSnapshot: t, Attempt: 1, ProductMode: t.ProductMode, CreatedBy: uid}
+	missing, err := a.preflight(r.Context(), product, []Item{item})
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if len(missing) > 0 {
+		writeMissing(w, missing)
+		return
+	}
 	tx, err := a.DB.BeginTx(r.Context(), nil)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	defer tx.Rollback()
-	item := Item{ListingID: in.ListingID, Slot: t.Slot, Seq: 1, TemplateKey: t.Key, TemplateVersion: t.Version, TemplateSnapshot: t, Attempt: 1, ProductMode: t.ProductMode, CreatedBy: uid}
+	if err = authorizeTx(r.Context(), tx, uid, in.ListingID, core.CreativeRun); err != nil {
+		fail(w, err)
+		return
+	}
 	id, err := insertItem(r.Context(), tx, item)
 	if err != nil {
 		fail(w, err)

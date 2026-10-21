@@ -51,10 +51,11 @@ type Size struct {
 	MM    float64 `json:"mm"`
 }
 type Params struct {
-	HeroStyle string `json:"hero_style"`
-	HeroB     *bool  `json:"hero_b"`
-	Sizes     []Size `json:"sizes"`
-	Note      string `json:"note"`
+	HeroStyle   string `json:"hero_style"`
+	HeroB       *bool  `json:"hero_b"`
+	Sizes       []Size `json:"sizes"`
+	Note        string `json:"note"`
+	SkipMissing bool   `json:"skip_missing"`
 }
 type Set struct {
 	ID              int64             `json:"id"`
@@ -123,12 +124,18 @@ type FormatCheck struct {
 	Pass bool `json:"pass"`
 }
 type Hard struct {
-	Pixel  PixelCheck  `json:"pixel"`
-	Text   []TextCheck `json:"text"`
-	Banned []string    `json:"banned"`
-	Format FormatCheck `json:"format"`
-	OCR    []OCRText   `json:"ocr"`
-	Error  string      `json:"error,omitempty"`
+	Cutout *CutoutCheck `json:"cutout,omitempty"`
+	Pixel  PixelCheck   `json:"pixel"`
+	Text   []TextCheck  `json:"text"`
+	Banned []string     `json:"banned"`
+	Format FormatCheck  `json:"format"`
+	OCR    []OCRText    `json:"ocr"`
+	Error  string       `json:"error,omitempty"`
+}
+type CutoutCheck struct {
+	Mode     string  `json:"mode"`
+	Coverage float64 `json:"coverage"`
+	Code     string  `json:"code"`
 }
 type Issue struct {
 	Check  string    `json:"check"`
