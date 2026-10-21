@@ -2,6 +2,7 @@ package assets
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -111,6 +112,7 @@ func (a *Module) modelRoutes(r *core.Router) {
 	r.Handle("POST /api/models", core.ModelManage, a.modelCreate)
 	r.Handle("GET /api/models/{id}", core.ModelView, a.modelGet)
 	r.Handle("PATCH /api/models/{id}", core.ModelManage, a.modelPatch)
+	r.Handle("DELETE /api/models/{id}", core.ModelManage, a.modelDelete)
 	r.Handle("POST /api/models/{id}/references", core.ModelManage, a.modelUpload)
 	r.Handle("DELETE /api/models/{id}/references/{ref}", core.ModelManage, a.modelDeleteReference)
 	r.Handle("GET /api/models/{id}/references/{ref}/file", core.ModelView, a.modelFile)
@@ -304,4 +306,122 @@ func (a *Module) modelPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	a.Audit(r, "assets.model.update", "model", m.ID, raw)
 	a.modelResponse(w, 200, m, nil)
+}
+func modelInShopSlot(tx *sql.Tx, id int64) (bool, error) {
+	var n int
+	if err := tx.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='creative_shop_settings'`).Scan(&n); err != nil {
+		return false, err
+	}
+	if n == 0 {
+		return false, nil
+	}
+	rows, err := tx.Query(`SELECT models FROM creative_shop_settings`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw string
+		if err = rows.Scan(&raw); err != nil {
+			return false, err
+		}
+		var models map[string]json.RawMessage
+		if json.Unmarshal([]byte(raw), &models) != nil {
+			continue
+		}
+		for _, v := range models {
+			var mid int64
+			if json.Unmarshal(v, &mid) == nil && mid == id {
+				return true, nil
+			}
+		}
+	}
+	return false, rows.Err()
+}
+func (a *Module) modelDelete(w http.ResponseWriter, r *http.Request) {
+	a.Mu.Lock()
+	defer a.Mu.Unlock()
+	u, err := a.User(currentUser(r).ID)
+	if err != nil || !u.Has(core.ModelManage) {
+		fail(w, 403, "没有维护模特权限")
+		return
+	}
+	m, err := a.getModel(u, idParam(r, "id"), false)
+	if err != nil {
+		fail(w, 404, "模特不存在")
+		return
+	}
+	if !m.Archived {
+		fail(w, 409, "先归档再删除")
+		return
+	}
+	tx, err := a.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	defer tx.Rollback()
+	used, err := modelInShopSlot(tx, m.ID)
+	if err != nil {
+		fail(w, 500, "读取出图设置失败")
+		return
+	}
+	if used {
+		fail(w, 409, "这个模特还在「设置 → AI 出图」的模特位里，先换掉再删除")
+		return
+	}
+	var refs int
+	if err = tx.QueryRow(`SELECT count(*) FROM model_references WHERE model_id=?`, m.ID).Scan(&refs); err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	rows, err := tx.Query(`SELECT file FROM model_references WHERE model_id=?`, m.ID)
+	if err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	files := []string{}
+	for rows.Next() {
+		var name string
+		if err = rows.Scan(&name); err != nil {
+			rows.Close()
+			fail(w, 500, "删除模特失败")
+			return
+		}
+		files = append(files, name)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	if _, err = tx.Exec(`UPDATE shop_models SET cover_reference_id=NULL WHERE id=?`, m.ID); err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	if _, err = tx.Exec(`DELETE FROM model_references WHERE model_id=?`, m.ID); err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	res, err := tx.Exec(`DELETE FROM shop_models WHERE id=? AND archived=1`, m.ID)
+	if err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		fail(w, 409, "先归档再删除")
+		return
+	}
+	if err = core.AuditTx(tx, r, "model.delete", "model", m.ID, Object{"name": m.Name, "reference_count": refs}); err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		fail(w, 500, "删除模特失败")
+		return
+	}
+	a.removeModelFiles(m.ID, files)
+	writeJSON(w, 200, Object{})
 }

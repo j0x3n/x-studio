@@ -16,7 +16,7 @@ func (a *Module) permissions(w http.ResponseWriter, r *http.Request) {
 	core.WriteJSON(w, 200, core.Permissions)
 }
 func (a *Module) visibleShops(u core.User) ([]core.Object, error) {
-	q := "SELECT id,name,platform,language,settings,archived,created_at FROM shops"
+	q := "SELECT id,name,platform,site,currency,language,settings,archived,created_at FROM shops"
 	args := []any{}
 	if u.Role.Key != "admin" {
 		q += " WHERE id IN (SELECT shop_id FROM user_shops WHERE user_id=?)"

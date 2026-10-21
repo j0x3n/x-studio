@@ -330,6 +330,31 @@ func (a *Module) modelDeleteReference(w http.ResponseWriter, r *http.Request) {
 	a.modelResponse(w, 200, m, nil)
 }
 
+func (a *Module) removeModelFiles(mid int64, files []string) {
+	root, err := a.modelRoot(mid)
+	if err != nil {
+		log.Printf("清理模特 %d 的参考图失败：%v", mid, err)
+		return
+	}
+	for _, name := range files {
+		if name == "" {
+			continue
+		}
+		if err = root.Remove(name); err != nil && !os.IsNotExist(err) {
+			log.Printf("清理模特 %d 的参考图 %s 失败：%v", mid, name, err)
+		}
+	}
+	root.Close()
+	parent, err := os.OpenRoot(a.Cfg.DataDir)
+	if err != nil {
+		log.Printf("清理模特 %d 的目录失败：%v", mid, err)
+		return
+	}
+	defer parent.Close()
+	if err = parent.Remove(fmt.Sprintf("models/%d", mid)); err != nil && !os.IsNotExist(err) {
+		log.Printf("清理模特 %d 的目录失败：%v", mid, err)
+	}
+}
 func (a *Module) modelFile(w http.ResponseWriter, r *http.Request) {
 	m, e := a.getModel(currentUser(r), idParam(r, "id"), false)
 	if e != nil {
