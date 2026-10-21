@@ -36,4 +36,4 @@ export const sceneApi = {
   bind: (body: { listing_ids: number[]; scene_id: number | null } | { shop_id: number; scene_id: number | null }) => api('/api/scenes/bindings', { method: 'PUT', body })
 }
 
-export const SCENE_SOURCE: Record<Binding['source'], string> = { listing: '单独指定', shop: '店铺默认', default: '兜底场景', none: '没有场景' }
+export const SCENE_SOURCE: Record<Binding['source'], string> = { listing: '单独指定', shop: '店铺默认', default: '默认场景', none: '没有场景' }

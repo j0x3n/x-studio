@@ -67,7 +67,7 @@ export function Scenes() {
               </div>
               <div className="scene-info">
                 <div className="row" style={{ gap: 6 }}><b className="ellipsis">{s.name}</b>{s.is_default && <Pill kind="pill-info" dot={false}>默认</Pill>}{s.archived && <Pill kind="pill-neutral" dot={false}>已归档</Pill>}</div>
-                <p className="scene-desc">{s.still || s.wear || s.note || '还没写描述'}</p>
+                <p className="scene-desc">{s.note || s.still || s.wear || '还没写描述'}</p>
                 <div className="inline fs-12 t3">
                   <span>{shopName(s.shop_id)}</span><span className="sep" />
                   <span>{s.categories.length ? s.categories.map(catName).join('、') : '全部品类'}</span><span className="sep" />
@@ -221,7 +221,7 @@ function SceneUsage({ scene, onChange }: { scene: Scene; onChange: () => void })
       {r.product.cover_url ? <img className="cover" src={r.product.cover_url} alt="" /> : <span className="cover" />}
       <span className="grow ellipsis">{r.product.name}<span className="t4 fs-12"> · {shopName(r.shop_id)}</span></span>
       {b && !mine && <span className="t3 fs-12 ellipsis" style={{ maxWidth: 180 }}>现在：{b.scene_name || '—'}（{SCENE_SOURCE[b.source]}）</span>}
-      {mine && <span className="t3 fs-12">{b?.source === 'listing' ? '单独指定' : '店铺默认'}</span>}
+      {mine && <span className="t3 fs-12">{b ? SCENE_SOURCE[b.source] : ''}</span>}
       {mine && run && b?.source === 'listing' && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={e => { e.preventDefault(); bind([r.id], null) }}>取消</button>}
     </label>
   }

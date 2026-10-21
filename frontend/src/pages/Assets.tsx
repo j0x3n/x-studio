@@ -444,7 +444,7 @@ export function Assets() {
                         {src.label !== '原图' && <span className="lib-src"><Pill kind={src.pill} dot={false}>{src.label}</Pill></span>}
                         {canUpload && a.media !== 'video' && <button className="lib-hover btn btn-sm" onClick={e => { e.stopPropagation(); process([a.id]) }}><Wand2 />处理</button>}
                         {a.stale && <span className="lib-stale">旧版本</span>}
-                        {(a.version_count || 1) > 1 && <span className="lib-ver mono" title="同一张原图的版本数">{a.version_count} 版</span>}
+                        {a.kind !== 'output' && (a.version_count || 1) > 1 && <span className="lib-ver mono" title="这张原图修过几个版本（含原图）">{a.version_count} 版</span>}
                         {a.distance !== undefined && <span className="lib-ver mono" title="差异值，0 表示几乎一样">差 {a.distance}</span>}
                       </div>
                       <div className="lib-meta">

@@ -3,9 +3,9 @@
   "name": "冷灰石材",
   "default": true,
   "categories": [],
-  "still": "A matte mid-grey stone surface with fine natural texture; the far edge of the stone falls off into darkness.",
-  "wear": "Charcoal fine-knit sweater, plain dark blue-grey backdrop, no other jewelry.",
-  "light": "Cool white side light from the left, crisp but soft directional shadow, low-key, calm, low saturation.",
+  "still": "哑光中灰石材台面，带细微的天然纹理，石材远端渐渐没入暗处。",
+  "wear": "炭灰色细针织毛衣，纯色深蓝灰背景，不戴其他首饰。",
+  "light": "左侧冷白侧光，影子清晰但柔和，整体偏暗、安静、低饱和。",
   "props": "",
   "note": "店里一直在用的默认风格：冷灰、侧光、暗调。没指定场景的款都用它。",
   "refs": []
