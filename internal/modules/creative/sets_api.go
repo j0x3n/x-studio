@@ -2,6 +2,7 @@ package creative
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -225,113 +226,22 @@ func (a *Module) setsCreate(w http.ResponseWriter, r *http.Request) {
 	if !core.Decode(w, r, &in) {
 		return
 	}
-	if len(in.Parts) == 0 || len(in.Parts) > 2 {
-		core.Fail(w, 400, "请选择 main 或 detail")
-		return
-	}
-	seen := map[string]bool{}
-	for _, part := range in.Parts {
-		if !slices.Contains([]string{"main", "detail"}, part) || seen[part] {
-			core.Fail(w, 400, "出图部分不正确或重复")
+	result, err := a.startSet(r.Context(), lid, core.CurrentUser(r).ID, in.Parts, in.Params, "")
+	if err != nil {
+		var missing *missingError
+		if errors.As(err, &missing) {
+			writeMissing(w, missing.Items)
 			return
 		}
-		seen[part] = true
-	}
-	if len(in.Params.Sizes) > 40 || len([]rune(in.Params.Note)) > 4000 {
-		core.Fail(w, 400, "尺寸数量或补充要求过长")
+		fail(w, err)
 		return
 	}
-	for _, size := range in.Params.Sizes {
-		if size.MM <= 0 {
-			core.Fail(w, 400, "尺寸必须大于 0")
-			return
-		}
-	}
-	product, err := a.PipelineProduct(lid)
+	obj, err := a.setObject(r.Context(), result.SetID, false)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	templates, err := a.selectTemplates(r.Context(), product, in.Parts, in.Params)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	keys := map[string]string{}
-	for _, t := range templates {
-		keys[t.Slot] = t.Key
-	}
-	allowance := int(number(a.settings()["max_images_per_listing"]))
-	uid := core.CurrentUser(r).ID
-	planned := planItems(0, lid, uid, templates, in.Params, product)
-	missing, err := a.preflight(r.Context(), product, planned)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	if len(missing) > 0 && (!in.Params.SkipMissing || len(missing) == len(planned)) {
-		writeMissing(w, missing)
-		return
-	}
-	tx, err := a.DB.BeginTx(r.Context(), nil)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	defer tx.Rollback()
-	if err = authorizeTx(r.Context(), tx, uid, lid, core.CreativeRun); err != nil {
-		fail(w, err)
-		return
-	}
-	var version int
-	if err = tx.QueryRowContext(r.Context(), "SELECT coalesce(max(version),0)+1 FROM creative_sets WHERE listing_id=?", lid).Scan(&version); err != nil {
-		fail(w, err)
-		return
-	}
-	result, err := tx.ExecContext(r.Context(), `INSERT INTO creative_sets(listing_id,version,status,template_keys,params,parts,images_allowance,created_by,created_at,updated_at) VALUES(?,?,'generating',?,?,?,?,?,?,?)`, lid, version, core.JS(keys), core.JS(in.Params), core.JS(in.Parts), allowance, uid, core.Now(), core.Now())
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	id, _ := result.LastInsertId()
-	for _, item := range planned {
-		item.SetID = &id
-		itemID, err := insertItem(r.Context(), tx, item)
-		if err != nil {
-			fail(w, err)
-			return
-		}
-		if item.Variant == "B" {
-			if _, err = tx.ExecContext(r.Context(), "UPDATE creative_sets SET hero_b_item_id=? WHERE id=?", itemID, id); err != nil {
-				fail(w, err)
-				return
-			}
-		}
-	}
-	kind := "creative.detail"
-	if contains(in.Parts, "main") {
-		kind = "creative.main"
-	}
-	jid, err := enqueueTx(r.Context(), tx, kind, "creative_set", id, uid, core.Object{})
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	if err = auditTx(r.Context(), tx, uid, "creative.create", "creative_set", id, in); err != nil {
-		fail(w, err)
-		return
-	}
-	if err = tx.Commit(); err != nil {
-		fail(w, err)
-		return
-	}
-	a.Wake()
-	obj, err := a.setObject(r.Context(), id, false)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	job, err := a.one(r.Context(), "SELECT * FROM jobs WHERE id=?", jid)
+	job, err := a.one(r.Context(), "SELECT * FROM jobs WHERE id=?", result.JobID)
 	if err != nil {
 		fail(w, err)
 		return

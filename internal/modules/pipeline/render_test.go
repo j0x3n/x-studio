@@ -87,6 +87,7 @@ func TestRenderFullPipelineDimensionsAndZip(t *testing.T) {
 	writeEnhancePrompt(t, f.a)
 	f.login(t, "admin")
 	id := f.product(t)
+	f.setRenderMode(t, id, "html")
 	for i := 0; i < 3; i++ {
 		up := f.upload(t, id, fmt.Sprintf("test-%d.png", i), photoBytes(t, 120, 160), 201)
 		ids = append(ids, int64(up["photos"].([]any)[0].(Object)["id"].(float64)))

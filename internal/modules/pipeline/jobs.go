@@ -125,7 +125,9 @@ func (a *Module) execute(ctx context.Context, j Job) error {
 		case "copy":
 			e = a.copyText(core.WithFeature(ctx, "copy"), p)
 		case "render":
-			e = a.render(ctx, p)
+			var notes []string
+			notes, e = a.render(ctx, p)
+			warnings = append(warnings, notes...)
 		default:
 			e = fmt.Errorf("未知任务步骤")
 		}

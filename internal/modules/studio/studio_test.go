@@ -334,6 +334,9 @@ func TestRenderCreamFallbackBatchAndReviewWorkflow(t *testing.T) {
 	listings := p1["listings"].([]any)
 	l1ID := int64(listings[0].(Object)["id"].(float64))
 	l2ID := int64(listings[1].(Object)["id"].(float64))
+	if _, err := env.c.DB.Exec("UPDATE listing_render SET mode='html' WHERE listing_id IN (?,?)", l1ID, l2ID); err != nil {
+		t.Fatal(err)
+	}
 
 	// Upload photo, set code=B1, run retouch so 照片/B1.jpg exists
 	photoID := env.uploadPhoto(t, pid, "b1.png")
@@ -623,6 +626,9 @@ func TestMigrationUpgradeExistingOutputsApproved(t *testing.T) {
 	if ren["review_status"] != "approved" {
 		t.Fatalf("expected upgraded ready listing to have review_status=approved, got %v", ren)
 	}
+	if ren["mode"] != "ai" {
+		t.Fatalf("expected upgraded listing_render mode=ai, got %v", ren)
+	}
 	dlRes, err := env.client.Get(s.URL + "/api/listings/1/download")
 	if err != nil {
 		t.Fatal(err)
@@ -630,5 +636,46 @@ func TestMigrationUpgradeExistingOutputsApproved(t *testing.T) {
 	_ = dlRes.Body.Close()
 	if dlRes.StatusCode != 200 {
 		t.Fatalf("expected upgraded ready listing download to return 200, got %d", dlRes.StatusCode)
+	}
+}
+
+func TestListingRenderModeAPI(t *testing.T) {
+	env := newTestEnv(t, nil)
+	env.login(t, "admin", "AdminPassword123!")
+	product := env.req(t, "POST", "/api/products", Object{"name": "出图方式", "shop_ids": []int64{1}}, 201)["product"].(Object)
+	lid := int64(product["listings"].([]any)[0].(Object)["id"].(float64))
+	var mode string
+	if err := env.c.DB.QueryRow("SELECT mode FROM listing_render WHERE listing_id=?", lid).Scan(&mode); err != nil || mode != "ai" {
+		t.Fatal(mode, err)
+	}
+	got := env.req(t, "GET", fmt.Sprintf("/api/listings/%d/render", lid), nil, 200)
+	if got["mode"] != "ai" || got["settings"].(Object)["mode"] != "ai" {
+		t.Fatal(got["mode"], got["settings"])
+	}
+	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", lid), Object{"mode": "print"}, 400)
+	env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", lid), Object{"mode": ""}, 400)
+	still := env.req(t, "GET", fmt.Sprintf("/api/listings/%d/render", lid), nil, 200)
+	if still["mode"] != "ai" {
+		t.Fatal(still["mode"])
+	}
+	saved := env.req(t, "PUT", fmt.Sprintf("/api/listings/%d/render", lid), Object{"mode": "html"}, 200)
+	if saved["mode"] != "html" || saved["settings"].(Object)["mode"] != "html" {
+		t.Fatal(saved["mode"], saved["settings"])
+	}
+	var detail string
+	if err := env.c.DB.QueryRow("SELECT detail FROM audit_log WHERE action='studio.render_settings' AND target_id=? ORDER BY id DESC LIMIT 1", lid).Scan(&detail); err != nil || !strings.Contains(detail, `"mode":"html"`) {
+		t.Fatal(detail, err)
+	}
+	tx, err := env.c.DB.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	for _, migration := range studio.New(env.c).Migrations() {
+		if migration.Version == 3 {
+			if err := migration.Up(tx); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 }

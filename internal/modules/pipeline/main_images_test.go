@@ -102,9 +102,10 @@ func TestRenderNoUsableMain(t *testing.T) {
 	f := newFixture(t, nil)
 	f.login(t, "admin")
 	id := f.product(t)
+	f.setRenderMode(t, id, "html")
 	p, _ := f.a.product(id)
 	p.Main = object(`{"imgs":[{"n":1,"layout":"photo","f":"missing.jpg"}]}`)
-	err := f.a.render(testActor(context.Background()), p)
+	_, err := f.a.render(testActor(context.Background()), p)
 	if err == nil || err.Error() != "没有可用的主图照片，至少需要一张上耳图或场景图" {
 		t.Fatal(err)
 	}
@@ -126,6 +127,7 @@ func TestRenderRemovesDeletedMainPhotoAndRenumbers(t *testing.T) {
 	f := newFixture(t, func(c *Config) { c.ChromePath = chrome })
 	f.login(t, "admin")
 	id := f.product(t)
+	f.setRenderMode(t, id, "html")
 	dir := filepath.Join(f.a.Dir(id), "照片")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
@@ -146,7 +148,7 @@ func TestRenderRemovesDeletedMainPhotoAndRenumbers(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, _ := f.a.product(id)
-	if err := f.a.render(testActor(context.Background()), p); err != nil {
+	if _, err := f.a.render(testActor(context.Background()), p); err != nil {
 		t.Fatal(err)
 	}
 	p, _ = f.a.product(id)
