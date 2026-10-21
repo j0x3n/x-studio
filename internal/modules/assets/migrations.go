@@ -53,5 +53,12 @@ CREATE UNIQUE INDEX asset_folders_name ON asset_folders(COALESCE(parent_id,0),na
 ALTER TABLE assets ADD COLUMN folder_id INTEGER;
 CREATE INDEX assets_folder_id ON assets(folder_id);`)
 		return err
+	}}, {Version: 7, Up: func(tx *sql.Tx) error {
+		_, err := tx.Exec(`ALTER TABLE assets ADD COLUMN media TEXT NOT NULL DEFAULT 'image';
+ALTER TABLE assets ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE assets ADD COLUMN poster_file TEXT NOT NULL DEFAULT '';
+ALTER TABLE assets ADD COLUMN stale INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX assets_media_stale ON assets(media,stale);`)
+		return err
 	}}}
 }
