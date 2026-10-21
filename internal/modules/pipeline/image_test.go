@@ -7,9 +7,6 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
-	"image/png"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -164,76 +161,6 @@ func TestConservativeRetouch(t *testing.T) {
 	resized, _ := Retouch(large, "E5")
 	if resized.Rect.Dx() != 2400 || resized.Rect.Dy() != 80 {
 		t.Fatal(resized.Rect)
-	}
-}
-func TestWhiteCompositePreservesOpaquePixelsAndFallback(t *testing.T) {
-	src := image.NewNRGBA(image.Rect(0, 0, 100, 80))
-	for y := 0; y < 80; y++ {
-		for x := 0; x < 100; x++ {
-			c := color.NRGBA{245, 245, 245, 255}
-			if x >= 30 && x < 70 && y >= 20 && y < 60 {
-				c = color.NRGBA{uint8(140 + x%10), uint8(100 + y%20), 160, 255}
-			}
-			src.SetNRGBA(x, y, c)
-		}
-	}
-	f := newFixture(t, nil)
-	mask, mode := f.a.mask(testActor(context.Background()), src)
-	if mode != "fallback" || mask.AlphaAt(0, 0).A != 0 || mask.AlphaAt(50, 40).A != 255 {
-		t.Fatal("fallback failed", mode)
-	}
-	white, transparent, e := CompositeWhite(src, mask)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if white.Rect.Dx() != 1200 || transparent.Rect.Dy() != 1200 {
-		t.Fatal("white dimensions")
-	}
-	// Foreground bounding box is [30,20,70,60], scaled to 780x780 and centered.
-	for y := 0; y < 780; y++ {
-		for x := 0; x < 780; x++ {
-			expected := src.NRGBAAt(30+x*40/780, 20+y*40/780)
-			got := white.NRGBAAt(210+x, 210+y)
-			if got != expected || transparent.NRGBAAt(210+x, 210+y) != expected {
-				t.Fatalf("product pixel changed at %d,%d: %v %v", x, y, got, expected)
-			}
-		}
-	}
-	// Even malicious/rembg RGB output never replaces our source RGB.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/remove" || r.Method != "POST" {
-			t.Error("wrong rembg request")
-		}
-		if e := r.ParseMultipartForm(1 << 20); e != nil {
-			t.Error(e)
-		}
-		if r.MultipartForm != nil {
-			defer r.MultipartForm.RemoveAll()
-		}
-		fake := image.NewNRGBA(src.Rect)
-		for y := 20; y < 60; y++ {
-			for x := 30; x < 70; x++ {
-				fake.SetNRGBA(x, y, color.NRGBA{0, 255, 0, 255})
-			}
-		}
-		_ = png.Encode(w, fake)
-	}))
-	defer server.Close()
-	f.a.Cfg.RembgURL = server.URL
-	mask, mode = f.a.mask(testActor(context.Background()), src)
-	if mode != "rembg" {
-		t.Fatal(mode)
-	}
-	white, _, e = CompositeWhite(src, mask)
-	if e != nil || white.NRGBAAt(600, 600) != src.NRGBAAt(50, 40) {
-		t.Fatal("used rembg RGB")
-	}
-	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
-	defer bad.Close()
-	f.a.Cfg.RembgURL = bad.URL
-	_, mode = f.a.mask(testActor(context.Background()), src)
-	if mode != "fallback" {
-		t.Fatal("no fallback on HTTP error")
 	}
 }
 func TestMetricsDetectDuplicateBlurAndGPS(t *testing.T) {

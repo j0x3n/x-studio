@@ -284,7 +284,7 @@ func (a *Module) render(ctx context.Context, p Product) error {
 			}
 		}
 	}
-	// 实拍抠图优先，没有才用 AI 补的白底
+	// 实拍的 AI 白底优先
 	for _, c := range []string{"A1", "A2", "A1_AI"} {
 		b, e := os.ReadFile(filepath.Join(a.Dir(p.ID), "照片", c+"_白底.jpg"))
 		if e == nil {

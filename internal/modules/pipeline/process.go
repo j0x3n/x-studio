@@ -3,9 +3,13 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"image"
 	"math/bits"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"xstudio/internal/core"
 )
 
 func (a *Module) check(ctx context.Context, p Product) error {
@@ -98,26 +102,10 @@ func (a *Module) retouch(ctx context.Context, p Product) error {
 		if e = saveJPEG(filename, im, 92); e != nil {
 			return e
 		}
-		if ph.WhiteBG { // Use the decoded saved JPG as the canonical retouched image.
-			canonical, _, e := loadPhoto(filename)
-			if e != nil {
+		if ph.WhiteBG {
+			if e = a.makeWhite(ctx, p, ph, filename, tmp, params); e != nil {
 				return e
 			}
-			mask, mode := a.mask(ctx, canonical)
-			white, transparent, e := CompositeWhite(canonical, mask)
-			if e != nil {
-				return e
-			}
-			if e = saveJPEG(filepath.Join(tmp, ph.Code+"_白底.jpg"), white, 92); e != nil {
-				return e
-			}
-			if e = savePNG(filepath.Join(tmp, ph.Code+"_透明.png"), transparent); e != nil {
-				return e
-			}
-			params["cutout"] = mode
-			params["white_size"] = 1200
-			params["product_occupancy"] = .65
-			params["opaque_pixels_preserved"] = true
 		}
 		logs[ph.ID] = params
 	}
@@ -153,4 +141,107 @@ func replaceDir(src, dst string) error {
 		return e
 	}
 	return os.RemoveAll(backup)
+}
+
+func (a *Module) makeWhite(ctx context.Context, p Product, ph Photo, canonicalPath, tmp string, params Object) error {
+	key := whiteParamKey(ph)
+	params["white_key"] = key
+	if a.reuseWhite(p.ID, ph, key, tmp, params) {
+		return nil
+	}
+	canonical, _, e := loadPhoto(canonicalPath)
+	if e != nil {
+		return e
+	}
+	// AI 补的白底图（A1_AI）本身就是 GPT 出的纯白底，不再调一次 AI，只做成方图和透明图
+	if ph.AIGenerated {
+		white := fitWhiteSquare(canonical, 1200)
+		if e = saveJPEG(filepath.Join(tmp, ph.Code+"_白底.jpg"), white, 92); e != nil {
+			return e
+		}
+		if e = savePNG(filepath.Join(tmp, ph.Code+"_透明.png"), knockoutWhite(white)); e != nil {
+			return e
+		}
+		params["white_source"] = "ai_fill"
+		params["white_size"] = 1200
+		return nil
+	}
+	doc, e := a.prompt("补图.md")
+	var prompt string
+	if e == nil {
+		prompt, e = enhancementPrompt(enhancementSections(doc), "A1", p)
+	}
+	if e != nil {
+		params["white_error"] = a.safeAIError(e.Error())
+		return nil
+	}
+	if model := strings.TrimSpace(a.Model("fill", a.Cfg.ImageModel)); model != "" {
+		params["white_model"] = model
+	}
+	data, e := a.EditImageSize(core.WithFeature(ctx, "fill"), prompt, []image.Image{canonical}, "1024x1024")
+	if e != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		params["white_error"] = a.safeAIError(e.Error())
+		return nil
+	}
+	white, transparent, returned, e := whiteOutputs(data)
+	if e != nil {
+		params["white_error"] = a.safeAIError(e.Error())
+		return nil
+	}
+	if e = saveJPEG(filepath.Join(tmp, ph.Code+"_白底.jpg"), white, 92); e != nil {
+		return e
+	}
+	if e = savePNG(filepath.Join(tmp, ph.Code+"_透明.png"), transparent); e != nil {
+		return e
+	}
+	params["white_source"] = "ai"
+	params["white_size"] = 1200
+	params["white_returned"] = returned
+	return nil
+}
+
+func (a *Module) reuseWhite(productID int64, ph Photo, key, tmp string, params Object) bool {
+	old, _ := ph.RetouchLog["white_key"].(string)
+	if old == "" || old != key {
+		return false
+	}
+	dir := filepath.Join(a.Dir(productID), "照片")
+	jpg := filepath.Join(dir, ph.Code+"_白底.jpg")
+	if _, e := os.Stat(jpg); e != nil {
+		return false
+	}
+	jpgDst := filepath.Join(tmp, ph.Code+"_白底.jpg")
+	pngDst := filepath.Join(tmp, ph.Code+"_透明.png")
+	if e := copyFile(jpg, jpgDst); e != nil {
+		return false
+	}
+	pngSrc := filepath.Join(dir, ph.Code+"_透明.png")
+	if _, e := os.Stat(pngSrc); e == nil {
+		if e = copyFile(pngSrc, pngDst); e != nil {
+			_ = os.Remove(jpgDst)
+			return false
+		}
+	} else {
+		im, _, e := loadPhoto(jpgDst)
+		if e == nil {
+			e = savePNG(pngDst, knockoutWhite(im))
+		}
+		if e != nil {
+			_ = os.Remove(jpgDst)
+			_ = os.Remove(pngDst)
+			return false
+		}
+	}
+	params["white_source"] = "ai"
+	params["white_size"] = 1200
+	if v, ok := ph.RetouchLog["white_returned"].(string); ok && v != "" {
+		params["white_returned"] = v
+	}
+	if v, ok := ph.RetouchLog["white_model"].(string); ok && v != "" {
+		params["white_model"] = v
+	}
+	return true
 }
