@@ -116,6 +116,7 @@ func (a *Module) returnOrder(w http.ResponseWriter, r *http.Request) (any, error
 			Qty         int64  `json:"qty"`
 			Action      string `json:"action"`
 			WarehouseID int64  `json:"warehouse_id"`
+			ReasonCode  string `json:"reason_code"`
 		} `json:"lines"`
 	}
 	if err := decode(w, r, &in); err != nil {
@@ -123,6 +124,11 @@ func (a *Module) returnOrder(w http.ResponseWriter, r *http.Request) (any, error
 	}
 	if in.RefundAmount < 0 || runeLen(in.Reason) > 1000 || len(in.Lines) > 200 || len(in.Lines) == 0 && in.RefundAmount == 0 {
 		return nil, bad(400, "退款金额、原因或售后明细不正确")
+	}
+	for _, line := range in.Lines {
+		if !allowedReason(line.ReasonCode) {
+			return nil, bad(400, "退货原因不正确")
+		}
 	}
 	id := core.ID(r, "id")
 	return a.change(r, "return", func(tx *sql.Tx) (int64, any, error) {
@@ -218,7 +224,11 @@ func (a *Module) returnOrder(w http.ResponseWriter, r *http.Request) (any, error
 			if left != 0 {
 				return 0, nil, bad(409, "发货批次数量不完整")
 			}
-			if _, err = tx.Exec("INSERT INTO order_return_lines(return_id,line_id,qty,action,warehouse_id) VALUES(?,?,?,?,?)", rid, line.LineID, line.Qty, line.Action, nullable(line.WarehouseID)); err != nil {
+			setID, err := creativeSetID(tx, l["item_id"].(int64), o["shop_id"].(int64), o["paid_at"].(string))
+			if err != nil {
+				return 0, nil, err
+			}
+			if _, err = tx.Exec("INSERT INTO order_return_lines(return_id,line_id,qty,action,warehouse_id,reason_code,creative_set_id) VALUES(?,?,?,?,?,?,?)", rid, line.LineID, line.Qty, line.Action, nullable(line.WarehouseID), line.ReasonCode, setID); err != nil {
 				return 0, nil, err
 			}
 			if _, err = tx.Exec("UPDATE order_lines SET returned_qty=returned_qty+? WHERE id=?", line.Qty, line.LineID); err != nil {
@@ -228,4 +238,36 @@ func (a *Module) returnOrder(w http.ResponseWriter, r *http.Request) (any, error
 		_, err = tx.Exec("UPDATE orders SET updated_at=? WHERE id=?", core.Now(), id)
 		return id, core.Object{"id": rid, "order_id": id}, err
 	})
+}
+
+func allowedReason(code string) bool {
+	switch code {
+	case "", "not_as_pictured", "smaller", "color", "flaw", "other":
+		return true
+	default:
+		return false
+	}
+}
+
+func tableExists(tx *sql.Tx, table string) bool {
+	var n int
+	return tx.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&n) == nil && n > 0
+}
+
+func creativeSetID(tx *sql.Tx, itemID, shopID int64, paidAt string) (any, error) {
+	if !tableExists(tx, "creative_sets") {
+		return nil, nil
+	}
+	var id sql.NullInt64
+	err := tx.QueryRow(`SELECT cs.id FROM creative_sets cs JOIN listings l ON l.id=cs.listing_id
+JOIN inv_items i ON i.product_id=l.product_id
+WHERE i.id=? AND l.shop_id=? AND cs.exported_at<>'' AND cs.exported_at<=?
+ORDER BY cs.exported_at DESC LIMIT 1`, itemID, shopID, paidAt).Scan(&id)
+	if err == sql.ErrNoRows || (err == nil && !id.Valid) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return id.Int64, nil
 }
