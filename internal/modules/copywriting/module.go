@@ -34,6 +34,9 @@ func (a *Module) Jobs() map[string]core.JobHandler {
 }
 
 func (a *Module) Routes(r *core.Router) {
+	r.Handle("POST /api/listings/{id}/titles/suggest", core.CopyEdit, a.suggestTitles)
+	r.Handle("POST /api/listings/{id}/titles/apply", core.CopyEdit, a.applyTitle)
+	r.Handle("GET /api/listings/{id}/titles/history", core.CopyView, a.titleHistory)
 	r.Handle("GET /api/listings/{id}/copies", core.CopyView, a.listCopies)
 	r.Handle("POST /api/listings/{id}/copies", core.CopyEdit, a.createCopy)
 	r.Handle("POST /api/listings/{id}/copies/generate", core.CopyEdit, a.generateCopy)
