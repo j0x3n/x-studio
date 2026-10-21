@@ -20,6 +20,11 @@ func (module *Module) Routes(request *core.Router) {
 	request.Handle("POST /api/scenes/{id}/refs", core.CreativeTemplate, module.upload)
 	request.Handle("DELETE /api/scenes/{id}/refs/{ref}", core.CreativeTemplate, module.refDelete)
 	request.Handle("GET /api/scenes/{id}/refs/{ref}/file", core.ProductView, module.refFile)
+	request.Handle("POST /api/scenes/{id}/plates", core.CreativeTemplate, module.plateCreate)
+	request.Handle("POST /api/scenes/{id}/plates/{plate}/lock", core.CreativeTemplate, module.plateLock)
+	request.Handle("POST /api/scenes/{id}/plates/{plate}/discard", core.CreativeTemplate, module.plateDiscard)
+	request.Handle("GET /api/scenes/{id}/plates/{plate}/file", core.ProductView, module.plateFile)
+	request.Handle("GET /api/scenes/{id}/plates/{plate}/sketch", core.ProductView, module.plateSketch)
 }
 func (module *Module) visible(user core.User, scene Scene) bool {
 	return scene.ShopID == nil || module.CanShop(user, *scene.ShopID)
@@ -89,7 +94,10 @@ func (module *Module) enrich(scene *Scene, user core.User) error {
 			}
 		}
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	return module.attachPlates(scene, user)
 }
 func (module *Module) read(writer http.ResponseWriter, request *http.Request) {
 	scene, ok := module.scoped(writer, request)
@@ -209,13 +217,17 @@ func (module *Module) create(writer http.ResponseWriter, request *http.Request) 
 		fail(writer, err)
 		return
 	}
+	if err := module.validateProps(core.CurrentUser(request), scene.Layout); err != nil {
+		fail(writer, err)
+		return
+	}
 	tx, err := module.DB.BeginTx(request.Context(), nil)
 	if err != nil {
 		fail(writer, err)
 		return
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(request.Context(), `INSERT INTO scenes(shop_id,name,categories,still,wear,light,props,note,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, scene.ShopID, scene.Name, core.JS(scene.Categories), scene.Still, scene.Wear, scene.Light, scene.Props, scene.Note, core.CurrentUser(request).ID, core.Now(), core.Now())
+	result, err := tx.ExecContext(request.Context(), `INSERT INTO scenes(shop_id,name,categories,still,wear,light,props,note,camera,brief,layout,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, scene.ShopID, scene.Name, core.JS(scene.Categories), scene.Still, scene.Wear, scene.Light, scene.Props, scene.Note, scene.Camera, scene.Brief, canonicalLayout(scene.Layout), core.CurrentUser(request).ID, core.Now(), core.Now())
 	if err == nil {
 		scene.ID, err = result.LastInsertId()
 	}
@@ -247,7 +259,7 @@ func (module *Module) patch(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	for key := range fields {
-		if !contains([]string{"shop_id", "name", "categories", "still", "wear", "light", "props", "note", "archived"}, key) {
+		if !contains([]string{"shop_id", "name", "categories", "still", "wear", "light", "props", "note", "archived", "camera", "brief", "layout"}, key) {
 			core.Fail(writer, 400, "不能修改这个场景字段："+key)
 			return
 		}
@@ -263,6 +275,12 @@ func (module *Module) patch(writer http.ResponseWriter, request *http.Request) {
 	if err := module.validateInput(&scene, core.CurrentUser(request)); err != nil {
 		fail(writer, err)
 		return
+	}
+	if _, ok := fields["layout"]; ok {
+		if err := module.validateProps(core.CurrentUser(request), scene.Layout); err != nil {
+			fail(writer, err)
+			return
+		}
 	}
 	if (old.ShopID == nil) != (scene.ShopID == nil) || (old.ShopID != nil && scene.ShopID != nil && *old.ShopID != *scene.ShopID) {
 		var count int
@@ -282,7 +300,7 @@ func (module *Module) patch(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(request.Context(), `UPDATE scenes SET shop_id=?,name=?,categories=?,still=?,wear=?,light=?,props=?,note=?,archived=?,updated_at=? WHERE id=?`, scene.ShopID, scene.Name, core.JS(scene.Categories), scene.Still, scene.Wear, scene.Light, scene.Props, scene.Note, scene.Archived, core.Now(), scene.ID)
+	_, err = tx.ExecContext(request.Context(), `UPDATE scenes SET shop_id=?,name=?,categories=?,still=?,wear=?,light=?,props=?,note=?,camera=?,brief=?,layout=?,archived=?,updated_at=? WHERE id=?`, scene.ShopID, scene.Name, core.JS(scene.Categories), scene.Still, scene.Wear, scene.Light, scene.Props, scene.Note, scene.Camera, scene.Brief, canonicalLayout(scene.Layout), scene.Archived, core.Now(), scene.ID)
 	action := "scene.update"
 	if old.Archived != scene.Archived {
 		action = "scene.archive"
@@ -308,6 +326,10 @@ func (module *Module) remove(writer http.ResponseWriter, request *http.Request) 
 		core.Fail(writer, 409, "先归档再删除")
 		return
 	}
+	if module.Active("scene", scene.ID) {
+		core.Fail(writer, 409, "场景正在生成定场图，等任务结束再删除")
+		return
+	}
 	if scene.IsDefault {
 		core.Fail(writer, 409, "兜底场景不能删除")
 		return
@@ -318,7 +340,7 @@ func (module *Module) remove(writer http.ResponseWriter, request *http.Request) 
 		return
 	}
 	defer tx.Rollback()
-	for _, query := range []string{"DELETE FROM scene_bindings WHERE scene_id=?", "DELETE FROM scene_refs WHERE scene_id=?", "DELETE FROM scenes WHERE id=?"} {
+	for _, query := range []string{"DELETE FROM scene_plates WHERE scene_id=?", "DELETE FROM scene_bindings WHERE scene_id=?", "DELETE FROM scene_refs WHERE scene_id=?", "DELETE FROM scenes WHERE id=?"} {
 		if _, err = tx.ExecContext(request.Context(), query, scene.ID); err != nil {
 			fail(writer, err)
 			return
