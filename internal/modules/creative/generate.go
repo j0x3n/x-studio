@@ -508,6 +508,9 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 	prompt += "\n" + params.Note
 	if item.Variant == "B" {
 		prompt += "\nThis is an alternative version B: use a clearly different camera angle and composition from version A while keeping the same style."
+		if item.ProductMode == "redraw" && len(item.SourceAssetIDs) == 1 {
+			prompt += "\nShow the product from a different angle than variant A."
+		}
 	}
 	if item.SizeCompare {
 		prompt += "\n多尺寸对比：所有图使用同一模特同一侧，构图距离固定，按本图尺寸真实还原。耳饰统一左耳，腕饰统一左腕，戒指统一左手中指，项链统一正面角度。"
@@ -520,6 +523,23 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 	}
 	return prompt, nil
 }
+func (a *Module) imageContext(ctx context.Context, item Item, info *core.ImageInfo) (context.Context, error) {
+	ctx = core.WithFeature(ctx, "creative")
+	if item.AutoAttempt > 0 && item.SetID != nil {
+		var previousModel string
+		var previousAutoAttempt int
+		err := a.DB.QueryRowContext(ctx, `SELECT model,auto_attempt FROM creative_items WHERE set_id=? AND slot=? AND seq=? AND variant=? AND attempt<? ORDER BY attempt DESC,id DESC LIMIT 1`, *item.SetID, item.Slot, item.Seq, item.Variant, item.Attempt).Scan(&previousModel, &previousAutoAttempt)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		primary, alternate := a.ImageModels(ctx)
+		if err == nil && item.AutoAttempt > previousAutoAttempt && previousModel == primary && alternate != "" {
+			ctx = core.WithImageModel(ctx, alternate)
+		}
+	}
+	return core.WithImageInfo(ctx, info), nil
+}
+
 func (a *Module) generateOne(ctx context.Context, item *Item, job core.Job) error {
 	uid := job.UserID
 	if _, err := a.authorize(ctx, uid, item.ListingID, core.CreativeRun); err != nil {
@@ -626,7 +646,11 @@ func (a *Module) generateOne(ctx context.Context, item *Item, job core.Job) erro
 	}
 	aiRefs := append(append([]image.Image{}, refs...), styles...)
 	width, height := imageSize(t.GenSize)
-	featureCtx := core.WithFeature(ctx, "creative")
+	info := core.ImageInfo{}
+	featureCtx, err := a.imageContext(ctx, *item, &info)
+	if err != nil {
+		return err
+	}
 	pixel := PixelCheck{Pass: true}
 	var output *image.NRGBA
 	var data []byte
@@ -698,6 +722,7 @@ func (a *Module) generateOne(ctx context.Context, item *Item, job core.Job) erro
 			return err
 		}
 	}
+	item.Model, item.ModelReturned = info.Model, info.Returned
 	if _, err = a.authorize(ctx, uid, item.ListingID, core.CreativeRun); err != nil {
 		return err
 	}
@@ -780,7 +805,7 @@ func decodePNG(data []byte) (*image.NRGBA, error) {
 	return nrgba(im), nil
 }
 func saveItemResult(ctx context.Context, tx *sql.Tx, item Item) error {
-	_, err := tx.ExecContext(ctx, `UPDATE creative_items SET source_asset_ids=?,model_id=?,model_ref_ids=?,wear_type=?,prompt=?,texts=?,output_asset_id=?,canvas_file=?,hard=?,review_a=?,review_b=?,route=?,route_reasons=?,risk=?,error=? WHERE id=?`, core.JS(item.SourceAssetIDs), item.ModelID, core.JS(item.ModelRefIDs), item.WearType, item.Prompt, core.JS(item.Texts), item.OutputAssetID, item.CanvasFile, core.JS(item.Hard), core.JS(item.ReviewA), core.JS(item.ReviewB), item.Route, core.JS(item.RouteReasons), item.Risk, item.Error, item.ID)
+	_, err := tx.ExecContext(ctx, `UPDATE creative_items SET source_asset_ids=?,model_id=?,model_ref_ids=?,wear_type=?,prompt=?,texts=?,output_asset_id=?,canvas_file=?,hard=?,review_a=?,review_b=?,route=?,route_reasons=?,risk=?,error=?,model=?,model_returned=? WHERE id=?`, core.JS(item.SourceAssetIDs), item.ModelID, core.JS(item.ModelRefIDs), item.WearType, item.Prompt, core.JS(item.Texts), item.OutputAssetID, item.CanvasFile, core.JS(item.Hard), core.JS(item.ReviewA), core.JS(item.ReviewB), item.Route, core.JS(item.RouteReasons), item.Risk, item.Error, item.Model, item.ModelReturned, item.ID)
 	return err
 }
 func (a *Module) replaceItem(ctx context.Context, old Item, uid int64, automatic bool, note string) (Item, error) {
@@ -818,6 +843,8 @@ func (a *Module) replaceItem(ctx context.Context, old Item, uid int64, automatic
 	}
 	next.Prompt = note
 	next.OutputAssetID = 0
+	next.Model = ""
+	next.ModelReturned = ""
 	next.CanvasFile = ""
 	next.Hard = Hard{}
 	next.ReviewA = Review{}

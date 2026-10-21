@@ -15,7 +15,7 @@ func (a *Core) Setting(key string) Object {
 }
 
 // aiFeatures 是 ai_models 里可以单独指定模型的功能名，对应 WithFeature 的取值。
-var aiFeatures = map[string]bool{"classify": true, "copy": true, "enhance": true, "fill": true, "tag": true, "upscale": true, "process": true, "copy_rewrite": true, "copy_check": true, "assistant": true, "model_create": true, "tryon_analyze": true, "tryon": true, "document_analyze": true, "finance_explain": true, "creative": true, "creative_verify": true, "creative_text": true, "title_suggest": true, "ops_advice": true}
+var aiFeatures = map[string]bool{"classify": true, "copy": true, "enhance": true, "fill": true, "tag": true, "upscale": true, "process": true, "copy_rewrite": true, "copy_check": true, "assistant": true, "model_create": true, "tryon_analyze": true, "tryon": true, "document_analyze": true, "finance_explain": true, "creative": true, "creative_verify": true, "creative_text": true, "title_suggest": true, "ops_advice": true, "image_alt": true}
 
 func ValidateSetting(key string, v json.RawMessage) error {
 	var o Object
@@ -32,6 +32,9 @@ func ValidateSetting(key string, v json.RawMessage) error {
 				return fmt.Errorf("不支持的 AI 功能")
 			}
 			if _, ok := v.(string); !ok {
+				if k == "image_alt" {
+					return fmt.Errorf("生图备用模型名称必须是文本")
+				}
 				return fmt.Errorf("模型名称必须是文本")
 			}
 		}

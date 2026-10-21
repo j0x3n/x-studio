@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"xstudio/internal/core"
 )
@@ -206,9 +207,22 @@ func (a *Module) stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	byType := map[string][]core.Object{}
+	byModel := map[string]core.Object{}
 	for _, item := range items {
 		category := stringValue(item["wear_type"])
 		byType[category] = append(byType[category], item)
+		model := stringValue(item["model"])
+		row := byModel[model]
+		if row == nil {
+			row = core.Object{"model": model, "total": 0, "auto_pass": 0, "human_pass": 0, "discard": 0}
+			byModel[model] = row
+		}
+		row["total"] = int(number(row["total"])) + 1
+		for field, matches := range map[string]bool{"auto_pass": item["route"] == "auto_pass", "human_pass": item["human"] == "pass", "discard": item["human"] == "discard"} {
+			if matches {
+				row[field] = int(number(row[field])) + 1
+			}
+		}
 	}
 	known := map[string]bool{}
 	for _, row := range calibration {
@@ -269,7 +283,14 @@ func (a *Module) stats(w http.ResponseWriter, r *http.Request) {
 		}
 		category["return_links"] = count
 	}
-	core.WriteJSON(w, 200, core.Object{"categories": categories, "suggestions": suggestions})
+	models := []core.Object{}
+	for _, row := range byModel {
+		models = append(models, row)
+	}
+	sort.Slice(models, func(first, second int) bool {
+		return stringValue(models[first]["model"]) < stringValue(models[second]["model"])
+	})
+	core.WriteJSON(w, 200, core.Object{"categories": categories, "suggestions": suggestions, "by_model": models})
 }
 func ratio(numerator, denominator int) float64 {
 	if denominator == 0 {

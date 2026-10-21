@@ -48,6 +48,10 @@ ALTER TABLE creative_templates ADD COLUMN hero_style TEXT NOT NULL DEFAULT '';`)
 			}
 		}
 		return nil
+	}}, {Version: 3, Up: func(tx *sql.Tx) error {
+		_, err := tx.Exec(`ALTER TABLE creative_items ADD COLUMN model TEXT NOT NULL DEFAULT '';
+ALTER TABLE creative_items ADD COLUMN model_returned TEXT NOT NULL DEFAULT '';`)
+		return err
 	}}}
 }
 

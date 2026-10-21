@@ -84,6 +84,8 @@ type Item struct {
 	Superseded       bool           `json:"superseded"`
 	Variant          string         `json:"variant"`
 	ProductMode      string         `json:"product_mode"`
+	Model            string         `json:"model"`
+	ModelReturned    string         `json:"model_returned"`
 	SourceAssetIDs   []int64        `json:"source_asset_ids"`
 	ModelID          int64          `json:"model_id"`
 	ModelRefIDs      []int64        `json:"model_ref_ids"`

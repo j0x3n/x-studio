@@ -6,7 +6,7 @@ import (
 )
 
 func variantPhotos(item Item, photos []core.Photo) []core.Photo {
-	if item.Variant == "B" && (item.ProductMode == "pixel_lock" || item.ProductMode == "model") && len(photos) > 1 {
+	if item.Variant == "B" && (item.ProductMode == "pixel_lock" || item.ProductMode == "model" || item.ProductMode == "redraw") && len(photos) > 1 {
 		photos[0], photos[1] = photos[1], photos[0]
 	}
 	return photos

@@ -213,11 +213,13 @@ func (a *Module) retextItem(ctx context.Context, old Item, job core.Job) error {
 	if err = a.reserve(ctx, item, job.UserID, job.ID); err != nil {
 		return err
 	}
-	data, err := a.EditImageMask(core.WithFeature(ctx, "creative"), prompt, []image.Image{output}, mask, item.TemplateSnapshot.GenSize)
+	info := core.ImageInfo{}
+	data, err := a.EditImageMask(core.WithImageInfo(core.WithFeature(ctx, "creative"), &info), prompt, []image.Image{output}, mask, item.TemplateSnapshot.GenSize)
 	if err != nil {
 		a.recordError(ctx, item, job.UserID, err)
 		return err
 	}
+	item.Model, item.ModelReturned = info.Model, info.Returned
 	edited, err := decodePNG(data)
 	if err != nil {
 		return err

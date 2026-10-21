@@ -89,7 +89,7 @@ func readImageRequest(t *testing.T, r *http.Request) imageRequest {
 		return imageRequest{}
 	}
 	defer r.MultipartForm.RemoveAll()
-	if r.FormValue("model") != "gpt-image-2.5-sunburst" || r.FormValue("quality") != "high" || r.Header.Get("Authorization") != "Bearer fake" {
+	if m := r.FormValue("model"); (m != "gpt-image-2.5-sunburst" && m != "gpt-image-2.5-flare") || r.FormValue("quality") != "high" || r.Header.Get("Authorization") != "Bearer fake" {
 		t.Error("missing model, high quality or authorization")
 	}
 	got := imageRequest{prompt: r.FormValue("prompt"), size: r.FormValue("size")}

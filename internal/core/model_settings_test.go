@@ -1,9 +1,24 @@
 package core
 
 import (
+	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
+
+func TestImageAlternateSettingValidation(t *testing.T) {
+	for _, alternate := range []any{"", "gpt-image-2.5-flare", 123, nil} {
+		err := ValidateSetting("ai_models", json.RawMessage(JS(Object{"image_alt": alternate})))
+		if _, valid := alternate.(string); valid {
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else if err == nil || !strings.Contains(err.Error(), "生图备用模型") {
+			t.Fatal(err)
+		}
+	}
+}
 
 func TestModelSettingsInheritance(t *testing.T) {
 	a := imageTestCore(t, func(http.ResponseWriter, *http.Request) { t.Error("unexpected AI call") })

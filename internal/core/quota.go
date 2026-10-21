@@ -102,3 +102,26 @@ func (a *Core) Model(feature, fallback string) string {
 	}
 	return fallback
 }
+
+func (a *Core) ImageModels(ctx context.Context) (string, string) {
+	primary := a.Model(Actor(ctx).Feature, a.Cfg.ImageModel)
+	if override, _ := ctx.Value(imageModelKey{}).(string); strings.TrimSpace(override) != "" {
+		primary = strings.TrimSpace(override)
+		return primary, alternateImageModel(primary)
+	}
+	if alternate, _ := a.Setting("ai_models")["image_alt"].(string); strings.TrimSpace(alternate) != "" {
+		return primary, strings.TrimSpace(alternate)
+	}
+	return primary, alternateImageModel(primary)
+}
+
+func alternateImageModel(primary string) string {
+	switch {
+	case strings.Contains(primary, "sunburst"):
+		return "gpt-image-2.5-flare"
+	case strings.Contains(primary, "flare"):
+		return "gpt-image-2.5-sunburst"
+	default:
+		return ""
+	}
+}
