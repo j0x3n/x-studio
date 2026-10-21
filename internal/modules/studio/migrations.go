@@ -108,5 +108,15 @@ func (a *Module) Migrations() []core.Migration {
 	}}, {Version: 2, Up: func(tx *sql.Tx) error {
 		_, e := tx.Exec("ALTER TABLE listing_render ADD COLUMN render_note TEXT NOT NULL DEFAULT ''")
 		return e
+	}}, {Version: 3, Up: func(tx *sql.Tx) error {
+		cols, e := core.Columns(tx, "listing_render")
+		if e != nil {
+			return e
+		}
+		if cols["mode"] {
+			return nil
+		}
+		_, e = tx.Exec("ALTER TABLE listing_render ADD COLUMN mode TEXT NOT NULL DEFAULT 'ai' CHECK(mode IN ('ai','html'))")
+		return e
 	}}}
 }

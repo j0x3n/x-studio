@@ -49,6 +49,10 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 	if !a.RequireListing(w, r, id, false) {
 		return
 	}
+	if code, msg := a.aiDownloadBlock(id); code != 0 {
+		fail(w, code, msg)
+		return
+	}
 	_, statErr := os.Stat(filepath.Join(a.ListingDir(id), "导出.zip"))
 	if code, msg := a.checkDownloadReview(id, statErr == nil); code != 0 {
 		fail(w, code, msg)
@@ -89,6 +93,17 @@ func (a *Module) checkDownloadReview(listingID int64, hasZip bool) (int, string)
 	}
 	if status != "approved" {
 		return 409, "出图结果还没审核通过"
+	}
+	return 0, ""
+}
+func (a *Module) aiDownloadBlock(listingID int64) (int, string) {
+	var mode, rendered string
+	err := a.DB.QueryRow("SELECT mode, rendered_template FROM listing_render WHERE listing_id=?", listingID).Scan(&mode, &rendered)
+	if err != nil {
+		return 0, ""
+	}
+	if mode == "ai" && rendered == "ai" {
+		return 409, "AI 出图请到商品详情的「AI 出图」标签导出"
 	}
 	return 0, ""
 }

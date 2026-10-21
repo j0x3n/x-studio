@@ -91,6 +91,17 @@ func (f *fixture) product(t *testing.T) int64 {
 	r := f.req(t, "POST", "/api/products", Object{"name": "测试珍珠", "shop_ids": []int64{1}}, 201)
 	return int64(r["product"].(Object)["id"].(float64))
 }
+func (f *fixture) setRenderMode(t *testing.T, productID int64, mode string) {
+	t.Helper()
+	res, err := f.a.DB.Exec("UPDATE listing_render SET mode=? WHERE listing_id IN (SELECT id FROM listings WHERE product_id=?)", mode, productID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		t.Fatal("listing_render missing")
+	}
+}
 func photoBytes(t *testing.T, w, h int) []byte {
 	t.Helper()
 	im := image.NewNRGBA(image.Rect(0, 0, w, h))

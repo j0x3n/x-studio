@@ -341,6 +341,7 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 	writeEnhancePrompt(t, f.a)
 	f.login(t, "admin")
 	id := f.product(t)
+	f.setRenderMode(t, id, "html")
 	for i := 0; i < 3; i++ {
 		ph := addRealPhoto(t, f, id, "", 120, 160)
 		ids = append(ids, ph.ID)

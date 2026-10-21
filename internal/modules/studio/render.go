@@ -25,6 +25,7 @@ type listingRenderRow struct {
 	RenderedJobID    sql.NullInt64
 	RenderedTemplate string
 	RenderNote       string
+	Mode             string
 	UpdatedAt        string
 }
 
@@ -41,12 +42,12 @@ func (a *Module) ensureListingRender(listingID int64) (listingRenderRow, error) 
 	var lr listingRenderRow
 	var aiInt int
 	e := a.DB.QueryRow(
-		"SELECT listing_id,detail_template,main_template,ai_label,review_status,review_note,reviewed_by,reviewed_at,rendered_job_id,rendered_template,render_note,updated_at FROM listing_render WHERE listing_id=?",
+		"SELECT listing_id,detail_template,main_template,ai_label,review_status,review_note,reviewed_by,reviewed_at,rendered_job_id,rendered_template,render_note,mode,updated_at FROM listing_render WHERE listing_id=?",
 		listingID,
 	).Scan(
 		&lr.ListingID, &lr.DetailTemplate, &lr.MainTemplate, &aiInt,
 		&lr.ReviewStatus, &lr.ReviewNote, &lr.ReviewedBy, &lr.ReviewedAt,
-		&lr.RenderedJobID, &lr.RenderedTemplate, &lr.RenderNote, &lr.UpdatedAt,
+		&lr.RenderedJobID, &lr.RenderedTemplate, &lr.RenderNote, &lr.Mode, &lr.UpdatedAt,
 	)
 	lr.AILabel = aiInt != 0
 	return lr, e
@@ -92,6 +93,7 @@ func (a *Module) renderStateJSON(listingID, shopID int64) (core.Object, error) {
 		"rendered_job_id":           renderedJobID,
 		"rendered_template":         lr.RenderedTemplate,
 		"render_note":               lr.RenderNote,
+		"mode":                      lr.Mode,
 		"updated_at":                lr.UpdatedAt,
 	}
 	review := core.Object{
@@ -116,6 +118,7 @@ func (a *Module) renderStateJSON(listingID, shopID int64) (core.Object, error) {
 		"rendered_job_id":   renderedJobID,
 		"rendered_template": lr.RenderedTemplate,
 		"render_note":       lr.RenderNote,
+		"mode":              lr.Mode,
 	}, nil
 }
 
@@ -225,6 +228,18 @@ func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 				tpl = "default"
 			}
 			lr.MainTemplate = tpl
+		case "mode":
+			var mode string
+			if json.Unmarshal(v, &mode) != nil {
+				core.Fail(w, 400, "出图方式只能是 ai 或 html")
+				return
+			}
+			mode = strings.TrimSpace(mode)
+			if mode != "ai" && mode != "html" {
+				core.Fail(w, 400, "出图方式只能是 ai 或 html")
+				return
+			}
+			lr.Mode = mode
 		default:
 			core.Fail(w, 400, "不支持的出图设置字段："+k)
 			return
@@ -238,12 +253,13 @@ func (a *Module) putListingRender(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	if _, e = tx.Exec(
-		"UPDATE listing_render SET detail_template=?,main_template=?,updated_at=? WHERE listing_id=?",
-		lr.DetailTemplate, lr.MainTemplate, ts, id,
+		"UPDATE listing_render SET detail_template=?,main_template=?,mode=?,updated_at=? WHERE listing_id=?",
+		lr.DetailTemplate, lr.MainTemplate, lr.Mode, ts, id,
 	); e == nil {
 		e = core.AuditTx(tx, r, "studio.render_settings", "listing", id, core.Object{
 			"detail_template": lr.DetailTemplate,
 			"main_template":   lr.MainTemplate,
+			"mode":            lr.Mode,
 		})
 	}
 	if e != nil || tx.Commit() != nil {
@@ -377,7 +393,7 @@ func (a *Module) runBatchRender(w http.ResponseWriter, r *http.Request) {
 		}
 		ts := core.Now()
 		if in.DetailTemplate != "" {
-			if _, e := tx.Exec("UPDATE listing_render SET detail_template=?,updated_at=? WHERE listing_id=?", in.DetailTemplate, ts, lid); e != nil {
+			if _, e := tx.Exec("UPDATE listing_render SET detail_template=?,mode='html',updated_at=? WHERE listing_id=?", in.DetailTemplate, ts, lid); e != nil {
 				_ = tx.Rollback()
 				results = append(results, core.Object{"listing_id": lid, "skipped_reason": "保存出图设置失败"})
 				continue

@@ -191,7 +191,7 @@ func saveMain(filename string, im image.Image) error {
 	}
 	return fmt.Errorf("主图压缩后仍超过 900 KB")
 }
-func (a *Module) render(ctx context.Context, p Product) error {
+func (a *Module) renderHTML(ctx context.Context, p Product) error {
 	p.Main = cleanMain(p.Main, filepath.Join(a.Dir(p.ID), "照片"))
 	if e := a.annotateForExport(p); e != nil {
 		return e
