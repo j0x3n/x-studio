@@ -562,15 +562,20 @@ func (m *Module) putShopSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n, _, ok := optInt(v)
-	if !ok || n == nil {
+	if !ok {
 		core.Fail(w, 400, "每日预算不正确")
 		return
 	}
+	// null 表示不设预算
+	var budget any
+	if n != nil {
+		budget = *n
+	}
 	now := core.Now()
-	if _, err := m.DB.Exec(`INSERT INTO market_shop_settings(shop_id, daily_budget_cents, updated_by, updated_at) VALUES(?,?,?,?) ON CONFLICT(shop_id) DO UPDATE SET daily_budget_cents=excluded.daily_budget_cents, updated_by=excluded.updated_by, updated_at=excluded.updated_at`, id, *n, core.CurrentUser(r).ID, now); err != nil {
+	if _, err := m.DB.Exec(`INSERT INTO market_shop_settings(shop_id, daily_budget_cents, updated_by, updated_at) VALUES(?,?,?,?) ON CONFLICT(shop_id) DO UPDATE SET daily_budget_cents=excluded.daily_budget_cents, updated_by=excluded.updated_by, updated_at=excluded.updated_at`, id, budget, core.CurrentUser(r).ID, now); err != nil {
 		core.Fail(w, 500, "保存店铺设置失败")
 		return
 	}
-	m.Audit(r, "market.settings", "shop", id, core.Object{"daily_budget_cents": *n})
-	core.WriteJSON(w, 200, core.Object{"shop_id": id, "daily_budget_cents": *n, "updated_at": now})
+	m.Audit(r, "market.settings", "shop", id, core.Object{"daily_budget_cents": budget})
+	core.WriteJSON(w, 200, core.Object{"shop_id": id, "daily_budget_cents": budget, "updated_at": now})
 }

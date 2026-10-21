@@ -496,6 +496,10 @@ func TestMarketQueries(t *testing.T) {
 	if settings["daily_budget_cents"].(float64) != 12345 {
 		t.Fatal(settings)
 	}
+	f.call("PUT", fmt.Sprintf("/api/market/shops/%d/settings", shop), []byte(`{"daily_budget_cents":null}`), "", 200)
+	if cleared := f.call("GET", fmt.Sprintf("/api/market/shops/%d/settings", shop), nil, "", 200); cleared["daily_budget_cents"] != nil {
+		t.Fatal(cleared)
+	}
 	ingested := f.call("POST", "/api/market/ingest", []byte(fmt.Sprintf(`{"shop_id":%d,"kind":"keyword","items":[{"word":"快照词","search_volume":2}]}`, shop)), "", 200)
 	snaps := f.call("GET", fmt.Sprintf("/api/market/snapshots?shop_id=%d&kind=keyword", shop), nil, "", 200)
 	sitems := snaps["items"].([]any)

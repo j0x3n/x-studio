@@ -6,13 +6,13 @@ import { useToast, errText } from '../lib/toast'
 import { CHECK_NAME, MODE, WEAR, creativeApi, criticalFail, itemState, minScore, slotName, type CreativeItem, type Review, type Verdict } from '../lib/creative'
 
 // 一张生成图的缩略卡：位置、版本、结论、分数，点开看详情
-export function ItemCard({ it, onOpen, active }: { it: CreativeItem; onOpen: () => void; active?: boolean }) {
+export function ItemCard({ it, onOpen, active, idle }: { it: CreativeItem; onOpen: () => void; active?: boolean; idle?: boolean }) {
   const st = itemState(it)
   const score = minScore(it)
   return (
     <button type="button" className={'cr-card' + (active ? ' active' : '') + (it.superseded ? ' old' : '')} onClick={onOpen}>
       <div className="cr-img">
-        {it.output_url ? <img src={it.output_url} alt="" loading="lazy" /> : <span className="t4 fs-12">{it.error ? '生成失败' : '生成中…'}</span>}
+        {it.output_url ? <img src={it.output_url} alt="" loading="lazy" /> : <span className="t4 fs-12">{it.error ? '生成失败' : idle ? '未生成' : '生成中…'}</span>}
         {it.variant && <span className="cr-variant">{it.variant}</span>}
         {criticalFail(it) && <span className="cr-flag" title="参数文字比对没过，改字前不能导出"><AlertTriangle />字不对</span>}
       </div>
@@ -67,15 +67,15 @@ export function ReviewDetail({ it }: { it: CreativeItem }) {
         <span className="sep" /><span className="mono">{it.template_key} v{it.template_version}</span><span className="sep" />第 {it.attempt} 次生成
       </div>
       {it.route_reasons.length > 0 && <div className="inline">{it.route_reasons.map(r => <span key={r} className="tag tag-blue">{r}</span>)}</div>}
-      {it.error && <div className="status-note">{it.error}</div>}
-      <table className="table cr-checks">
+      {it.error && <div className="cr-warn">{it.error}</div>}
+      {!a && !b ? <div className="fs-12 t3">还没有 AI 复核结果</div> : <table className="table cr-checks">
         <thead><tr><th>检查</th><th>第 1 次</th><th>第 2 次（换顺序）</th></tr></thead>
         <tbody>
           {Object.keys(CHECK_NAME).map(k => <tr key={k}><td>{CHECK_NAME[k]}</td><td>{cell(a?.checks[k as keyof Review['checks']])}</td><td>{cell(b?.checks[k as keyof Review['checks']])}</td></tr>)}
           <tr><td>总分</td><td className="mono">{a?.score ?? '—'}</td><td className="mono">{b?.score ?? '—'}</td></tr>
           {(a?.size_mm.length || b?.size_mm.length) ? <tr><td>估算尺寸</td><td className="mono">{a?.size_mm.join(' / ') || '—'} mm</td><td className="mono">{b?.size_mm.join(' / ') || '—'} mm</td></tr> : null}
         </tbody>
-      </table>
+      </table>}
       {issues.length > 0 && <ol className="cr-issues">{issues.map((x, i) => <li key={i}><span className="tag tag-gray">{CHECK_NAME[x.check] || x.check}</span>{x.reason}</li>)}</ol>}
       {h && (
         <div className="stack" style={{ gap: 6 }}>
@@ -85,6 +85,7 @@ export function ReviewDetail({ it }: { it: CreativeItem }) {
             {h.format && <span>尺寸格式 {h.format.pass ? <Pill kind="pill-success" dot={false}>通过</Pill> : <Pill kind="pill-danger" dot={false}>不对</Pill>}</span>}
             {(h.banned || []).length > 0 && <span>违禁词 <Pill kind="pill-danger" dot={false}>{h.banned!.join('、')}</Pill></span>}
           </div>
+          {h.error && <div className="cr-warn">硬检查出错：{h.error}</div>}
         </div>
       )}
     </div>

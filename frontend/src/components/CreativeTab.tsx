@@ -38,6 +38,7 @@ function ListingCreative({ listingId, product }: { listingId: number; product: P
   }).catch(e => { toast(errText(e), 'error'); setSets([]) }), [listingId, toast])
   useEffect(() => { load() }, [load])
   const set = sets?.find(s => s.id === setId)
+  useEffect(() => { setMissing([]) }, [setId])
   // 生成中每 3 秒刷新
   const busy = set && (set.status === 'generating' || (set.jobs || []).some(j => j.status === 'queued' || j.status === 'running'))
   useEffect(() => {
@@ -61,6 +62,9 @@ function ListingCreative({ listingId, product }: { listingId: number; product: P
   const ok = cur.filter(itemOk).length
   const pending = cur.filter(i => !i.human && i.route === 'manual').length
   const st = SET_STATUS[set.status] || SET_STATUS.draft
+  // 最近结束的任务失败了（不是到上限暂停），还有图没生成：说明原因（后端按新的在前排）
+  const lastJob = (set.jobs || []).find(j => j.status !== 'queued' && j.status !== 'running')
+  const failedJobShown = lastJob?.status === 'failed' && set.status !== 'paused_limit' && cur.some(i => !i.output_url && !i.error) ? lastJob : null
   const act = async (f: () => Promise<unknown>, msg: string) => {
     try { await f(); toast(msg, 'ok'); load() } catch (e) { toast(errText(e), 'error') }
   }
@@ -69,14 +73,14 @@ function ListingCreative({ listingId, product }: { listingId: number; product: P
       await creativeApi.exportSet(set.id)
       setMissing([]); toast('已打包', 'ok'); load()
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) { setMissing([e.message]); return }
+      if (e instanceof ApiError && e.status === 409) { setMissing(e.message.split('；').filter(Boolean)); return }
       toast(errText(e), 'error')
     }
   }
   const item = set.items.find(i => i.id === open)
   const grid = (slots: string[]) => {
     const list = cur.filter(i => slots.includes(i.slot)).sort((a, b) => slots.indexOf(a.slot) - slots.indexOf(b.slot) || a.variant.localeCompare(b.variant) || a.seq - b.seq)
-    return list.length ? <div className="cr-grid">{list.map(i => <ItemCard key={i.id} it={i} onOpen={() => setOpen(i.id)} active={open === i.id} />)}</div> : <div className="t3 fs-12">{busy ? '排队中…' : '这一部分没生成'}</div>
+    return list.length ? <div className="cr-grid">{list.map(i => <ItemCard key={i.id} it={i} onOpen={() => setOpen(i.id)} active={open === i.id} idle={!busy} />)}</div> : <div className="t3 fs-12">{busy ? '排队中…' : '这一部分没生成'}</div>
   }
   return (
     <>
@@ -102,8 +106,9 @@ function ListingCreative({ listingId, product }: { listingId: number; product: P
               <div className="progress"><span style={{ width: `${j.progress}%` }} /></div>
             </div>
           ))}
-          {set.status === 'paused_limit' && <div className="status-note">已达每套 {set.images_allowance} 次生成上限，暂停了。看过已有的图再决定要不要继续。</div>}
-          {missing.length > 0 && <div className="status-note">还不能导出：{missing.join('；')}</div>}
+          {!busy && failedJobShown && <div className="cr-warn">上次生成中断：{failedJobShown.message || '任务失败'}。没生成的图可以点开单张重画。</div>}
+          {set.status === 'paused_limit' && <div className="cr-warn">已达每套 {set.images_allowance} 次生成上限，暂停了。看过已有的图再决定要不要继续。</div>}
+          {missing.length > 0 && <div className="cr-warn">还不能导出：<ul>{missing.map((m, i) => <li key={i}>{m}</li>)}</ul></div>}
           {set.glanced_at && <div className="fs-12 t3">整套已过目 · {new Date(set.glanced_at).toLocaleString('zh-CN')}</div>}
           <div className="stack" style={{ gap: 8 }}><div className="sub-title">主图</div>{grid(MAIN_SLOTS)}</div>
           <div className="stack" style={{ gap: 8 }}><div className="sub-title">详情页</div>{grid(DETAIL_SLOTS)}</div>

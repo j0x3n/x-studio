@@ -6,12 +6,12 @@ import { useListingRefs } from '../lib/listings'
 import { useCategories } from '../lib/categories'
 import { Topbar, Pill, Loading, Empty, Field } from './ui'
 import { CompareView, ReviewDetail } from './CreativeShared'
-import { MODE, creativeApi, slotName, type CreativeItem, type CreativeTemplate, type ProductMode } from '../lib/creative'
+import { MODE, creativeApi, slotName, templatePatch, type CreativeItem, type CreativeTemplate, type ProductMode } from '../lib/creative'
 import '../styles/creative.css'
 
 const SIZES = ['1024x1536', '1024x1024', '1536x1024']
 // 改了这几项版本号会 +1（后端算），提醒一下
-const VERSIONED: (keyof CreativeTemplate)[] = ['prompt', 'texts', 'product_mode', 'product_box', 'gen_size']
+const VERSIONED: (keyof CreativeTemplate)[] = ['prompt', 'texts', 'product_mode', 'product_box', 'gen_size', 'lock_shape', 'size_compare', 'hero_style']
 
 // 模板中心的「生图模板」：每个位置一张图怎么生成，提示词、商品模式和位置、图上的字；可以挑一款试跑一张
 export function CreativeTemplates({ switcher }: { switcher: ReactNode }) {
@@ -40,11 +40,10 @@ export function CreativeTemplates({ switcher }: { switcher: ReactNode }) {
   useEffect(() => { setListingId(id => shopRefs.some(r => r.id === id) ? id : shopRefs[0]?.id || 0) }, [refs, cat]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
-    if (!draft) return
+    if (!draft || !t) return
     setBusy(true)
     try {
-      const { key, version, source, updated_at, ...body } = draft; void version; void source; void updated_at
-      await creativeApi.saveTemplate(key, body)
+      await creativeApi.saveTemplate(draft.key, templatePatch(t, draft))
       toast(bump ? '已保存，版本号加 1，之后生成的图用新版本' : '已保存', 'ok'); load()
     } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }
@@ -54,7 +53,7 @@ export function CreativeTemplates({ switcher }: { switcher: ReactNode }) {
     try {
       const r = await creativeApi.trial(t.key, listingId)
       if (r.item) setTrial(r.item)
-      toast(r.item ? '试跑完成' : '已开始试跑，结果在后台任务里，完成后刷新这里', 'ok')
+      toast(r.item?.output_url ? '试跑完成' : '已开始试跑，结果在后台任务里，完成后刷新这里', 'ok')
     } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }
   const set = <K extends keyof CreativeTemplate>(k: K, v: CreativeTemplate[K]) => setDraft(d => d ? { ...d, [k]: v } : d)

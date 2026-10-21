@@ -10,6 +10,13 @@ import '../styles/market.css'
 
 type TabKey = 'keywords' | 'competitors' | 'ads' | 'import' | 'collect'
 
+// 预览样例是后端规整过的：金额在 *_cents，商品 id 换成了 listing_id
+const sampleCell = (r: Record<string, unknown>, f: { key: string; num?: 'int' | 'money' }) => {
+  const v = f.num === 'money' ? r[f.key + '_cents'] : f.key === 'item_id' ? (r.listing_id ? `上架版本 #${r.listing_id}` : r.item_id) : r[f.key]
+  if (v === null || v === undefined || v === '') return <span className="t4">—</span>
+  return f.num === 'money' ? yuan(Number(v)) : String(v)
+}
+
 // 数据页：关键词、竞品、推广数据，报表导入，采集助手的令牌和采集记录
 export function Market() {
   const { me, can } = useAuth()
@@ -226,7 +233,7 @@ function Import({ shopId }: { shopId: number }) {
             {pv.errors.length > 0 && <div className="mk-errors">{pv.errors.slice(0, 50).map(e => <div key={e.index} className="fs-12"><span className="mono t3">第 {e.index + headRow + 2} 行</span> {e.reason}</div>)}</div>}
             <div className="table-wrap"><table className="table">
               <thead><tr>{fields.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead>
-              <tbody>{pv.sample.slice(0, 10).map((r, i) => <tr key={i}>{fields.map(f => <td key={f.key} className="mono fs-12">{r[f.key] === null || r[f.key] === undefined ? <span className="t4">—</span> : String(r[f.key])}</td>)}</tr>)}</tbody>
+              <tbody>{pv.sample.slice(0, 10).map((r, i) => <tr key={i}>{fields.map(f => <td key={f.key} className="mono fs-12">{sampleCell(r, f)}</td>)}</tr>)}</tbody>
             </table></div>
           </div>
         )}

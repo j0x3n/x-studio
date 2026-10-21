@@ -18,6 +18,7 @@ export type Hard = {
   text?: { key: string; expect: string; found: string; pass: boolean; warn?: boolean; critical?: boolean }[]
   banned?: string[]
   format?: { pass: boolean }
+  error?: string
 }
 export type CreativeItem = {
   id: number; set_id: number | null; slot: string; seq: number
@@ -38,6 +39,7 @@ export type CreativeSet = {
   images_used: number; images_allowance: number
   glanced_by: number | null; glanced_at: string; exported_at: string; export_file: string
   created_by: number; created_at: string; updated_at: string
+  parts?: ('main' | 'detail')[]; progress?: { total: number; completed: number }
   items: CreativeItem[]
   jobs?: { id: number; kind: string; status: string; progress: number; message: string }[]
   missing?: string[] // 导出还缺什么（后端 409 时给出）
@@ -47,6 +49,7 @@ export type CreativeTemplate = {
   key: string; name: string; kind: 'main' | 'detail'; slot: string; categories: string[]; purpose: string; prompt: string
   style_refs: string[]; texts: { key: string; from: string; max: number; critical: boolean }[]; photo_codes: string[]
   product_mode: ProductMode; product_box: [number, number, number, number] | null; gen_size: string
+  lock_shape?: string; size_compare?: boolean | null; hero_style?: string
   export: { name: string; w: number; h: number }[]; count: number
   wear: { slot: string; body_part: string; framing: string } | null
   version: number; enabled: boolean; source: 'file' | 'custom'; updated_at?: string
@@ -87,7 +90,7 @@ export const MODEL_SLOT = { female_main: '女主模特（F1）', male: '男模�
 
 // 一张图当前的结论：人工判断优先，其次分流
 export const itemState = (it: CreativeItem) =>
-  it.error ? { label: '失败', pill: 'pill-danger' } : it.human ? VERDICT[it.human] : ROUTE[it.route] || ROUTE.pending
+  it.error ? { label: '失败', pill: 'pill-danger' } : it.human ? VERDICT[it.human] : !it.output_url && it.route === 'pending' ? { label: '待生成', pill: 'pill-neutral' } : ROUTE[it.route] || ROUTE.pending
 export const itemOk = (it: CreativeItem) => it.human === 'pass' || (!it.human && it.route === 'auto_pass')
 export const criticalFail = (it: CreativeItem) => (it.hard?.text || []).some(t => !t.pass && !t.warn)
 export const minScore = (it: CreativeItem) => {
@@ -95,14 +98,45 @@ export const minScore = (it: CreativeItem) => {
   return s.length ? Math.min(...s) : null
 }
 
+// ---------- 后端原样返回数据库行：没复核的是 {}、没有的编号是 0，这里统一成上面的类型 ----------
+type Raw = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+const normReview = (r: Raw | null | undefined): Review | null =>
+  r && r.checks && Object.keys(r.checks).length ? { checks: r.checks, size_mm: r.size_mm || [], score: r.score ?? 0, issues: r.issues || [] } : null
+const normHard = (h: Raw | null | undefined, mode: string, done: boolean): Hard | null => {
+  if (!h || !Object.keys(h).length) return null
+  return {
+    pixel: mode === 'pixel_lock' && done ? h.pixel : undefined, // 非像素锁定的图后端也写 pass:true，不显示
+    format: done ? h.format : undefined, text: h.text || [], banned: h.banned || [], error: h.error || undefined
+  }
+}
+export const normItem = (it: Raw): CreativeItem => ({
+  ...it, model_id: it.model_id || null, output_asset_id: it.output_asset_id || null,
+  source_asset_ids: it.source_asset_ids || [], source_urls: it.source_urls || [], output_url: it.output_url || undefined,
+  texts: it.texts || [], route_reasons: it.route_reasons || [], human_note: it.human_note || '', error: it.error || '',
+  review_a: normReview(it.review_a), review_b: normReview(it.review_b), hard: normHard(it.hard, it.product_mode, !!it.output_asset_id)
+} as CreativeItem)
+const normSet = (s: Raw): CreativeSet => ({ ...s, params: s.params || {}, template_keys: s.template_keys || {}, items: (s.items || []).map(normItem), jobs: s.jobs || [] } as CreativeSet)
+const normTemplate = (t: Raw): CreativeTemplate => ({
+  ...t, categories: t.categories || [], style_refs: t.style_refs || [], texts: t.texts || [], photo_codes: t.photo_codes || [], export: t.export || [],
+  product_box: t.product_box?.length === 4 ? t.product_box : null
+} as CreativeTemplate)
+const page = <T,>(f: (x: Raw) => T) => (p: Page<Raw>): Page<T> => ({ ...p, items: (p.items || []).map(f) })
+// 模板保存只发改过的、后端允许改的字段
+export const TEMPLATE_FIELDS = ['name', 'kind', 'slot', 'categories', 'purpose', 'prompt', 'style_refs', 'texts', 'photo_codes', 'product_mode', 'product_box', 'gen_size', 'export', 'count', 'wear', 'enabled', 'lock_shape', 'size_compare', 'hero_style'] as const
+export const templatePatch = (from: CreativeTemplate, to: CreativeTemplate) => {
+  const out: Raw = {}
+  for (const k of TEMPLATE_FIELDS) if (JSON.stringify(from[k]) !== JSON.stringify(to[k])) out[k] = k === 'product_box' ? (to[k] || []) : to[k]
+  return out as Partial<CreativeTemplate>
+}
+
 // ---------- 接口（mock 开着时走假数据） ----------
 export const mockOn = () => { try { return localStorage.getItem('xs-mock') === '1' } catch { return false } }
 const wait = <T,>(v: T) => new Promise<T>(r => setTimeout(() => r(structuredClone(v)), 200))
 
 export const creativeApi = {
-  sets: (listingId: number) => mockOn() ? wait({ items: MOCK_SETS(listingId), total: 1 }) : api<Page<CreativeSet>>(`/api/listings/${listingId}/creative`),
-  set: (id: number) => mockOn() ? wait(MOCK_SETS(1)[0]) : api<CreativeSet>(`/api/creative/sets/${id}`),
-  create: (listingId: number, body: { parts: string[]; params: SetParams }) => mockOn() ? wait({ set: MOCK_SETS(listingId)[0], jobs: [] }) : api<{ set: CreativeSet; jobs: unknown[] }>(`/api/listings/${listingId}/creative`, { body }),
+  sets: (listingId: number) => mockOn() ? wait({ items: MOCK_SETS(listingId), total: 1 }) : api<Page<Raw>>(`/api/listings/${listingId}/creative`).then(page(normSet)),
+  set: (id: number) => mockOn() ? wait(MOCK_SETS(1)[0]) : api<Raw>(`/api/creative/sets/${id}`).then(normSet),
+  create: (listingId: number, body: { parts: string[]; params: SetParams }) => mockOn() ? wait({ set: MOCK_SETS(listingId)[0], jobs: [] }) : api<{ set: Raw; jobs: unknown[] }>(`/api/listings/${listingId}/creative`, { body }).then(r => ({ ...r, set: normSet(r.set) })),
   cont: (id: number) => mockOn() ? wait({}) : api(`/api/creative/sets/${id}/continue`, { method: 'POST' }),
   glance: (id: number) => mockOn() ? wait({}) : api(`/api/creative/sets/${id}/glance`, { method: 'POST' }),
   exportSet: (id: number) => mockOn() ? wait({ file: '' }) : api<{ file: string }>(`/api/creative/sets/${id}/export`, { method: 'POST' }),
@@ -110,11 +144,11 @@ export const creativeApi = {
   retext: (id: number, key: string, text: string) => mockOn() ? wait({}) : api(`/api/creative/items/${id}/retext`, { body: { key, text } }),
   choose: (id: number) => mockOn() ? wait({}) : api(`/api/creative/items/${id}/choose`, { body: { variant: 'A' } }),
   judge: (id: number, verdict: Verdict, note: string) => mockOn() ? wait({}) : api(`/api/creative/items/${id}/judge`, { body: { verdict, note } }),
-  review: (p: { shop_id?: number; slot?: string; page?: number }) => mockOn() ? wait({ items: MOCK_REVIEW, total: MOCK_REVIEW.length }) : api<Page<CreativeItem>>('/api/creative/review' + qs(p)),
-  templates: (p: { kind?: string; category?: string }) => mockOn() ? wait({ items: MOCK_TEMPLATES, total: MOCK_TEMPLATES.length }) : api<Page<CreativeTemplate>>('/api/creative/templates' + qs(p)),
+  review: (p: { shop_id?: number; slot?: string; page?: number }) => mockOn() ? wait({ items: MOCK_REVIEW, total: MOCK_REVIEW.length }) : api<Page<Raw>>('/api/creative/review' + qs(p)).then(page(normItem)),
+  templates: (p: { kind?: string; category?: string }) => mockOn() ? wait({ items: MOCK_TEMPLATES, total: MOCK_TEMPLATES.length }) : api<Page<Raw>>('/api/creative/templates' + qs(p)).then(page(normTemplate)),
   saveTemplate: (key: string, body: Partial<CreativeTemplate>) => mockOn() ? wait({}) : api(`/api/creative/templates/${key}`, { method: 'PATCH', body }),
-  trial: (key: string, listingId: number) => mockOn() ? wait({ item: MOCK_REVIEW[0] }) : api<{ item?: CreativeItem; job_id?: number }>(`/api/creative/templates/${key}/trial`, { body: { listing_id: listingId } }),
-  shop: (id: number) => mockOn() ? wait<ShopCreative>({ models: { female_main: null, male: null, hand: null }, template_set: {} }) : api<ShopCreative>(`/api/creative/shops/${id}/settings`),
+  trial: (key: string, listingId: number) => mockOn() ? wait({ item: MOCK_REVIEW[0] }) : api<{ item?: Raw; job_id?: number }>(`/api/creative/templates/${key}/trial`, { body: { listing_id: listingId } }).then(r => ({ ...r, item: r.item && normItem(r.item) })),
+  shop: (id: number) => mockOn() ? wait<ShopCreative>({ models: { female_main: null, male: null, hand: null }, template_set: {} }) : api<Raw>(`/api/creative/shops/${id}/settings`).then(r => ({ models: r.models || {}, template_set: r.template_set || {} }) as ShopCreative),
   saveShop: (id: number, body: ShopCreative) => mockOn() ? wait({}) : api(`/api/creative/shops/${id}/settings`, { method: 'PUT', body }),
   stats: () => mockOn() ? wait(MOCK_STATS) : api<Stats>('/api/creative/stats'),
   suggestion: (id: number, status: 'done' | 'ignored') => mockOn() ? wait({}) : api(`/api/creative/suggestions/${id}`, { body: { status } }),

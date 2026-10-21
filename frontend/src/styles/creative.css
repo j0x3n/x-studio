@@ -49,7 +49,12 @@
 
 @media (max-width: 1100px) {
   .cr-compare { grid-template-columns: 1fr; }
+  .cr-srcs img { max-height: 220px; object-fit: contain; }
   .cr-queue { width: 220px; }
 }
 
 .input.input-sm { height: var(--h-control-sm); font-size: var(--fs-12); padding: 0 8px; }
+
+/* 长提示（导出缺项、生成错误）：块级，可换行 */
+.cr-warn { padding: 8px 12px; border-radius: var(--r-md); background: var(--warning-bg); color: var(--warning-text); font-size: var(--fs-12); line-height: 1.6; overflow-wrap: anywhere; }
+.cr-warn ul { margin: 2px 0 0; padding-left: 18px; }
