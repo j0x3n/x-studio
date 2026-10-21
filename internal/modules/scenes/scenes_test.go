@@ -20,6 +20,7 @@ import (
 	"xstudio/internal/modules/accounts"
 	"xstudio/internal/modules/assets"
 	"xstudio/internal/modules/products"
+	"xstudio/internal/modules/props"
 )
 
 type sceneFixture struct {
@@ -56,7 +57,7 @@ func newSceneFixture(t *testing.T, withSeed bool) *sceneFixture {
 		t.Fatal(err)
 	}
 	a := New(c)
-	if err = c.Start(accounts.New(c), products.New(c), assets.New(c), a); err != nil {
+	if err = c.Start(accounts.New(c), products.New(c), assets.New(c), props.New(c), a); err != nil {
 		c.Close()
 		t.Fatal(err)
 	}

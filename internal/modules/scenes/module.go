@@ -16,9 +16,11 @@ import (
 
 type Module struct{ *core.Core }
 
-func New(app *core.Core) *Module                 { return &Module{app} }
-func (*Module) Name() string                     { return "scenes" }
-func (*Module) Jobs() map[string]core.JobHandler { return nil }
+func New(app *core.Core) *Module { return &Module{app} }
+func (*Module) Name() string     { return "scenes" }
+func (module *Module) Jobs() map[string]core.JobHandler {
+	return map[string]core.JobHandler{"scenes.plate": module.runPlate}
+}
 func (*Module) Migrations() []core.Migration {
 	return []core.Migration{{Version: 1, Up: func(tx *sql.Tx) error {
 		_, err := tx.Exec(`CREATE TABLE scenes(id INTEGER PRIMARY KEY,shop_id INTEGER REFERENCES shops(id),name TEXT NOT NULL,categories TEXT NOT NULL DEFAULT '[]',still TEXT NOT NULL DEFAULT '',wear TEXT NOT NULL DEFAULT '',light TEXT NOT NULL DEFAULT '',props TEXT NOT NULL DEFAULT '',note TEXT NOT NULL DEFAULT '',builtin_key TEXT UNIQUE,archived INTEGER NOT NULL DEFAULT 0,created_by INTEGER NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
@@ -28,26 +30,47 @@ CREATE INDEX scenes_shop ON scenes(shop_id,archived);
 CREATE INDEX scene_refs_scene ON scene_refs(scene_id);
 CREATE INDEX scene_bindings_scene ON scene_bindings(scene_id);`)
 		return err
+	}}, {Version: 2, Up: func(tx *sql.Tx) error {
+		if err := core.AddColumns(tx, "scenes", [][2]string{
+			{"camera", "TEXT NOT NULL DEFAULT ''"},
+			{"brief", "TEXT NOT NULL DEFAULT ''"},
+			{"layout", `TEXT NOT NULL DEFAULT '{"size":"1024x1536","elements":[]}'`},
+			{"plate_id", "INTEGER"},
+		}); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`CREATE TABLE scene_plates(id INTEGER PRIMARY KEY,scene_id INTEGER NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,status TEXT NOT NULL CHECK(status IN ('candidate','locked','discarded')),file TEXT NOT NULL,width INTEGER NOT NULL,height INTEGER NOT NULL,size TEXT NOT NULL,layout_snapshot TEXT NOT NULL,prompt TEXT NOT NULL DEFAULT '',model TEXT NOT NULL DEFAULT '',sketch_file TEXT NOT NULL DEFAULT '',created_by INTEGER NOT NULL,created_at TEXT NOT NULL);
+CREATE INDEX scene_plates_scene ON scene_plates(scene_id,status);
+CREATE UNIQUE INDEX scene_plate_one_locked ON scene_plates(scene_id) WHERE status='locked';`)
+		return err
 	}}}
 }
 
 type Scene struct {
-	ID         int64       `json:"id"`
-	ShopID     *int64      `json:"shop_id"`
-	Name       string      `json:"name"`
-	Categories []string    `json:"categories"`
-	Still      string      `json:"still"`
-	Wear       string      `json:"wear"`
-	Light      string      `json:"light"`
-	Props      string      `json:"props"`
-	Note       string      `json:"note"`
-	BuiltinKey *string     `json:"builtin_key"`
-	IsDefault  bool        `json:"is_default"`
-	Archived   bool        `json:"archived"`
-	Refs       []Reference `json:"refs"`
-	Usage      Usage       `json:"usage"`
-	CreatedAt  string      `json:"created_at"`
-	UpdatedAt  string      `json:"updated_at"`
+	ID            int64       `json:"id"`
+	ShopID        *int64      `json:"shop_id"`
+	Name          string      `json:"name"`
+	Categories    []string    `json:"categories"`
+	Still         string      `json:"still"`
+	Wear          string      `json:"wear"`
+	Light         string      `json:"light"`
+	Props         string      `json:"props"`
+	Note          string      `json:"note"`
+	Camera        string      `json:"camera"`
+	Brief         string      `json:"brief"`
+	Layout        Layout      `json:"layout"`
+	PlateID       *int64      `json:"plate_id,omitempty"`
+	ThumbURL      string      `json:"thumb_url"`
+	Plate         *Plate      `json:"plate"`
+	Plates        []Plate     `json:"plates"`
+	PlateOutdated bool        `json:"plate_outdated"`
+	BuiltinKey    *string     `json:"builtin_key"`
+	IsDefault     bool        `json:"is_default"`
+	Archived      bool        `json:"archived"`
+	Refs          []Reference `json:"refs"`
+	Usage         Usage       `json:"usage"`
+	CreatedAt     string      `json:"created_at"`
+	UpdatedAt     string      `json:"updated_at"`
 }
 type Usage struct {
 	Listings int `json:"listings"`
@@ -62,13 +85,21 @@ type Reference struct {
 	File   string `json:"-"`
 }
 type Snapshot struct {
-	ID    int64         `json:"id"`
-	Name  string        `json:"name"`
-	Still string        `json:"still"`
-	Wear  string        `json:"wear"`
-	Light string        `json:"light"`
-	Props string        `json:"props"`
-	Refs  []SnapshotRef `json:"refs"`
+	ID    int64          `json:"id"`
+	Name  string         `json:"name"`
+	Still string         `json:"still"`
+	Wear  string         `json:"wear"`
+	Light string         `json:"light"`
+	Props string         `json:"props"`
+	Refs  []SnapshotRef  `json:"refs"`
+	Plate *SnapshotPlate `json:"plate,omitempty"`
+}
+type SnapshotPlate struct {
+	Path   string      `json:"path"`
+	Size   string      `json:"size"`
+	Width  int         `json:"width"`
+	Height int         `json:"height"`
+	Box    *[4]float64 `json:"box,omitempty"`
 }
 type SnapshotRef struct {
 	Use  string `json:"use"`
@@ -90,15 +121,30 @@ func fail(writer http.ResponseWriter, err error) {
 	core.Fail(writer, 500, "场景处理失败，请稍后重试")
 }
 
-const columns = `id,shop_id,name,categories,still,wear,light,props,note,builtin_key,archived,created_at,updated_at,EXISTS(SELECT 1 FROM settings WHERE key='scenes.default' AND CAST(value AS INTEGER)=scenes.id)`
+const columns = `id,shop_id,name,categories,still,wear,light,props,note,camera,brief,layout,plate_id,builtin_key,archived,created_at,updated_at,EXISTS(SELECT 1 FROM settings WHERE key='scenes.default' AND CAST(value AS INTEGER)=scenes.id)`
 
 func scan(scanner core.Scanner) (scene Scene, err error) {
-	var categories string
-	err = scanner.Scan(&scene.ID, &scene.ShopID, &scene.Name, &categories, &scene.Still, &scene.Wear, &scene.Light, &scene.Props, &scene.Note, &scene.BuiltinKey, &scene.Archived, &scene.CreatedAt, &scene.UpdatedAt, &scene.IsDefault)
+	var categories, layoutText string
+	var plateID sql.NullInt64
+	err = scanner.Scan(&scene.ID, &scene.ShopID, &scene.Name, &categories, &scene.Still, &scene.Wear, &scene.Light, &scene.Props, &scene.Note, &scene.Camera, &scene.Brief, &layoutText, &plateID, &scene.BuiltinKey, &scene.Archived, &scene.CreatedAt, &scene.UpdatedAt, &scene.IsDefault)
 	if err == nil {
 		err = json.Unmarshal([]byte(categories), &scene.Categories)
 	}
+	if err == nil {
+		if strings.TrimSpace(layoutText) == "" {
+			layoutText = `{"size":"1024x1536","elements":[]}`
+		}
+		err = json.Unmarshal([]byte(layoutText), &scene.Layout)
+	}
+	if plateID.Valid {
+		id := plateID.Int64
+		scene.PlateID = &id
+	}
+	if scene.Layout.Elements == nil {
+		scene.Layout.Elements = []LayoutElement{}
+	}
 	scene.Refs = []Reference{}
+	scene.Plates = []Plate{}
 	return
 }
 func get(ctx context.Context, db *sql.DB, id int64) (Scene, error) {
@@ -209,6 +255,10 @@ func resolve(ctx context.Context, db *sql.DB, listingID, overrideID int64) (Snap
 			err = rows.Err()
 		}
 		rows.Close()
+		if err != nil {
+			return out, choice.source, err
+		}
+		out.Plate, err = plateSnapshot(ctx, db, scene)
 		return out, choice.source, err
 	}
 	return Snapshot{}, "none", nil
@@ -236,7 +286,15 @@ func validate(scene *Scene) error {
 	if scene.Categories == nil {
 		scene.Categories = []string{}
 	}
-	return nil
+	scene.Camera = strings.TrimSpace(scene.Camera)
+	scene.Brief = strings.TrimSpace(scene.Brief)
+	if !validCamera(scene.Camera) {
+		return invalid(400, "机位请选择顶拍、俯拍 45°、平视或微距")
+	}
+	if utf8.RuneCountInString(scene.Brief) > 1000 {
+		return invalid(400, "摆放说明不能超过 1000 字")
+	}
+	return normalizeLayout(&scene.Layout)
 }
 func refURL(sceneID, refID int64) string {
 	return fmt.Sprintf("/api/scenes/%d/refs/%d/file", sceneID, refID)
