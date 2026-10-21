@@ -3,6 +3,8 @@ package pipeline
 import (
 	"bytes"
 	"crypto/rand"
+	"database/sql"
+	"errors"
 	"image"
 	"image/jpeg"
 	"io"
@@ -23,7 +25,41 @@ func validFilePath(name string) bool {
 // serveThumbnail returns false only when w is absent, preserving raw downloads.
 // Both source and cache accesses stay under the same os.Root, including writes.
 func (a *Module) serveThumbnail(w http.ResponseWriter, r *http.Request, id int64, name string) bool {
+	if a.serveVideoThumbnail(w, r, id, name) {
+		return true
+	}
 	return a.serveThumbnailRoot(w, r, a.Dir(id), name)
+}
+func (a *Module) serveVideoThumbnail(w http.ResponseWriter, r *http.Request, id int64, name string) bool {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return false
+	}
+	values, present := query["w"]
+	if !present {
+		return false
+	}
+	var media, poster string
+	err = a.DB.QueryRow("SELECT media, poster_file FROM assets WHERE product_id=? AND file=?", id, name).Scan(&media, &poster)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false
+		}
+		fail(w, 500, "读取视频封面失败")
+		return true
+	}
+	if media != "video" {
+		return false
+	}
+	if len(values) != 1 || (values[0] != "240" && values[0] != "480" && values[0] != "960") {
+		fail(w, 400, "w 只能是 240、480 或 960")
+		return true
+	}
+	if poster == "" || !validFilePath(poster) {
+		fail(w, 404, "没有封面")
+		return true
+	}
+	return a.serveThumbnailRoot(w, r, a.Dir(id), poster)
 }
 func (a *Module) serveThumbnailRoot(w http.ResponseWriter, r *http.Request, rootDir, name string) bool {
 	query, err := url.ParseQuery(r.URL.RawQuery)

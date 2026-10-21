@@ -86,6 +86,10 @@ func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if _, sent := in["code"]; sent && p.Media == "video" && p.Code != "" {
+		fail(w, 400, "视频不能用来设置拍摄编号")
+		return
+	}
 	if e := validatePhoto(p.Photo); e != nil {
 		fail(w, 400, e.Error())
 		return
@@ -156,12 +160,12 @@ func (a *Module) deletePhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.Audit(r, "asset.delete", "asset", p.ID, Object{"product_id": p.ProductID})
-	for _, file := range []string{p.File, p.EnhancedFile} {
+	for _, file := range []string{p.File, p.EnhancedFile, p.PosterFile} {
 		if !validAssetFile(file) {
 			continue
 		}
 		var n int
-		if e := a.DB.QueryRow("SELECT count(*) FROM assets WHERE product_id=? AND (file=? OR enhanced_file=?)", p.ProductID, file, file).Scan(&n); e == nil && n == 0 {
+		if e := a.DB.QueryRow("SELECT count(*) FROM assets WHERE product_id=? AND (file=? OR enhanced_file=? OR poster_file=?)", p.ProductID, file, file, file).Scan(&n); e == nil && n == 0 {
 			_ = os.Remove(filepath.Join(a.Dir(p.ProductID), filepath.FromSlash(file)))
 		}
 	}

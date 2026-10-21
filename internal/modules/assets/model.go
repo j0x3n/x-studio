@@ -57,6 +57,9 @@ func (a *Module) ensureHash(p *Asset) error {
 	if p.PHash != "" {
 		return nil
 	}
+	if err := videoBlocked(*p, "查找相似图"); err != nil {
+		return err
+	}
 	// Stored paths originate from upload/processing. Check again before reading.
 	if !validAssetFile(p.File) {
 		return fmt.Errorf("素材文件路径不合法")
@@ -95,6 +98,9 @@ func (a *Module) decorate(p Asset, u core.User, chain []Asset) Asset {
 	}
 	root := rootOf(p, byID)
 	for _, v := range chain {
+		if v.Stale {
+			continue
+		}
 		if rootOf(v, byID) == root {
 			p.VersionCount++
 		}

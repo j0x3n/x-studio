@@ -60,7 +60,7 @@ func (a *Module) productJSON(id int64, u core.User) (core.Object, error) {
 	o["listings"] = listings
 	var count int
 	var cover string
-	if e = a.DB.QueryRow("SELECT count(*),coalesce(min(file),'') FROM assets WHERE product_id=? AND kind='photo'", id).Scan(&count, &cover); e != nil {
+	if e = a.DB.QueryRow("SELECT count(*),coalesce(min(CASE WHEN media='image' THEN file END),'') FROM assets WHERE product_id=? AND kind='photo'", id).Scan(&count, &cover); e != nil {
 		return nil, e
 	}
 	o["asset_count"] = count

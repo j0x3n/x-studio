@@ -39,6 +39,7 @@ func (a *Module) Routes(r *core.Router) {
 	r.Handle("POST /api/assets/{pid}/similar", core.ProductView, a.similar)
 	r.Handle("POST /api/assets/tag", core.AssetUpload, a.tag)
 	r.Handle("GET /api/assets", core.ProductView, a.library)
+	r.Handle("GET /api/assets/{pid}/poster", core.ProductView, a.poster)
 	r.Handle("GET /api/assets/{pid}", core.ProductView, a.detail)
 	r.Handle("GET /api/products/{id}/assets", core.ProductView, a.list)
 	r.Handle("POST /api/products/{id}/assets", core.AssetUpload, a.upload)
@@ -84,7 +85,7 @@ func (a *Module) list(w http.ResponseWriter, r *http.Request) {
 			args = append(args, s)
 		}
 	}
-	rows, e := a.DB.Query(q+" ORDER BY id", args...)
+	rows, e := a.DB.Query(q+" ORDER BY CASE WHEN media='video' THEN 1 ELSE 0 END, id", args...)
 	if e != nil {
 		core.Fail(w, 500, "读取素材失败")
 		return

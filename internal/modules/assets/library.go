@@ -25,6 +25,25 @@ func (a *Module) library(w http.ResponseWriter, r *http.Request) {
 	}
 	query += " AND a.archived=?"
 	args = append(args, archived)
+	switch q.Get("stale") {
+	case "", "0":
+		query += " AND a.stale=0"
+	case "1":
+		query += " AND a.stale=1"
+	case "all":
+	default:
+		fail(w, 400, "stale 只能是 0、1 或 all")
+		return
+	}
+	switch q.Get("media") {
+	case "":
+	case "image", "video":
+		query += " AND a.media=?"
+		args = append(args, q.Get("media"))
+	default:
+		fail(w, 400, "media 只能是 image 或 video")
+		return
+	}
 	if values, ok := q["folder_id"]; ok {
 		folderID, err := strconv.ParseInt(values[0], 10, 64)
 		if err != nil || folderID < 0 {

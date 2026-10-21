@@ -71,6 +71,11 @@ func (a *Module) download(w http.ResponseWriter, r *http.Request) {
 	z := zip.NewWriter(f)
 	names := map[string]bool{}
 	for _, p := range items {
+		if err = videoBlocked(p, "打包成图片"); err != nil {
+			z.Close()
+			fail(w, 400, err.Error())
+			return
+		}
 		im, ex, e := a.load(p)
 		if e != nil {
 			z.Close()
@@ -132,6 +137,10 @@ func (a *Module) similar(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "素材不存在")
 		return
 	}
+	if err = videoBlocked(p, "查找相似图"); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
 	if err = a.ensureHash(&p); err != nil {
 		fail(w, 400, err.Error())
 		return
@@ -143,7 +152,7 @@ func (a *Module) similar(w http.ResponseWriter, r *http.Request) {
 	}
 	scope, args := productScopeSQL(u)
 	args = append(args, p.ID)
-	all, err := a.readAssets("SELECT "+strings.ReplaceAll("a."+assetColumns, ",", ",a.")+" FROM assets a JOIN products p ON p.id=a.product_id WHERE "+scope+" AND a.phash<>'' AND a.phash<>'-' AND a.id<>? ORDER BY a.id", args...)
+	all, err := a.readAssets("SELECT "+strings.ReplaceAll("a."+assetColumns, ",", ",a.")+" FROM assets a JOIN products p ON p.id=a.product_id WHERE "+scope+" AND a.media='image' AND a.phash<>'' AND a.phash<>'-' AND a.id<>? ORDER BY a.id", args...)
 	if err != nil {
 		fail(w, 500, "读取相似素材失败")
 		return

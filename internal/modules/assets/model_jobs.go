@@ -88,6 +88,18 @@ func (a *Module) tryonSources(u core.User, inputs []workbenchInput) ([]workbench
 		}
 		seen[*id] = true
 	}
+	for _, v := range inputs {
+		if v.AssetID == nil {
+			continue
+		}
+		p, err := a.asset(*v.AssetID)
+		if err != nil || !a.CanProduct(u, p.ProductID) {
+			continue
+		}
+		if err = videoBlocked(p, "试穿试戴"); err != nil {
+			return nil, err
+		}
+	}
 	sources, e := a.workbenchSources(u, workbenchRequest{Inputs: inputs})
 	if e != nil {
 		return nil, e

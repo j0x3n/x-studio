@@ -74,6 +74,11 @@ type Photo struct {
 	CreatedBy      int64     `json:"created_by"`
 	CreatedAt      string    `json:"created_at"`
 	SourceOverride string    `json:"source_override"`
+	Media          string    `json:"media"`
+	DurationMS     int       `json:"duration_ms"`
+	PosterFile     string    `json:"-"`
+	PosterURL      string    `json:"poster_url"`
+	Stale          bool      `json:"stale"`
 }
 
 func (p Photo) EffectiveSource() string {
@@ -113,11 +118,11 @@ func (a *Core) User(id int64) (User, error) {
 	return ScanUser(a.DB.QueryRow(UserQuery+" WHERE u.id=?", id))
 }
 
-const PhotoColumns = "id,product_id,file,orig_name,width,height,metrics,code,crop,rotate,white_bg,ai_note,retouch_log,manual,enhanced_file,ai_enhanced,ai_generated,source,parent_id,kind,tags,op,created_by,created_at,source_override"
+const PhotoColumns = "id,product_id,file,orig_name,width,height,metrics,code,crop,rotate,white_bg,ai_note,retouch_log,manual,enhanced_file,ai_enhanced,ai_generated,source,parent_id,kind,tags,op,created_by,created_at,source_override,media,duration_ms,poster_file,stale"
 
 func ScanPhoto(s Scanner) (p Photo, e error) {
 	var metrics, crop, log, tags, op string
-	e = s.Scan(&p.ID, &p.ProductID, &p.File, &p.OrigName, &p.Width, &p.Height, &metrics, &p.Code, &crop, &p.Rotate, &p.WhiteBG, &p.AINote, &log, &p.Manual, &p.EnhancedFile, &p.AIEnhanced, &p.AIGenerated, &p.Source, &p.ParentID, &p.Kind, &tags, &op, &p.CreatedBy, &p.CreatedAt, &p.SourceOverride)
+	e = s.Scan(&p.ID, &p.ProductID, &p.File, &p.OrigName, &p.Width, &p.Height, &metrics, &p.Code, &crop, &p.Rotate, &p.WhiteBG, &p.AINote, &log, &p.Manual, &p.EnhancedFile, &p.AIEnhanced, &p.AIGenerated, &p.Source, &p.ParentID, &p.Kind, &tags, &op, &p.CreatedBy, &p.CreatedAt, &p.SourceOverride, &p.Media, &p.DurationMS, &p.PosterFile, &p.Stale)
 	p.Metrics = JSONObj(metrics)
 	p.RetouchLog = JSONObj(log)
 	p.Op = JSONObj(op)
@@ -125,6 +130,9 @@ func ScanPhoto(s Scanner) (p Photo, e error) {
 	p.Tags = []string{}
 	_ = json.Unmarshal([]byte(tags), &p.Tags)
 	p.URL = fmt.Sprintf("/files/products/%d/%s", p.ProductID, p.File)
+	if p.PosterFile != "" {
+		p.PosterURL = fmt.Sprintf("/api/assets/%d/poster", p.ID)
+	}
 	return
 }
 func (a *Core) Photos(id int64) ([]Photo, error) {
@@ -134,9 +142,9 @@ func (a *Core) AllPhotos(id int64) ([]Photo, error) { return a.readPhotos(id, tr
 func (a *Core) readPhotos(id int64, all bool) ([]Photo, error) {
 	query := "SELECT " + PhotoColumns + " FROM assets WHERE product_id=?"
 	if !all {
-		query += " AND kind='photo' AND NOT(source='ai_enhanced' AND parent_id IS NOT NULL AND code='')"
+		query += " AND kind='photo' AND media='image' AND NOT(source='ai_enhanced' AND parent_id IS NOT NULL AND code='')"
 	}
-	rows, e := a.DB.Query(query+" ORDER BY id", id)
+	rows, e := a.DB.Query(query+" ORDER BY CASE WHEN media='video' THEN 1 ELSE 0 END, id", id)
 	if e != nil {
 		return nil, e
 	}
