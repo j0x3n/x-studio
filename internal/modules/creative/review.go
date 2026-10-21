@@ -329,6 +329,8 @@ func (a *Module) reviewOnce(ctx context.Context, item Item, product core.Product
 		parts = append(parts, part)
 	}
 	prompt = strings.ReplaceAll(core.FillPrompt(prompt, product.Category), "{{order}}", order)
+	still, wear := scenePrompts(item.SceneSnapshot)
+	prompt = strings.NewReplacer("{场景}", still, "{穿搭}", wear).Replace(prompt)
 	var last error
 	for attempt := 0; attempt < 2; attempt++ {
 		var raw core.Object

@@ -52,6 +52,12 @@ ALTER TABLE creative_templates ADD COLUMN hero_style TEXT NOT NULL DEFAULT '';`)
 		_, err := tx.Exec(`ALTER TABLE creative_items ADD COLUMN model TEXT NOT NULL DEFAULT '';
 ALTER TABLE creative_items ADD COLUMN model_returned TEXT NOT NULL DEFAULT '';`)
 		return err
+	}}, {Version: 4, Up: func(tx *sql.Tx) error {
+		_, err := tx.Exec(`ALTER TABLE creative_items ADD COLUMN scene_snapshot TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE creative_shop_settings ADD COLUMN main_ratios TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE creative_shop_settings ADD COLUMN detail_width INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE creative_shop_settings ADD COLUMN about_text TEXT NOT NULL DEFAULT '';`)
+		return err
 	}}}
 }
 
@@ -62,7 +68,7 @@ type queryer interface {
 var jsonColumns = map[string]bool{}
 
 func init() {
-	for _, key := range strings.Fields("categories style_refs texts photo_codes product_box export wear template_keys params parts source_asset_ids model_ref_ids hard review_a review_b route_reasons models template_set template_snapshot") {
+	for _, key := range strings.Fields("categories style_refs texts photo_codes product_box export wear template_keys params parts source_asset_ids model_ref_ids hard review_a review_b route_reasons models template_set template_snapshot scene_snapshot main_ratios") {
 		jsonColumns[key] = true
 	}
 }

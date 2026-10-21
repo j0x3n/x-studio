@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"xstudio/internal/core"
+	"xstudio/internal/modules/scenes"
 )
 
 type StartResult struct {
@@ -46,6 +47,9 @@ func (a *Module) startSet(ctx context.Context, listingID, userID int64, parts []
 		}
 		seen[part] = true
 	}
+	if params.SceneID < 0 {
+		return StartResult{}, problem(400, "场景编号不正确")
+	}
 	if len(params.Sizes) > 40 || len([]rune(params.Note)) > 4000 {
 		return StartResult{}, problem(400, "尺寸数量或补充要求过长")
 	}
@@ -57,6 +61,13 @@ func (a *Module) startSet(ctx context.Context, listingID, userID int64, parts []
 	product, err := a.PipelineProduct(listingID)
 	if err != nil {
 		return StartResult{}, err
+	}
+	if _, err = a.authorize(ctx, userID, listingID, core.CreativeRun); err != nil {
+		return StartResult{}, err
+	}
+	scene, err := scenes.Resolve(ctx, a.DB, listingID, params.SceneID)
+	if err != nil {
+		return StartResult{}, problem(400, err.Error())
 	}
 	if source == "pipeline" {
 		// 一键出图重复跑时，上一套还在生成就不再开新的一套
@@ -78,6 +89,9 @@ func (a *Module) startSet(ctx context.Context, listingID, userID int64, parts []
 	}
 	allowance := int(number(a.settings()["max_images_per_listing"]))
 	planned := planItems(0, listingID, userID, templates, params, product)
+	for index := range planned {
+		planned[index].SceneSnapshot = scene
+	}
 	missing, err := a.preflight(ctx, product, planned)
 	if err != nil {
 		return StartResult{}, err

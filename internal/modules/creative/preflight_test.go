@@ -68,7 +68,7 @@ func TestPreflightRejectsMissingBeforeCreatingAnything(t *testing.T) {
 	path := fmt.Sprintf("/api/listings/%d/creative", f.listingID)
 	response := f.request(t, "POST", path, core.Object{"parts": []string{"main"}}, 409)
 	missing, err := typed[[]Missing](response["missing"])
-	if err != nil || len(missing) != 1 || missing[0].Slot != "main2" || missing[0].Label != slotLabel("main2") || missing[0].TemplateKey != "main2" || missing[0].Reason != "缺少实拍参考图（A1、A2、B2）" || response["error"] != slotLabel("main2")+"："+missing[0].Reason {
+	if err != nil || len(missing) != 1 || missing[0].Slot != "main2" || missing[0].Label != slotLabel("main2") || missing[0].TemplateKey != "main2" || missing[0].Reason != "缺少实拍参考图（一对平放正面（A1）、一对立起 45°（A2）、珍珠光泽和反光（B2））" || response["error"] != slotLabel("main2")+"："+missing[0].Reason {
 		t.Fatal(response, err)
 	}
 	f.assertNoGeneration(t, 0, 0, 0, 0)
@@ -82,7 +82,7 @@ func TestPreflightSkipMissingGeneratesRemainingItems(t *testing.T) {
 	jid := int64(number(response["jobs"].([]any)[0].(map[string]any)["id"]))
 	items, _ := f.a.currentItems(context.Background(), sid)
 	for _, item := range items {
-		if item.Slot == "main2" && (item.Error != "缺少实拍参考图（A1）" || item.Route != "manual" || core.JS(item.RouteReasons) != `["缺少素材，未生成"]`) {
+		if item.Slot == "main2" && (item.Error != "缺少实拍参考图（一对平放正面（A1））" || item.Route != "manual" || core.JS(item.RouteReasons) != `["缺少素材，未生成"]`) {
 			t.Fatal(item)
 		}
 	}
@@ -143,7 +143,7 @@ func TestPreflightChecksModelsAndPhotoModeCodes(t *testing.T) {
 	f.mainTemplates(t, map[string]Template{"main2": model, "main4": testTemplate("photo")})
 	response := f.request(t, "POST", fmt.Sprintf("/api/listings/%d/creative", f.listingID), core.Object{"parts": []string{"main"}}, 409)
 	missing, _ := typed[[]Missing](response["missing"])
-	if len(missing) != 2 || missing[0].Reason != "先在 AI 出图设置里给店铺选模特" || missing[1].Reason != "缺少实拍参考图（C1、C2、C3）" {
+	if len(missing) != 2 || missing[0].Reason != "先在 AI 出图设置里给店铺选模特" || missing[1].Reason != "缺少实拍参考图（钢尺参照（C1）、一元硬币参照（C2）、指尖或手心（C3））" {
 		t.Fatal(response)
 	}
 	f.assertNoGeneration(t, 0, 0, 0, 0)
@@ -296,7 +296,7 @@ func TestUntrustedFallbackSkipsAIAndAllowance(t *testing.T) {
 	}
 	items, _ := f.a.currentItems(context.Background(), set.ID)
 	item := items[0]
-	if !strings.HasPrefix(item.Error, "抠图失败：A1") || !strings.Contains(item.Error, "兜底算法") || !strings.Contains(item.Error, "REMBG_URL") || item.Route != "manual" {
+	if !strings.HasPrefix(item.Error, "抠图失败：一对平放正面（A1）") || !strings.Contains(item.Error, "兜底算法") || !strings.Contains(item.Error, "REMBG_URL") || item.Route != "manual" {
 		t.Fatal(item)
 	}
 	f.assertNoGeneration(t, 1, 1, 1, 0)

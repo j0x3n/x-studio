@@ -46,6 +46,7 @@ func (a *Module) slotsList(categories ...*core.Category) []slot {
 	}
 	return out
 }
+
 // slotHits 按候选顺序找照片，同一编号实拍排在 AI 图前面。
 // AI 生成或改过的图只能进可以补图的位置（首图、首屏、白底），实拍证据位只认实拍。
 func slotHits(s slot, photos []Photo) []Photo {
@@ -279,7 +280,7 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 			}
 		}
 		if count >= maxGeneratedPhotos && reuseID == 0 {
-			warnings = append(warnings, "补图已达每款 4 张上限，跳过 "+code)
+			warnings = append(warnings, "补图已达每款 4 张上限，跳过 "+photoCodeLabels(p.Category, code))
 			continue
 		}
 		refs := selectReferences(photos)
@@ -306,11 +307,11 @@ func (a *Module) enhance(ctx context.Context, p Product) ([]string, error) {
 			}
 		}
 		if fillErr != nil {
-			warnings = append(warnings, "补图 "+code+" 失败："+a.safeAIError(fillErr.Error()))
+			warnings = append(warnings, "补图 "+photoCodeLabels(p.Category, code)+" 失败："+a.safeAIError(fillErr.Error()))
 			continue
 		}
 		if err = writeAIFile(filepath.Join(a.Dir(p.ID), filepath.FromSlash(file)), data); err != nil {
-			warnings = append(warnings, "保存补图 "+code+" 失败")
+			warnings = append(warnings, "保存补图 "+photoCodeLabels(p.Category, code)+" 失败")
 			continue
 		}
 		cfg, _, _ := image.DecodeConfig(bytes.NewReader(data))

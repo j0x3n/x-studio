@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"xstudio/internal/core"
+	"xstudio/internal/modules/scenes"
 )
 
 func TestPixelLockRestoresProviderChangesAndExport(t *testing.T) {
@@ -72,6 +73,8 @@ func TestCriticalTextBlocksExportUntilRetext(t *testing.T) {
 	tpl.Texts = []TextSpec{{Key: "size", From: "literal:8 mm", Critical: false}, {Key: "title", From: "literal:珍珠", Critical: false}}
 	f.fake.read = []OCRText{{Text: "7mm", Box: []float64{0.1, 0.1, 0.3, 0.1}}}
 	set, _ := f.makeSet(t, tpl, 1)
+	scene := scenes.Snapshot{ID: 7, Name: "改字前场景", Still: "浅色桌面", Wear: "白衬衫", Light: "日光"}
+	f.exec(t, "UPDATE creative_items SET scene_snapshot=? WHERE set_id=?", core.JS(scene), set.ID)
 	if err := f.run(t, "creative.detail", "creative_set", set.ID, 1, core.Object{}); err != nil {
 		t.Fatal(err)
 	}
@@ -96,6 +99,9 @@ func TestCriticalTextBlocksExportUntilRetext(t *testing.T) {
 	items, _ = f.a.currentItems(context.Background(), set.ID)
 	if !items[0].Hard.Text[0].Pass || !items[0].Hard.Text[1].Warn {
 		t.Fatal(items[0].Hard)
+	}
+	if core.JS(items[0].SceneSnapshot) != core.JS(scene) || f.scalar(t, "SELECT stale FROM assets WHERE id=?", item.OutputAssetID) != 1 {
+		t.Fatal("改字没有保留场景快照或标记旧图", items[0])
 	}
 	if !strings.Contains(items[0].Prompt, "OLD 7mm") || !strings.Contains(items[0].Prompt, "Numbers and units must be exactly as given.") || strings.Contains(items[0].Prompt, "NEVER_SEND_RULES") || strings.Contains(items[0].Prompt, "{{") {
 		t.Fatal(items[0].Prompt)

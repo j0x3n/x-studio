@@ -31,21 +31,33 @@ func (a *Module) set(ctx context.Context, id int64) (Set, error) {
 	if err != nil {
 		return Set{}, problem(404, "出图套装不存在")
 	}
-	return typed[Set](obj)
+	set, err := typed[Set](obj)
+	if err != nil {
+		return set, err
+	}
+	snapshot, err := a.setScene(ctx, id)
+	set.Scene = sceneSummary(snapshot)
+	return set, err
 }
 func (a *Module) item(ctx context.Context, id int64) (Item, error) {
 	obj, err := a.one(ctx, "SELECT * FROM creative_items WHERE id=?", id)
 	if err != nil {
 		return Item{}, problem(404, "出图图片不存在")
 	}
-	return typed[Item](obj)
+	item, err := typed[Item](obj)
+	item.Scene = sceneSummary(item.SceneSnapshot)
+	return item, err
 }
 func (a *Module) currentItems(ctx context.Context, setID int64) ([]Item, error) {
 	objs, err := objects(ctx, a.DB, "SELECT * FROM creative_items WHERE set_id=? AND superseded=0 ORDER BY slot,seq,variant", setID)
 	if err != nil {
 		return nil, err
 	}
-	return typed[[]Item](objs)
+	items, err := typed[[]Item](objs)
+	for index := range items {
+		items[index].Scene = sceneSummary(items[index].SceneSnapshot)
+	}
+	return items, err
 }
 func enqueueTx(ctx context.Context, tx *sql.Tx, kind, target string, id, uid int64, params core.Object) (int64, error) {
 	var count int
@@ -345,7 +357,7 @@ func (a *Module) selectedPhotos(product core.Product, t Template) ([]core.Photo,
 		}
 	}
 	if t.ProductMode != "none" && len(selected) == 0 {
-		return nil, problem(409, fmt.Sprintf("缺少实拍参考图（%s）", strings.Join(codes, "、")))
+		return nil, problem(409, fmt.Sprintf("缺少实拍参考图（%s）", photoCodeNames(product.Category, codes)))
 	}
 	return selected, nil
 }
@@ -490,6 +502,27 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 	if len(item.Texts) == 0 {
 		item.Texts = makeTexts(t, product, item.Seq, currentSize)
 	}
+	about := ""
+	if item.Slot == "d9" {
+		if err := a.DB.QueryRow("SELECT about_text FROM creative_shop_settings WHERE shop_id=?", product.ShopID).Scan(&about); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return "", err
+		}
+		if strings.TrimSpace(about) != "" {
+			texts := []ExpectedText{}
+			for _, text := range item.Texts {
+				isAbout := text.Key == "about" || text.Key == "about_text"
+				for _, spec := range t.Texts {
+					if spec.Key == text.Key && strings.HasPrefix(spec.From, "content.about") {
+						isAbout = true
+					}
+				}
+				if !isAbout {
+					texts = append(texts, text)
+				}
+			}
+			item.Texts = append(texts, ExpectedText{Key: "about", Text: about, Critical: critical(about)})
+		}
+	}
 	if item.SizeCompare && len(sizes) == 1 {
 		label := fmt.Sprintf("%gmm", sizes[0].MM)
 		found := false
@@ -533,6 +566,7 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 	}
 	values := map[string]string{"款名": product.Name, "商品": productFacts(product), "尺寸": core.JS(sizes), "颜色": stringValue(product.Info["color"]), "品类": product.Category.Name, "文字": strings.Join(textLines, " / "), "模特": modelDescription, "佩戴位置": placement(product), "i": strconv.Itoa(max(1, item.Seq)), "问题": item.Prompt}
 	values["英文名"] = stringValue(product.Content["nameEn"])
+	values["场景"], values["穿搭"] = scenePrompts(item.SceneSnapshot)
 	values["一句话"] = stringValue(product.Content["oneLiner"])
 	if currentSize != nil {
 		values["尺寸"] = fmt.Sprintf("%gmm（%s）", currentSize.MM, currentSize.Label)
@@ -569,6 +603,9 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 		sections = append(sections, promptSection(mainDoc, "上一次的问题"))
 	}
 	prompt := core.FillPrompt(strings.Join(sections, "\n\n"), product.Category)
+	if strings.TrimSpace(about) != "" {
+		prompt = aboutPrompt(prompt, product.Category, about)
+	}
 	for key, value := range values {
 		prompt = strings.ReplaceAll(prompt, "{"+key+"}", value)
 	}
@@ -651,7 +688,7 @@ func (a *Module) generateOne(ctx context.Context, item *Item, job core.Job) erro
 				if mode == "fallback" {
 					algorithm = "兜底算法"
 				}
-				cutoutErrors = append(cutoutErrors, fmt.Sprintf("%s 识别出的商品区域占画面 %.1f%%（%s）", ph.Code, coverage*100, algorithm))
+				cutoutErrors = append(cutoutErrors, fmt.Sprintf("%s 识别出的商品区域占画面 %.1f%%（%s）", photoCodeNames(product.Category, []string{ph.Code}), coverage*100, algorithm))
 				continue
 			}
 			cutout = &CutoutCheck{Mode: mode, Coverage: coverage, Code: ph.Code}
@@ -701,6 +738,24 @@ func (a *Module) generateOne(ctx context.Context, item *Item, job core.Job) erro
 		styleLimit = 0
 	}
 	styles := []image.Image{}
+	for _, path := range sceneStylePaths(item.SceneSnapshot, item.ProductMode) {
+		if len(styles) >= styleLimit {
+			break
+		}
+		base, err := filepath.Abs(filepath.Join(a.Cfg.DataDir, "scenes"))
+		if err != nil {
+			return err
+		}
+		name, err := filepath.Rel(base, path)
+		if err != nil {
+			return err
+		}
+		im, err := loadImage(base, filepath.ToSlash(name))
+		if err != nil {
+			return fmt.Errorf("读取场景参考失败：%w", err)
+		}
+		styles = append(styles, im)
+	}
 	for _, name := range t.StyleRefs {
 		if len(styles) >= styleLimit {
 			break
@@ -902,6 +957,9 @@ func (a *Module) replaceItem(ctx context.Context, old Item, uid int64, automatic
 	if count == 0 {
 		return Item{}, problem(409, "图片已有新版本")
 	}
+	if err = assets.MarkStale(ctx, tx, []int64{old.OutputAssetID}, true); err != nil {
+		return Item{}, err
+	}
 	next := old
 	next.ID = 0
 	next.Attempt++
@@ -944,7 +1002,7 @@ func insertItem(ctx context.Context, tx *sql.Tx, item Item) (int64, error) {
 	if item.RouteReasons == nil {
 		item.RouteReasons = []string{}
 	}
-	result, err := tx.ExecContext(ctx, `INSERT INTO creative_items(set_id,listing_id,slot,seq,template_key,template_version,template_snapshot,attempt,auto_attempt,variant,product_mode,prompt,texts,size_compare,created_by,created_at,error,route,route_reasons) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, item.SetID, item.ListingID, item.Slot, item.Seq, item.TemplateKey, item.TemplateVersion, core.JS(item.TemplateSnapshot), item.Attempt, item.AutoAttempt, item.Variant, item.ProductMode, item.Prompt, core.JS(item.Texts), item.SizeCompare, item.CreatedBy, core.Now(), item.Error, item.Route, core.JS(item.RouteReasons))
+	result, err := tx.ExecContext(ctx, `INSERT INTO creative_items(set_id,listing_id,slot,seq,template_key,template_version,template_snapshot,attempt,auto_attempt,variant,product_mode,prompt,texts,size_compare,created_by,created_at,error,route,route_reasons,scene_snapshot) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, item.SetID, item.ListingID, item.Slot, item.Seq, item.TemplateKey, item.TemplateVersion, core.JS(item.TemplateSnapshot), item.Attempt, item.AutoAttempt, item.Variant, item.ProductMode, item.Prompt, core.JS(item.Texts), item.SizeCompare, item.CreatedBy, core.Now(), item.Error, item.Route, core.JS(item.RouteReasons), core.JS(item.SceneSnapshot))
 	if err != nil {
 		return 0, err
 	}
@@ -1015,6 +1073,9 @@ func (a *Module) compareSizes(ctx context.Context, setID, uid int64) error {
 			}
 			if err == nil {
 				_, err = tx.ExecContext(ctx, "UPDATE creative_items SET human='',human_by=NULL,human_at='' WHERE id=?", item.ID)
+			}
+			if err == nil {
+				err = assets.MarkStale(ctx, tx, []int64{item.OutputAssetID}, false)
 			}
 			if err == nil {
 				_, err = tx.ExecContext(ctx, "UPDATE creative_sets SET glanced_at='',glanced_by=NULL WHERE id=?", setID)

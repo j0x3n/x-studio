@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"xstudio/internal/core"
+	"xstudio/internal/modules/assets"
 )
 
 func (a *Module) itemJudge(w http.ResponseWriter, r *http.Request) {
@@ -19,13 +20,20 @@ func (a *Module) itemJudge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Verdict string `json:"verdict"`
-		Note    string `json:"note"`
+		Verdict *string `json:"verdict"`
+		Note    string  `json:"note"`
 	}
 	if !core.Decode(w, r, &in) {
 		return
 	}
-	if !slices.Contains([]string{"pass", "redraw", "discard"}, in.Verdict) || (in.Verdict == "redraw" && strings.TrimSpace(in.Note) == "") {
+	if in.Verdict == nil {
+		core.Fail(w, 400, "请选择人工判断")
+		return
+	}
+	if *in.Verdict == "reject" {
+		*in.Verdict = "discard"
+	}
+	if !slices.Contains([]string{"pass", "redraw", "discard", ""}, *in.Verdict) || (*in.Verdict == "redraw" && strings.TrimSpace(in.Note) == "") {
 		core.Fail(w, 400, "判断不正确，重画必须带说明")
 		return
 	}
@@ -34,7 +42,7 @@ func (a *Module) itemJudge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := core.CurrentUser(r).ID
-	if in.Verdict == "redraw" {
+	if *in.Verdict == "redraw" {
 		if _, err := a.authorize(r.Context(), uid, item.ListingID, core.CreativeRun); err != nil {
 			fail(w, err)
 			return
@@ -51,16 +59,23 @@ func (a *Module) itemJudge(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if _, err = tx.ExecContext(r.Context(), "UPDATE creative_items SET human=?,human_note=?,human_by=?,human_at=? WHERE id=? AND superseded=0", in.Verdict, in.Note, uid, core.Now(), item.ID); err != nil {
+	if _, err = tx.ExecContext(r.Context(), "UPDATE creative_items SET human=?,human_note=?,human_by=?,human_at=? WHERE id=? AND superseded=0", *in.Verdict, in.Note, uid, core.Now(), item.ID); err != nil {
 		fail(w, err)
 		return
 	}
-	if err = a.calibrate(r.Context(), tx, item, in.Verdict, settings); err != nil {
+	if *in.Verdict != "" {
+		err = a.calibrate(r.Context(), tx, item, *in.Verdict, settings)
+	}
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err = assets.MarkStale(r.Context(), tx, []int64{item.OutputAssetID}, *in.Verdict == "discard"); err != nil {
 		fail(w, err)
 		return
 	}
 	var job int64
-	if in.Verdict == "redraw" {
+	if *in.Verdict == "redraw" {
 		job, err = enqueueTx(r.Context(), tx, "creative.item", "creative_item", item.ID, uid, core.Object{"note": in.Note})
 		if err != nil {
 			fail(w, err)

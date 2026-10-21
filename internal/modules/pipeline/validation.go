@@ -5,14 +5,19 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+	"xstudio/internal/core"
 	"xstudio/internal/media"
 )
 
 var codePattern = regexp.MustCompile(`^[A-Z][0-9]{1,2}(?:_[\p{L}\p{N}_-]+)?$`)
 
-func validatePhoto(p Photo) error {
+func validatePhoto(p Photo, categories ...*core.Category) error {
 	if p.AIGenerated && p.Code != "" && !allowedFillCode(p.Code) {
-		return errors.New("AI 生成照片只能使用 A1_AI、E1_AI、E2_AI、E3_AI 编号")
+		var category *core.Category
+		if len(categories) > 0 {
+			category = categories[0]
+		}
+		return errors.New("AI 生成照片只能使用 " + photoCodeLabels(category, "A1_AI", "E1_AI", "E2_AI", "E3_AI") + " 编号")
 	}
 	if !p.AIGenerated && strings.HasSuffix(p.Code, media.AISuffix) {
 		return errors.New("_AI 是 AI 补图保留后缀，请换一个拍摄编号")
