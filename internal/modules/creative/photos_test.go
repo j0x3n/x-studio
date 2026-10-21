@@ -5,8 +5,8 @@ import (
 	"xstudio/internal/core"
 )
 
-// 重画、模特位：缺实拍的编号由同编号的 AI 补图顶上，排在原来的位置；实拍原图位只认实拍。
-func TestSelectedPhotosUsesAIFillOnlyForRedrawAndModel(t *testing.T) {
+// 重画位：缺实拍的编号由同编号的 AI 补图顶上，排在原来的位置；模特、实拍原图、像素锁定位只认实拍。
+func TestSelectedPhotosUsesAIFillOnlyForRedraw(t *testing.T) {
 	f := newFixture(t)
 	insert := func(code string, aiGenerated bool) int64 {
 		f.exec(t, "INSERT INTO assets(product_id,file,orig_name,width,height,code,ai_generated,source,created_by,created_at) VALUES(?,?,?,160,120,?,?,?,1,?)", f.productID, "原图/"+code+".png", code, code, aiGenerated, map[bool]string{true: "ai_generated", false: "original"}[aiGenerated], core.Now())
@@ -30,12 +30,10 @@ func TestSelectedPhotosUsesAIFillOnlyForRedrawAndModel(t *testing.T) {
 		}
 		return ids
 	}
-	for _, mode := range []string{"redraw", "model"} {
-		if got := pick(mode); len(got) != 2 || got[0] != fill || got[1] != worn {
-			t.Fatal(mode, got)
-		}
+	if got := pick("redraw"); len(got) != 2 || got[0] != fill || got[1] != worn {
+		t.Fatal("redraw", got)
 	}
-	for _, mode := range []string{"photo", "pixel_lock"} {
+	for _, mode := range []string{"model", "photo", "pixel_lock"} {
 		if got := pick(mode); len(got) != 1 || got[0] != worn {
 			t.Fatal(mode, got)
 		}
