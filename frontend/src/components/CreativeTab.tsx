@@ -7,7 +7,7 @@ import type { Product } from '../lib/types'
 import { Pill, Loading, Empty, Drawer, Field } from './ui'
 import { ItemCard, CompareView, ReviewDetail, TextRows, JudgeBar } from './CreativeShared'
 import '../styles/creative.css'
-import { DETAIL_SLOTS, HERO_STYLE, MAIN_SLOTS, SET_STATUS, creativeApi, itemOk, mockOn, slotName, type CreativeItem, type CreativeSet, type SetParams } from '../lib/creative'
+import { DETAIL_SLOTS, HERO_STYLE, MAIN_SLOTS, SET_STATUS, creativeApi, itemOk, mockOn, preflightMissing, slotName, type CreativeItem, type CreativeSet, type PreflightMissing, type SetParams } from '../lib/creative'
 
 // 商品详情「AI 出图」：每个店铺版本一套或多套 AI 主图和详情页，逐张复核后导出
 export function CreativeTab({ product }: { product: Product }) {
@@ -60,7 +60,8 @@ function ListingCreative({ listingId, product }: { listingId: number; product: P
 
   const cur = set.items.filter(i => !i.superseded)
   const ok = cur.filter(itemOk).length
-  const pending = cur.filter(i => !i.human && i.route === 'manual').length
+  const pending = cur.filter(i => !i.human && i.route === 'manual' && !i.error).length
+  const failed = cur.filter(i => !i.human && i.error).length
   const st = SET_STATUS[set.status] || SET_STATUS.draft
   // 最近结束的任务失败了（不是到上限暂停），还有图没生成：说明原因（后端按新的在前排）
   const lastJob = (set.jobs || []).find(j => j.status !== 'queued' && j.status !== 'running')
@@ -91,7 +92,7 @@ function ListingCreative({ listingId, product }: { listingId: number; product: P
               {sets.length > 1 ? <select className="input input-sm" style={{ width: 90 }} value={set.id} onChange={e => setSetId(Number(e.target.value))}>{sets.map(s => <option key={s.id} value={s.id}>第 {s.version} 套</option>)}</select> : <span className="t3 fs-12">第 {set.version} 套</span>}
               <Pill kind={st.pill}>{st.label}</Pill>
             </div>
-            <div className="panel-sub">可用 {ok} / {cur.length} 张 · 待人工 {pending} 张 · 已生成 {set.images_used} / {set.images_allowance} 次{set.params.hero_style ? ` · 首屏${HERO_STYLE[set.params.hero_style]}` : ''}</div>
+            <div className="panel-sub">可用 {ok} / {cur.length} 张 · 待人工 {pending} 张{failed ? ` · 没出来 ${failed} 张` : ''} · 已生成 {set.images_used} / {set.images_allowance} 次{set.params.hero_style ? ` · 首屏${HERO_STYLE[set.params.hero_style]}` : ''}</div>
           </div>
           {run && <button className="btn btn-ghost btn-sm" onClick={() => setCreating(true)}><Plus />再出一套</button>}
           {review && !set.glanced_at && <button className="btn btn-secondary btn-sm" onClick={() => act(() => creativeApi.glance(set.id), '已记录整套过目')}><Eye />整套过目</button>}
@@ -170,6 +171,8 @@ function CreateDrawer({ listingId, product, onClose, onCreated }: { listingId: n
   const [parts, setParts] = useState({ main: true, detail: true })
   const [p, setP] = useState<SetParams>({ hero_style: 'vertical', hero_b: true, sizes: [], note: '' })
   const [busy, setBusy] = useState(false)
+  const [missing, setMissing] = useState<PreflightMissing[]>([]) // 预检缺的位置；改了选项就清掉重新检查
+  useEffect(() => setMissing([]), [parts, p.hero_b, p.sizes?.length])
   // 预填尺寸：info.size（如「8–9」「8-9mm」）
   useEffect(() => {
     const s = String(product.info?.size || '').trim()
@@ -179,17 +182,31 @@ function CreateDrawer({ listingId, product, onClose, onCreated }: { listingId: n
   }, [product.info])
   const sizes = p.sizes || []
   const setSize = (i: number, k: 'label' | 'mm', v: string) => setP({ ...p, sizes: sizes.map((s, j) => j === i ? { ...s, [k]: k === 'mm' ? Number(v) || 0 : v } : s) })
-  const submit = async () => {
+  const submit = async (skip = false) => {
     const list = Object.entries(parts).filter(([, v]) => v).map(([k]) => k)
     if (!list.length) return toast('至少选主图或详情页', 'error')
     if (sizes.some(s => !s.label.trim() || !(s.mm > 0))) return toast('尺寸要写名称和毫米数', 'error')
     setBusy(true)
-    try { const r = await creativeApi.create(listingId, { parts: list, params: { ...p, note: p.note?.trim() } }); toast('已开始生成，一套大约 10–20 分钟', 'ok'); onCreated(r.set) }
-    catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+    try { const r = await creativeApi.create(listingId, { parts: list, params: { ...p, note: p.note?.trim(), ...(skip ? { skip_missing: true } : {}) } }); toast('已开始生成，一套大约 10–20 分钟', 'ok'); onCreated(r.set) }
+    catch (e) {
+      const m = e instanceof ApiError && e.status === 409 ? preflightMissing(e.data) : []
+      if (m.length) setMissing(m)
+      else toast(errText(e), 'error')
+    } finally { setBusy(false) }
   }
+  const foot = missing.length
+    ? <><button className="btn btn-secondary" onClick={onClose}>取消</button><button className="btn btn-primary" disabled={busy} onClick={() => submit(true)}><Sparkles />跳过这 {missing.length} 个位置，先出其余的</button></>
+    : <><button className="btn btn-secondary" onClick={onClose}>取消</button><button className="btn btn-primary" disabled={busy} onClick={() => submit()}><Sparkles />开始生成</button></>
   return (
-    <Drawer title="AI 出图" width={460} onClose={onClose} foot={<><button className="btn btn-secondary" onClick={onClose}>取消</button><button className="btn btn-primary" disabled={busy} onClick={submit}><Sparkles />开始生成</button></>}>
+    <Drawer title="AI 出图" width={460} onClose={onClose} foot={foot}>
       <div className="stack">
+        {missing.length > 0 && (
+          <div className="cr-warn">
+            这些位置缺素材，还没开始生成，也没占额度：
+            <ul>{missing.map(m => <li key={m.slot + m.template_key}>{m.label}：{m.reason}</li>)}</ul>
+            补拍上传后再出，或者先跳过它们。
+          </div>
+        )}
         <Field label="出哪些">
           <div className="checks">
             <label><input type="checkbox" className="check" checked={parts.main} onChange={e => setParts({ ...parts, main: e.target.checked })} />主图 5 张 + SKU 图</label>

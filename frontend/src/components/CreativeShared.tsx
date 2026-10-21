@@ -12,7 +12,7 @@ export function ItemCard({ it, onOpen, active, idle }: { it: CreativeItem; onOpe
   return (
     <button type="button" className={'cr-card' + (active ? ' active' : '') + (it.superseded ? ' old' : '')} onClick={onOpen}>
       <div className="cr-img">
-        {it.output_url ? <img src={it.output_url} alt="" loading="lazy" /> : <span className="t4 fs-12">{it.error ? '生成失败' : idle ? '未生成' : '生成中…'}</span>}
+        {it.output_url ? <img src={it.output_url} alt="" loading="lazy" /> : <span className="t4 fs-12">{it.error ? (it.route_reasons.includes('缺少素材，未生成') ? '缺素材，未生成' : '生成失败') : idle ? '未生成' : '生成中…'}</span>}
         {it.variant && <span className="cr-variant">{it.variant}</span>}
         {criticalFail(it) && <span className="cr-flag" title="参数文字比对没过，改字前不能导出"><AlertTriangle />字不对</span>}
       </div>
@@ -63,7 +63,7 @@ export function ReviewDetail({ it }: { it: CreativeItem }) {
   return (
     <div className="stack" style={{ gap: 12 }}>
       <div className="fs-12 t3 inline">
-        <span>{MODE[it.product_mode]}</span>{it.wear_type && <><span className="sep" />{WEAR[it.wear_type]}</>}
+        <span>{MODE[it.product_mode]}</span>{it.wear_type && <><span className="sep" />{WEAR[it.wear_type]}</>}{it.model && <><span className="sep" /><span className="mono" title={it.model_returned ? `AI 返回 ${it.model_returned}` : undefined}>{it.model.replace(/^gpt-image-[\d.]+-/, '')}</span></>}
         <span className="sep" /><span className="mono">{it.template_key} v{it.template_version}</span><span className="sep" />第 {it.attempt} 次生成
       </div>
       {it.route_reasons.length > 0 && <div className="inline">{it.route_reasons.map(r => <span key={r} className="tag tag-blue">{r}</span>)}</div>}
@@ -81,7 +81,8 @@ export function ReviewDetail({ it }: { it: CreativeItem }) {
         <div className="stack" style={{ gap: 6 }}>
           <div className="sub-title">程序硬检查</div>
           <div className="inline fs-12">
-            {h.pixel && <span>像素锁定 {h.pixel.pass ? <Pill kind="pill-success" dot={false}>差异 {h.pixel.max_diff}</Pill> : <Pill kind="pill-danger" dot={false}>差异 {h.pixel.max_diff}</Pill>}</span>}
+            {h.cutout && <span title="抠图识别出的商品区域占实拍画面的比例">抠图 <Pill kind={h.cutout.mode === 'rembg' ? 'pill-neutral' : 'pill-warning'} dot={false}>{h.cutout.code} · {h.cutout.mode === 'rembg' ? 'rembg' : '兜底算法'} · {Math.round(h.cutout.coverage * 100)}%</Pill></span>}
+            {h.pixel && <span>像素锁定{h.pixel.pass ? <Pill kind="pill-success" dot={false}>差异 {h.pixel.max_diff}</Pill> : <Pill kind="pill-danger" dot={false}>差异 {h.pixel.max_diff}</Pill>}</span>}
             {h.format && <span>尺寸格式 {h.format.pass ? <Pill kind="pill-success" dot={false}>通过</Pill> : <Pill kind="pill-danger" dot={false}>不对</Pill>}</span>}
             {(h.banned || []).length > 0 && <span>违禁词 <Pill kind="pill-danger" dot={false}>{h.banned!.join('、')}</Pill></span>}
           </div>

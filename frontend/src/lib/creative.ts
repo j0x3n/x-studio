@@ -19,6 +19,7 @@ export type Hard = {
   banned?: string[]
   format?: { pass: boolean }
   error?: string
+  cutout?: { mode: 'rembg' | 'fallback' | string; coverage: number; code: string }
 }
 export type CreativeItem = {
   id: number; set_id: number | null; slot: string; seq: number
@@ -27,6 +28,7 @@ export type CreativeItem = {
   size_compare: boolean; prompt: string; texts: { key: string; text: string; critical: boolean }[]
   output_asset_id: number | null; output_url?: string; source_urls?: string[]
   hard: Hard | null; review_a: Review | null; review_b: Review | null
+  model?: string; model_returned?: string // 实际用的生图模型、AI 原始返回尺寸（照片模式为空）
   route: Route; route_reasons: string[]; risk: number
   human: '' | Verdict; human_note: string; human_by?: number; human_at?: string
   error: string; created_at: string
@@ -44,7 +46,13 @@ export type CreativeSet = {
   jobs?: { id: number; kind: string; status: string; progress: number; message: string }[]
   missing?: string[] // 导出还缺什么（后端 409 时给出）
 }
-export type SetParams = { hero_style?: 'vertical' | 'album' | 'window'; hero_b?: boolean; sizes?: { label: string; mm: number }[]; note?: string }
+export type SetParams = { hero_style?: 'vertical' | 'album' | 'window'; hero_b?: boolean; sizes?: { label: string; mm: number }[]; note?: string; skip_missing?: boolean }
+// 新建套装 / 重画 / 试跑前的预检：缺实拍或没配模特时后端 409 给出
+export type PreflightMissing = { slot: string; label: string; template_key: string; reason: string }
+export const preflightMissing = (data: unknown): PreflightMissing[] => {
+  const m = data && typeof data === 'object' ? (data as { missing?: unknown }).missing : null
+  return Array.isArray(m) ? m.filter(x => x && typeof x === 'object' && 'reason' in x) as PreflightMissing[] : []
+}
 export type CreativeTemplate = {
   key: string; name: string; kind: 'main' | 'detail'; slot: string; categories: string[]; purpose: string; prompt: string
   style_refs: string[]; texts: { key: string; from: string; max: number; critical: boolean }[]; photo_codes: string[]
@@ -90,7 +98,7 @@ export const MODEL_SLOT = { female_main: '女主模特（F1）', male: '男模�
 
 // 一张图当前的结论：人工判断优先，其次分流
 export const itemState = (it: CreativeItem) =>
-  it.error ? { label: '失败', pill: 'pill-danger' } : it.human ? VERDICT[it.human] : !it.output_url && it.route === 'pending' ? { label: '待生成', pill: 'pill-neutral' } : ROUTE[it.route] || ROUTE.pending
+  it.error ? (it.route_reasons.includes('缺少素材，未生成') ? { label: '缺素材', pill: 'pill-warning' } : { label: '失败', pill: 'pill-danger' }) : it.human ? VERDICT[it.human] : !it.output_url && it.route === 'pending' ? { label: '待生成', pill: 'pill-neutral' } : ROUTE[it.route] || ROUTE.pending
 export const itemOk = (it: CreativeItem) => it.human === 'pass' || (!it.human && it.route === 'auto_pass')
 export const criticalFail = (it: CreativeItem) => (it.hard?.text || []).some(t => !t.pass && !t.warn)
 export const minScore = (it: CreativeItem) => {
@@ -106,7 +114,8 @@ const normHard = (h: Raw | null | undefined, mode: string, done: boolean): Hard 
   if (!h || !Object.keys(h).length) return null
   return {
     pixel: mode === 'pixel_lock' && done ? h.pixel : undefined, // 非像素锁定的图后端也写 pass:true，不显示
-    format: done ? h.format : undefined, text: h.text || [], banned: h.banned || [], error: h.error || undefined
+    format: done ? h.format : undefined, text: h.text || [], banned: h.banned || [], error: h.error || undefined,
+    cutout: h.cutout && h.cutout.mode ? h.cutout : undefined
   }
 }
 export const normItem = (it: Raw): CreativeItem => ({

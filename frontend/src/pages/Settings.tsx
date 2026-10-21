@@ -32,7 +32,10 @@ const FEATURES: Record<string, string> = {
   creative_text: 'AI 出图·图上文字核对（看图）',
   title_suggest: '标题优化',
   ops_advice: '运营诊断解释',
+  image_alt: '生图备用模型',
 }
+// 留空时的说明：备用模型在主模型失败、或 AI 出图自动重画时换着用
+const FEATURE_HINT: Record<string, string> = { image_alt: '留空自动：sunburst ↔ flare 互为备用' }
 
 export function SettingsPage() {
   const [tab, setTab] = useState<'general' | 'codes' | 'categories' | 'rules' | 'creative' | 'market'>('general')
@@ -153,7 +156,7 @@ function GeneralSettings({ tabs }: { tabs: ReactNode }) {
           <div className="panel-pad stack" style={{ gap: 10 }}>
             {Object.entries(FEATURES).map(([k, t]) => (
               <div key={k} className="setting"><div className="cell-title">{t}</div>
-                <input className="input mono" style={{ width: 260 }} value={models[k] || ''} onChange={e => setModels({ ...models, [k]: e.target.value })} /></div>
+                <input className="input mono" style={{ width: 260 }} placeholder={FEATURE_HINT[k]} value={models[k] || ''} onChange={e => setModels({ ...models, [k]: e.target.value })} /></div>
             ))}
           </div>
         </section>

@@ -1,9 +1,11 @@
 // 后端接口封装：同源 cookie 会话；写操作带 X-Requested-With: fetch（后端防 CSRF）；出错时抛出带中文说明的 ApiError。
 export class ApiError extends Error {
   status: number
-  constructor(message: string, status: number) {
+  data: unknown // 出错时后端返回的完整 JSON（如 409 的 missing 列表）
+  constructor(message: string, status: number, data: unknown = null) {
     super(message)
     this.status = status
+    this.data = data
   }
 }
 
@@ -31,7 +33,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   if (!res.ok) {
     const e = data && typeof data === 'object' && 'error' in data ? String((data as { error: unknown }).error) : ''
     const msg = e || `请求失败（${res.status}）`
-    throw new ApiError(msg, res.status)
+    throw new ApiError(msg, res.status, data)
   }
   return data as T
 }
