@@ -4,8 +4,8 @@ import { api, qs, type Page } from './api'
 import { mockOn } from './creative'
 
 export type Keyword = { word: string; category: string; date: string; search_volume: number | null; clicks: number | null; ctr_bps: number | null; cvr_bps: number | null; competition: number | null; score: number | null; trend: { date: string; search_volume: number | null }[] }
-export type Competitor = { platform_item_id: string; keyword: string; rank: number | null; title: string; price_cents: number | null; sales_text: string; sales: number | null; shop_name: string; image_url: string; material: string; date: string }
-export type AdRow = { date: string; campaign: string; keyword: string; listing_id: number | null; cost_cents: number; impressions: number | null; clicks: number | null; orders: number | null; gmv_cents: number | null }
+export type Competitor = { platform_item_id: string; keyword: string; rank: number | null; title: string; price_cents: number | null; sales_text: string | null; sales: number | null; shop_name: string; image_url: string; material: string; date: string }
+export type AdRow = { date: string; campaign: string; keyword: string; listing_id: number | null; cost_cents: number | null; impressions: number | null; clicks: number | null; orders: number | null; gmv_cents: number | null }
 export type Snapshot = { id: number; kind: string; source: 'script' | 'csv'; source_url: string; captured_at: string; rows: number; created_by: number; created_at: string }
 export type Token = { id: number; name: string; prefix: string; scopes: string[]; created_at: string; last_used_at: string; revoked_at: string }
 export type IngestResult = { snapshot_id: number; duplicate: boolean; inserted: number; updated: number; skipped: { index: number; reason: string }[] }

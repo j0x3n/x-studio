@@ -123,7 +123,7 @@ function Ads({ shopId }: { shopId: number }) {
   const [to, setTo] = useState(() => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10))
   const [rows, setRows] = useState<AdRow[] | null>(null)
   useEffect(() => { marketApi.ads({ shop_id: shopId, from, to }).then(r => setRows(r.items || [])).catch(e => { toast(errText(e), 'error'); setRows([]) }) }, [shopId, from, to, toast])
-  const sum = useMemo(() => (rows || []).reduce((a, r) => ({ cost: a.cost + r.cost_cents, gmv: a.gmv + (r.gmv_cents || 0), clicks: a.clicks + (r.clicks || 0), orders: a.orders + (r.orders || 0) }), { cost: 0, gmv: 0, clicks: 0, orders: 0 }), [rows])
+  const sum = useMemo(() => (rows || []).reduce((a, r) => ({ cost: a.cost + (r.cost_cents || 0), gmv: a.gmv + (r.gmv_cents || 0), clicks: a.clicks + (r.clicks || 0), orders: a.orders + (r.orders || 0) }), { cost: 0, gmv: 0, clicks: 0, orders: 0 }), [rows])
   return (
     <section className="panel">
       <div className="panel-head">
