@@ -11,9 +11,10 @@
   "photo_codes": [
     "A3",
     "A1",
-    "A2"
+    "A2",
+    "E4"
   ],
-  "product_mode": "pixel_lock",
+  "product_mode": "redraw",
   "product_box": [
     0.2,
     0.3,

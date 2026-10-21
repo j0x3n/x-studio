@@ -16,6 +16,8 @@ creative 模块启动时从这里读模板种子（表里没有的 key 插入，
 | d2 | 珍珠 `detail_real_pearl`，水晶 `detail_real_crystal` | — |
 | d3–d9 | `detail_macro`、`detail_wear`、`detail_size`、`detail_series`（未启用）、`detail_pack`、`detail_care`、`detail_about` | — |
 
+**商品模式默认怎么选（2026-10-21 用户定）**：首图、规格、SKU、详情页首屏和同系列用 `redraw`（GPT 照实拍直接出）；细节、真假对比、尺寸、包装这些证据屏用 `pixel_lock` + `rect`（实拍整张贴回）；上身和模特首图用 `model`。`pixel_lock` 抠图模式保留，模板里可以改回去。
+
 ## 约定以外多出来的字段（阶段 2 由 Claude 和 Codex 接进后端）
 
 | 字段 / 写法 | 含义 |
