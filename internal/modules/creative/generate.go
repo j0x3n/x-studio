@@ -318,12 +318,26 @@ func (a *Module) selectedPhotos(product core.Product, t Template) ([]core.Photo,
 	if t.Slot == "main4" && t.ProductMode == "photo" {
 		codes = []string{"C1", "C2", "C3"}
 	}
+	// 重画、模特位：某个编号没有实拍时，用这个编号的 AI 补图（A1_AI 等）顶上；实拍原图和像素锁定这些证据位只认实拍
+	aiFill := t.ProductMode == "redraw" || t.ProductMode == "model"
 	for _, code := range codes {
-		for _, ph := range photos {
+		var pick *core.Photo
+		for i, ph := range photos {
 			if ph.Code == code && !media.AIMade(ph) {
-				selected = append(selected, ph)
+				pick = &photos[i]
 				break
 			}
+		}
+		for i, ph := range photos {
+			if pick != nil || !aiFill {
+				break
+			}
+			if base, ok := media.FillBase(ph.Code); ok && base == code && media.AIMade(ph) {
+				pick = &photos[i]
+			}
+		}
+		if pick != nil {
+			selected = append(selected, *pick)
 		}
 		if len(selected) == 2 {
 			break
