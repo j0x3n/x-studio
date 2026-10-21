@@ -269,7 +269,10 @@ func TestCopyAndPatchForceAILabels(t *testing.T) {
 
 func TestPerProductEnhanceSwitches(t *testing.T) {
 	var calls atomic.Int32
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); imageReply(w, photoBytes(t, 64, 80)) }))
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		imageReply(w, sizedPhotoBytes(t, readImageRequest(t, r).size))
+	}))
 	defer s.Close()
 	f := newFixture(t, func(c *Config) {
 		c.AIKey = "fake"
@@ -304,12 +307,11 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 	t.Setenv("CHROME_NO_SANDBOX", "1")
 	var ids []int64
 	var imageCalls atomic.Int32
-	imageData := photoBytes(t, 1000, 700)
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/images/edits" {
-			readImageRequest(t, r)
+			got := readImageRequest(t, r)
 			imageCalls.Add(1)
-			imageReply(w, imageData)
+			imageReply(w, sizedPhotoBytes(t, got.size))
 			return
 		}
 		var request Object

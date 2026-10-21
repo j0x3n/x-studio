@@ -37,7 +37,6 @@ type modelFakeAI struct {
 func modelFixture(t *testing.T) (*fixture, *modelFakeAI) {
 	t.Helper()
 	fake := &modelFakeAI{traces: make(chan modelAITrace, 30)}
-	output := imageBytes(t, 32, 48)
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fake.calls.Add(1)
 		tr := modelAITrace{Path: r.URL.Path}
@@ -136,7 +135,7 @@ func modelFixture(t *testing.T) (*fixture, *modelFakeAI) {
 			io.WriteString(w, "test-key http://private.internal C:\\secret")
 			return
 		}
-		core.WriteJSON(w, 200, obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(output)}}})
+		core.WriteJSON(w, 200, obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(sizedImageBytes(t, tr.Size))}}})
 	}))
 	t.Cleanup(s.Close)
 	f := newFixture(t, func(c *core.Config) {
@@ -224,7 +223,7 @@ func TestModelsCandidateConfirmAndManualTryon(t *testing.T) {
 	}
 	rid2 := modelCandidate(t, f, mid, &ref)
 	tr = modelTrace(t, ai)
-	if tr.Path != "/images/edits" || tr.Size != "1536x1024" || len(tr.Widths) != 1 || tr.Widths[0] != 32 {
+	if tr.Path != "/images/edits" || tr.Size != "1536x1024" || len(tr.Widths) != 1 || tr.Widths[0] != 1536 {
 		t.Fatal(tr)
 	}
 	m = f.req(t, "GET", fmt.Sprintf("/api/models/%d", mid), nil, 200)["model"].(obj)
@@ -244,7 +243,7 @@ func TestModelsCandidateConfirmAndManualTryon(t *testing.T) {
 	wbExec(t, f, "UPDATE products SET info=? WHERE id=?", core.JS(obj{"style": "蝴蝶结", "material": "银", "cost": "SECRET_COST", "supplier": "SECRET_SUPPLIER"}), pid)
 	result := wbResult(t, modelJob(t, f, "/api/tryon/generate", modelTryon(mid, ref, obj{"asset_id": a1}, obj{"asset_id": a2})))
 	tr = modelTrace(t, ai)
-	if tr.Size != "1024x1536" || fmt.Sprint(tr.Widths) != "[60 40 32]" || strings.Contains(tr.Prompt, "SECRET") || !strings.Contains(tr.Prompt, "蝴蝶结") || !strings.Contains(tr.Prompt, "第3张：模特参考图") {
+	if tr.Size != "1024x1536" || fmt.Sprint(tr.Widths) != "[1024 40 1536]" || strings.Contains(tr.Prompt, "SECRET") || !strings.Contains(tr.Prompt, "蝴蝶结") || !strings.Contains(tr.Prompt, "第3张：模特参考图") {
 		t.Fatal(tr)
 	}
 	saved := f.req(t, "POST", fmt.Sprintf("/api/workbench/items/%d/save", result), obj{"set_current": true}, 200)["asset"].(obj)

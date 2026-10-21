@@ -137,10 +137,10 @@ func TestCategoryClassifyCopyCoverageAndScopedEndpoints(t *testing.T) {
 
 func TestCategoryEnhancementSlotsCodesAndPrompt(t *testing.T) {
 	requests := make(chan imageRequest, 4)
-	output := photoBytes(t, 80, 100)
 	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests <- readImageRequest(t, r)
-		imageReply(w, output)
+		got := readImageRequest(t, r)
+		requests <- got
+		imageReply(w, sizedPhotoBytes(t, got.size))
 	}))
 	defer ai.Close()
 	f := newFixture(t, func(c *Config) {

@@ -198,7 +198,7 @@ func TestWorkbenchProcessingSourcesPartialFailureAndQuota(t *testing.T) {
 	var calls atomic.Int32
 	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(output)}}})
+		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(requestedImageBytes(t, r))}}})
 	}))
 	defer ai.Close()
 	f := newFixture(t, func(c *core.Config) { c.AIKey = "fake"; c.AIBaseURL = ai.URL })
@@ -364,7 +364,7 @@ func TestWorkbenchOneActiveTaskPerUser(t *testing.T) {
 		default:
 		}
 		<-release
-		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(imageBytes(t, 20, 20))}}})
+		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(requestedImageBytes(t, r))}}})
 	}))
 	defer ai.Close()
 	f := newFixture(t, func(c *core.Config) { c.AIKey = "fake"; c.AIBaseURL = ai.URL })
@@ -431,7 +431,6 @@ func TestWorkbenchPreflightPermissionsAndRecentList(t *testing.T) {
 }
 
 func TestWorkbenchQuotaChangeDiscardsWholeStagedBatch(t *testing.T) {
-	output := imageBytes(t, 20, 20)
 	var calls atomic.Int32
 	var f *fixture
 	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -441,7 +440,7 @@ func TestWorkbenchQuotaChangeDiscardsWholeStagedBatch(t *testing.T) {
 		if _, err := f.c.DB.Exec("INSERT INTO quotas(user_id,month_images) VALUES(1,1) ON CONFLICT(user_id) DO UPDATE SET month_images=1"); err != nil {
 			t.Error(err)
 		}
-		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(output)}}})
+		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(requestedImageBytes(t, r))}}})
 	}))
 	defer ai.Close()
 	f = newFixture(t, func(c *core.Config) { c.AIKey = "fake"; c.AIBaseURL = ai.URL })

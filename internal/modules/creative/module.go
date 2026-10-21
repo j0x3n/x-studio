@@ -2,12 +2,15 @@
 // 像素锁定合成、模特图、三层复核和分流、改字、导出。契约见 接口约定-AI出图.md。
 package creative
 
-import "xstudio/internal/core"
+import (
+	"sync"
+	"xstudio/internal/core"
+)
 
-type Module struct{ *core.Core }
+type Module struct {
+	*core.Core
+	returnOnce sync.Once
+}
 
-func New(c *core.Core) *Module                   { return &Module{c} }
-func (*Module) Name() string                     { return "creative" }
-func (*Module) Migrations() []core.Migration     { return nil }
-func (*Module) Routes(*core.Router)              {}
-func (*Module) Jobs() map[string]core.JobHandler { return nil }
+func New(c *core.Core) *Module { return &Module{Core: c} }
+func (*Module) Name() string   { return "creative" }

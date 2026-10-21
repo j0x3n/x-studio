@@ -160,6 +160,15 @@ func (a *Module) getJob(w http.ResponseWriter, r *http.Request) {
 		visible = j.TargetID == u.ID
 	case "listing":
 		visible = a.CanListing(u, j.TargetID)
+	case "creative_set", "creative_item":
+		var listingID int64
+		query := "SELECT listing_id FROM creative_sets WHERE id=?"
+		if j.TargetType == "creative_item" {
+			query = "SELECT COALESCE(i.listing_id,s.listing_id) FROM creative_items i LEFT JOIN creative_sets s ON s.id=i.set_id WHERE i.id=?"
+		}
+		if a.DB.QueryRow(query, j.TargetID).Scan(&listingID) == nil {
+			visible = a.CanListing(u, listingID)
+		}
 	case "product":
 		visible = a.CanProduct(u, j.TargetID)
 	case "asset":

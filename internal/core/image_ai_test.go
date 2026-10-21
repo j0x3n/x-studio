@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/png"
 	"io"
@@ -34,10 +35,14 @@ func imageTestCore(t *testing.T, handler http.HandlerFunc) *Core {
 	}
 	return a
 }
-func imageTestPNG(t *testing.T) []byte {
+func imageTestPNG(t *testing.T, sizes ...string) []byte {
 	t.Helper()
 	var b bytes.Buffer
-	if e := png.Encode(&b, image.NewNRGBA(image.Rect(0, 0, 20, 30))); e != nil {
+	width, height := 1024, 1024
+	if len(sizes) > 0 {
+		_, _ = fmt.Sscanf(sizes[0], "%dx%d", &width, &height)
+	}
+	if e := png.Encode(&b, image.NewNRGBA(image.Rect(0, 0, width, height))); e != nil {
 		t.Fatal(e)
 	}
 	return b.Bytes()
@@ -45,8 +50,48 @@ func imageTestPNG(t *testing.T) []byte {
 func imageTestActor() context.Context {
 	return WithAIActor(context.Background(), AIActor{UserID: 1, JobID: 9, Feature: "model_create"})
 }
+
+func TestEditImageFitsFirstPortraitReferenceToLandscape(t *testing.T) {
+	portrait := image.NewNRGBA(image.Rect(0, 0, 24, 36))
+	other := image.NewNRGBA(image.Rect(0, 0, 12, 18))
+	refs := []image.Image{portrait, other}
+	a := imageTestCore(t, func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Error(err)
+			return
+		}
+		defer r.MultipartForm.RemoveAll()
+		for index, header := range r.MultipartForm.File["image"] {
+			file, err := header.Open()
+			if err != nil {
+				t.Error(err)
+				continue
+			}
+			cfg, _, err := image.DecodeConfig(file)
+			file.Close()
+			want := image.Pt(1536, 1024)
+			if index == 1 {
+				want = other.Bounds().Size()
+			}
+			if err != nil || image.Pt(cfg.Width, cfg.Height) != want {
+				t.Errorf("reference %d: %+v, %v", index, cfg, err)
+			}
+		}
+		WriteJSON(w, 200, Object{"data": []Object{{"b64_json": base64.StdEncoding.EncodeToString(imageTestPNG(t, "1536x1024"))}}})
+	})
+	if _, err := a.EditImageMask(imageTestActor(), "test", refs, nil, "1536x1024"); err != nil {
+		t.Fatal(err)
+	}
+	if refs[0] != portrait || FitToSize(other, "bad") != other {
+		t.Fatal("caller references mutated")
+	}
+	landscape := image.NewNRGBA(image.Rect(0, 0, 1536, 1024))
+	if FitToSize(landscape, "1536x1024") != landscape {
+		t.Fatal("matching reference changed")
+	}
+}
 func TestGenerateImageRetryQuotaAndUsage(t *testing.T) {
-	b := imageTestPNG(t)
+	b := imageTestPNG(t, "1024x1536")
 	var calls atomic.Int64
 	a := imageTestCore(t, func(w http.ResponseWriter, r *http.Request) {
 		n := calls.Add(1)
@@ -124,7 +169,6 @@ func TestImageResponseValidationAndReservationRelease(t *testing.T) {
 	}
 }
 func TestImageExplicitSizeAndLegacyEdit(t *testing.T) {
-	b := imageTestPNG(t)
 	sizes := make(chan string, 3)
 	counts := make(chan int, 3)
 	a := imageTestCore(t, func(w http.ResponseWriter, r *http.Request) {
@@ -161,7 +205,7 @@ func TestImageExplicitSizeAndLegacyEdit(t *testing.T) {
 		}
 		sizes <- size
 		counts <- count
-		WriteJSON(w, 200, Object{"data": []Object{{"b64_json": base64.StdEncoding.EncodeToString(b)}}})
+		WriteJSON(w, 200, Object{"data": []Object{{"b64_json": base64.StdEncoding.EncodeToString(imageTestPNG(t, size))}}})
 	})
 	a.DB.Exec("UPDATE quotas SET month_images=5")
 	refs := []image.Image{image.NewNRGBA(image.Rect(0, 0, 80, 40)), image.NewNRGBA(image.Rect(0, 0, 20, 30)), image.NewNRGBA(image.Rect(0, 0, 10, 10))}
@@ -216,5 +260,96 @@ func TestImageCancellationAndTimeout(t *testing.T) {
 	a.DB.QueryRow("SELECT count(*) FROM ai_usage").Scan(&used)
 	if used != 0 {
 		t.Fatal("timed out request charged")
+	}
+}
+
+func TestImageReturnedSizeMismatch(t *testing.T) {
+	wrong := imageTestPNG(t, "1536x1024")
+	var calls atomic.Int64
+	a := imageTestCore(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		WriteJSON(w, 200, Object{"data": []Object{{"b64_json": base64.StdEncoding.EncodeToString(wrong)}}})
+	})
+	for _, edit := range []bool{false, true} {
+		var err error
+		if edit {
+			_, err = a.EditImageMask(imageTestActor(), "mask", []image.Image{image.NewNRGBA(image.Rect(0, 0, 10, 10))}, image.NewAlpha(image.Rect(0, 0, 10, 10)), "1024x1536")
+		} else {
+			_, err = a.GenerateImage(imageTestActor(), "text", "1024x1536")
+		}
+		if err == nil || err.Error() != "图像服务返回的尺寸不对：请求 1024×1536，返回 1536×1024" {
+			t.Fatal(err)
+		}
+	}
+	if calls.Load() != 4 {
+		t.Fatal(calls.Load())
+	}
+	var usage int
+	_ = a.DB.QueryRow("SELECT count(*) FROM ai_usage").Scan(&usage)
+	if usage != 0 {
+		t.Fatal("failed image consumed quota")
+	}
+}
+
+func TestEditImageMaskMultipartOrderAndValidation(t *testing.T) {
+	a := imageTestCore(t, func(w http.ResponseWriter, r *http.Request) {
+		reader, err := r.MultipartReader()
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		names := []string{}
+		for {
+			part, err := reader.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			name := part.FormName()
+			if name == "image" || name == "mask" {
+				names = append(names, name)
+				if part.Header.Get("Content-Type") != "image/png" {
+					t.Error("wrong PNG content type")
+				}
+				if _, err = png.Decode(part); err != nil {
+					t.Error(err)
+				}
+			}
+			part.Close()
+		}
+		if strings.Join(names, ",") != "image,image,mask" {
+			t.Error(names)
+		}
+		WriteJSON(w, 200, Object{"data": []Object{{"b64_json": base64.StdEncoding.EncodeToString(imageTestPNG(t))}}})
+	})
+	refs := []image.Image{image.NewNRGBA(image.Rect(0, 0, 10, 20)), image.NewNRGBA(image.Rect(0, 0, 8, 8))}
+	if _, err := a.EditImageMask(imageTestActor(), "edit", refs, image.NewAlpha(image.Rect(0, 0, 9, 20)), "1024x1024"); err == nil {
+		t.Fatal("bad mask accepted")
+	}
+	if _, err := a.EditImageMask(imageTestActor(), "edit", refs, image.NewAlpha(image.Rect(0, 0, 10, 20)), "1024x1024"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerateImageStyleReferences(t *testing.T) {
+	app := imageTestCore(t, func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/images/edits" {
+			t.Error("style reference was discarded", request.URL.Path)
+		}
+		if err := request.ParseMultipartForm(8 << 20); err != nil {
+			t.Error(err)
+			return
+		}
+		defer request.MultipartForm.RemoveAll()
+		if len(request.MultipartForm.File["image"]) != 1 || request.FormValue("size") != "1024x1024" {
+			t.Error("missing style reference")
+		}
+		WriteJSON(writer, 200, Object{"data": []Object{{"b64_json": base64.StdEncoding.EncodeToString(imageTestPNG(t))}}})
+	})
+	if _, err := app.GenerateImage(imageTestActor(), "background", "1024x1024", image.NewNRGBA(image.Rect(0, 0, 10, 10))); err != nil {
+		t.Fatal(err)
 	}
 }
