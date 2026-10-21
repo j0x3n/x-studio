@@ -119,8 +119,17 @@ func imageReply(w http.ResponseWriter, b []byte) {
 	writeJSON(w, 200, Object{"data": []Object{{"b64_json": base64.StdEncoding.EncodeToString(b)}}})
 }
 
+func sizedPhotoBytes(t *testing.T, size string) []byte {
+	t.Helper()
+	var width, height int
+	if _, err := fmt.Sscanf(size, "%dx%d", &width, &height); err != nil || width < 1 || height < 1 {
+		t.Fatalf("invalid image size %q", size)
+	}
+	return photoBytes(t, width, height)
+}
+
 func TestImageEditsMultipartRetryAndSize(t *testing.T) {
-	png := photoBytes(t, 1448, 1086)
+	png := sizedPhotoBytes(t, "1536x1024")
 	var calls atomic.Int32
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got := readImageRequest(t, r)
@@ -153,13 +162,12 @@ func TestImageEditsMultipartRetryAndSize(t *testing.T) {
 func TestUpscaleThresholdGeometryAndInvalidation(t *testing.T) {
 	var mu sync.Mutex
 	requests := []imageRequest{}
-	output := photoBytes(t, 640, 400)
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got := readImageRequest(t, r)
 		mu.Lock()
 		requests = append(requests, got)
 		mu.Unlock()
-		imageReply(w, output)
+		imageReply(w, sizedPhotoBytes(t, got.size))
 	}))
 	defer s.Close()
 	f := newFixture(t, func(c *Config) {
@@ -185,7 +193,7 @@ func TestUpscaleThresholdGeometryAndInvalidation(t *testing.T) {
 	mu.Lock()
 	got := append([]imageRequest(nil), requests...)
 	mu.Unlock()
-	if len(got) != 2 || got[0].dimensions[0] != image.Pt(1200, 899) || got[1].dimensions[0] != image.Pt(600, 600) {
+	if len(got) != 2 || got[0].dimensions[0] != image.Pt(1536, 1024) || got[1].dimensions[0] != image.Pt(1024, 1024) {
 		t.Fatal(got)
 	}
 	if err = f.a.retouch(testActor(context.Background()), p); err != nil {
@@ -200,7 +208,11 @@ func TestUpscaleThresholdGeometryAndInvalidation(t *testing.T) {
 			t.Fatal(ph)
 		}
 		data, err := os.ReadFile(filepath.Join(f.a.Dir(id), filepath.FromSlash(ph.EnhancedFile)))
-		if err != nil || !bytes.Equal(data, output) {
+		size := "1536x1024"
+		if ph.ID == cropped.ID {
+			size = "1024x1024"
+		}
+		if err != nil || !bytes.Equal(data, sizedPhotoBytes(t, size)) {
 			t.Fatal("enhanced PNG not saved", err)
 		}
 		file, err := os.Open(filepath.Join(f.a.Dir(id), "照片", ph.Code+".jpg"))
@@ -209,7 +221,7 @@ func TestUpscaleThresholdGeometryAndInvalidation(t *testing.T) {
 		}
 		cfg, err := jpeg.DecodeConfig(file)
 		_ = file.Close()
-		if err != nil || cfg.Width != 640 || cfg.Height != 400 {
+		if err != nil || cfg.Width != map[bool]int{true: 1024, false: 1536}[ph.ID == cropped.ID] || cfg.Height != 1024 {
 			t.Fatal("retouch applied crop/rotate twice", cfg, err)
 		}
 	}
@@ -239,7 +251,6 @@ func TestUpscaleThresholdGeometryAndInvalidation(t *testing.T) {
 
 func TestFillRulesReferencesStorageCoverageAndLimit(t *testing.T) {
 	var count atomic.Int32
-	output := photoBytes(t, 640, 480)
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got := readImageRequest(t, r)
 		if len(got.dimensions) != 2 {
@@ -252,7 +263,7 @@ func TestFillRulesReferencesStorageCoverageAndLimit(t *testing.T) {
 			t.Error("placeholders not replaced")
 		}
 		count.Add(1)
-		imageReply(w, output)
+		imageReply(w, sizedPhotoBytes(t, got.size))
 	}))
 	defer s.Close()
 	f := newFixture(t, func(c *Config) { c.AIKey = "fake"; c.AIBaseURL = s.URL + "/v1"; c.AutoFill = true })
@@ -281,10 +292,10 @@ func TestFillRulesReferencesStorageCoverageAndLimit(t *testing.T) {
 			t.Fatal(ph)
 		}
 		data, err := os.ReadFile(filepath.Join(f.a.Dir(id), filepath.FromSlash(ph.File)))
-		if err != nil || !bytes.Equal(data, output) {
+		if err != nil || !bytes.Equal(data, sizedPhotoBytes(t, "1024x1536")) {
 			t.Fatal("generated base64 PNG not saved", err)
 		}
-		getJPEG(t, f, fmt.Sprintf("/files/products/%d/%s?w=240", id, ph.File), 240, 180)
+		getJPEG(t, f, fmt.Sprintf("/files/products/%d/%s?w=240", id, ph.File), 160, 240)
 	}
 	if generated != 2 {
 		t.Fatal(generated)

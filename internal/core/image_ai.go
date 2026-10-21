@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"io"
 	"math"
@@ -14,7 +15,28 @@ import (
 	"net/http"
 	"net/textproto"
 	"strings"
+
+	"golang.org/x/image/draw"
 )
+
+func FitToSize(im image.Image, size string) image.Image {
+	var width, height int
+	if im == nil || !validImageSize(size) {
+		return im
+	}
+	_, _ = fmt.Sscanf(size, "%dx%d", &width, &height)
+	if im.Bounds().Size() == image.Pt(width, height) {
+		return im
+	}
+	canvas := image.NewNRGBA(image.Rect(0, 0, width, height))
+	draw.Draw(canvas, canvas.Bounds(), image.NewUniform(color.NRGBA{R: 128, G: 128, B: 128, A: 255}), image.Point{}, draw.Src)
+	scale := math.Min(float64(width)/float64(im.Bounds().Dx()), float64(height)/float64(im.Bounds().Dy()))
+	fitWidth := max(1, int(math.Round(float64(im.Bounds().Dx())*scale)))
+	fitHeight := max(1, int(math.Round(float64(im.Bounds().Dy())*scale)))
+	left, top := (width-fitWidth)/2, (height-fitHeight)/2
+	draw.CatmullRom.Scale(canvas, image.Rect(left, top, left+fitWidth, top+fitHeight), im, im.Bounds(), draw.Over, nil)
+	return canvas
+}
 
 func ImageSize(im image.Image) string {
 	ratio := float64(im.Bounds().Dx()) / float64(im.Bounds().Dy())
@@ -35,7 +57,7 @@ func ImageSize(im image.Image) string {
 // EditImage sends only PNG references, never URLs or generated-image references
 // supplied by a model. The image client has its own timeout (not the text 120s).
 func (a *Core) EditImage(ctx context.Context, prompt string, refs []image.Image) ([]byte, error) {
-	if len(refs) == 0 {
+	if len(refs) == 0 || refs[0] == nil {
 		return nil, fmt.Errorf("图像编辑需要 1–3 张参考图")
 	}
 	return a.EditImageSize(ctx, prompt, refs, ImageSize(refs[0]))
@@ -43,6 +65,10 @@ func (a *Core) EditImage(ctx context.Context, prompt string, refs []image.Image)
 
 // EditImageSize preserves reference order and uses an explicit output size.
 func (a *Core) EditImageSize(ctx context.Context, prompt string, refs []image.Image, size string) ([]byte, error) {
+	return a.EditImageMask(ctx, prompt, refs, nil, size)
+}
+
+func (a *Core) EditImageMask(ctx context.Context, prompt string, refs []image.Image, mask image.Image, size string) ([]byte, error) {
 	if !validImageSize(size) {
 		return nil, fmt.Errorf("图片尺寸不正确")
 	}
@@ -51,6 +77,18 @@ func (a *Core) EditImageSize(ctx context.Context, prompt string, refs []image.Im
 	}
 	if len(refs) == 0 || len(refs) > 3 {
 		return nil, fmt.Errorf("图像编辑需要 1–3 张参考图")
+	}
+	for _, ref := range refs {
+		if ref == nil {
+			return nil, fmt.Errorf("参考图不能为空")
+		}
+	}
+	if mask != nil && mask.Bounds().Size() != refs[0].Bounds().Size() {
+		return nil, fmt.Errorf("mask 必须与第一张参考图同尺寸")
+	}
+	if mask == nil {
+		refs = append([]image.Image(nil), refs...)
+		refs[0] = FitToSize(refs[0], size)
 	}
 	model := a.Model(Actor(ctx).Feature, a.Cfg.ImageModel)
 	var body bytes.Buffer
@@ -73,6 +111,18 @@ func (a *Core) EditImageSize(ctx context.Context, prompt string, refs []image.Im
 			return nil, err
 		}
 	}
+	if mask != nil {
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", `form-data; name="mask"; filename="mask.png"`)
+		header.Set("Content-Type", "image/png")
+		part, err := mw.CreatePart(header)
+		if err != nil {
+			return nil, err
+		}
+		if err = png.Encode(part, mask); err != nil {
+			return nil, err
+		}
+	}
 	if err := mw.Close(); err != nil {
 		return nil, err
 	}
@@ -80,7 +130,7 @@ func (a *Core) EditImageSize(ctx context.Context, prompt string, refs []image.Im
 	if err != nil {
 		return nil, err
 	}
-	return a.imageRequest(ctx, "/images/edits", mw.FormDataContentType(), body.Bytes(), finish)
+	return a.imageRequest(ctx, "/images/edits", mw.FormDataContentType(), body.Bytes(), size, finish)
 }
 
 func validImageSize(size string) bool {
@@ -88,7 +138,10 @@ func validImageSize(size string) bool {
 }
 
 // GenerateImage uses the same provider, quota reservation and response checks as edits.
-func (a *Core) GenerateImage(ctx context.Context, prompt, size string) ([]byte, error) {
+func (a *Core) GenerateImage(ctx context.Context, prompt, size string, styleRefs ...image.Image) ([]byte, error) {
+	if len(styleRefs) > 0 {
+		return a.EditImageSize(ctx, prompt, styleRefs, size)
+	}
 	if !validImageSize(size) {
 		return nil, fmt.Errorf("图片尺寸不正确")
 	}
@@ -101,10 +154,10 @@ func (a *Core) GenerateImage(ctx context.Context, prompt, size string) ([]byte, 
 		return nil, err
 	}
 	body := []byte(JS(Object{"model": model, "prompt": prompt, "size": size, "quality": "high", "n": 1}))
-	return a.imageRequest(ctx, "/images/generations", "application/json", body, finish)
+	return a.imageRequest(ctx, "/images/generations", "application/json", body, size, finish)
 }
 
-func (a *Core) imageRequest(ctx context.Context, endpoint, contentType string, body []byte, finish func(bool) error) ([]byte, error) {
+func (a *Core) imageRequest(ctx context.Context, endpoint, contentType string, body []byte, size string, finish func(bool) error) ([]byte, error) {
 	charged := false
 	defer func() {
 		if !charged {
@@ -155,6 +208,10 @@ func (a *Core) imageRequest(ctx context.Context, endpoint, contentType string, b
 			}
 			if _, err = png.Decode(bytes.NewReader(decoded)); err != nil {
 				return nil, fmt.Errorf("图像服务返回的 PNG 已损坏")
+			}
+			cfg, _, _ := image.DecodeConfig(bytes.NewReader(decoded))
+			if fmt.Sprintf("%dx%d", cfg.Width, cfg.Height) != size {
+				return nil, fmt.Errorf("图像服务返回的尺寸不对：请求 %s，返回 %d×%d", strings.ReplaceAll(size, "x", "×"), cfg.Width, cfg.Height)
 			}
 			return decoded, nil
 		}()

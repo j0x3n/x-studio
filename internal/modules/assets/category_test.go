@@ -14,6 +14,25 @@ import (
 	"xstudio/internal/core"
 )
 
+func requestedImageBytes(t *testing.T, r *http.Request) []byte {
+	t.Helper()
+	if err := r.ParseMultipartForm(16 << 20); err != nil {
+		t.Error(err)
+	}
+	defer r.MultipartForm.RemoveAll()
+	return sizedImageBytes(t, r.FormValue("size"))
+}
+
+func sizedImageBytes(t *testing.T, size string) []byte {
+	t.Helper()
+	var width, height int
+	if _, err := fmt.Sscanf(size, "%dx%d", &width, &height); err != nil || width < 1 || height < 1 {
+		t.Errorf("invalid image size %q", size)
+		return nil
+	}
+	return imageBytes(t, width, height)
+}
+
 func TestCategoryTagProcessAndWorkbenchPrompts(t *testing.T) {
 	requests := make(chan string, 8)
 	var tagAsset atomic.Int64
@@ -32,7 +51,7 @@ func TestCategoryTagProcessAndWorkbenchPrompts(t *testing.T) {
 			t.Error(e)
 		}
 		requests <- r.FormValue("prompt")
-		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(output)}}})
+		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(requestedImageBytes(t, r))}}})
 	}))
 	defer ai.Close()
 	f := newFixture(t, func(c *core.Config) { c.AIKey = "fake"; c.AIBaseURL = ai.URL; c.VisionModel = "vision" })

@@ -92,7 +92,7 @@ func TestAIProcessPermissionsSourcesDiffAndQuota(t *testing.T) {
 		if err := r.ParseMultipartForm(16 << 20); err != nil {
 			t.Error(err)
 		}
-		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(output)}}})
+		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(requestedImageBytes(t, r))}}})
 	}))
 	defer ai.Close()
 	f := newFixture(t, func(c *core.Config) { c.AIKey = "fake"; c.AIBaseURL = ai.URL })
@@ -185,7 +185,7 @@ func TestSetCurrentRechecksRunningPipelineAtExecution(t *testing.T) {
 	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(started)
 		<-release
-		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(output)}}})
+		json.NewEncoder(w).Encode(obj{"data": []obj{{"b64_json": base64.StdEncoding.EncodeToString(requestedImageBytes(t, r))}}})
 	}))
 	defer ai.Close()
 	f := newFixture(t, func(c *core.Config) { c.AIKey = "fake"; c.AIBaseURL = ai.URL })
