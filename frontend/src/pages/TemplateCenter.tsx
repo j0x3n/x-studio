@@ -67,7 +67,7 @@ function HtmlTemplates({ switcher }: { switcher: ReactNode }) {
   const useForListing = async (rerun: boolean) => {
     if (!t || !listingId) return
     try {
-      await api(`/api/listings/${listingId}/render`, { method: 'PUT', body: { detail_template: t.key } })
+      await api(`/api/listings/${listingId}/render`, { method: 'PUT', body: { detail_template: t.key, mode: 'html' } })
       if (rerun) { await api(`/api/listings/${listingId}/render/run`, { method: 'POST' }); toast('已换模板，开始重新出图', 'ok') }
       else toast('已换模板，下次出图生效', 'ok')
       loadState()
@@ -126,7 +126,7 @@ function HtmlTemplates({ switcher }: { switcher: ReactNode }) {
               {shopRefs.length === 0 && <option value={0}>这个店还没有款</option>}
               {shopRefs.map(r => <option key={r.id} value={r.id}>{r.product.name}</option>)}
             </select>
-            {state && effective && <span className="t4 fs-12">这款现在用「{nameOf(effective)}」{state.settings.detail_template ? '' : '（店铺默认）'}</span>}
+            {state && effective && <span className="t4 fs-12">{state.settings.mode === 'ai' ? '这款一键出图用 AI 出图，HTML 模板不生效；在下面换成某套模板会改回 HTML' : <>这款现在用「{nameOf(effective)}」{state.settings.detail_template ? '' : '（店铺默认）'}</>}</span>}
             <span className="spacer" />
             <div className="segmented">{[[0.35, '小'], [0.5, '中'], [0.75, '大']].map(([z, l]) => <button key={z} className={zoom === z ? 'active' : ''} onClick={() => setZoom(z as number)}>{l}</button>)}</div>
             {t && listingId > 0 && <a className="btn btn-ghost btn-sm" href={`/render/详情页模板/${t.file}?p=${listingId}`} target="_blank" rel="noreferrer"><ExternalLink />新窗口</a>}
@@ -162,7 +162,7 @@ function HtmlTemplates({ switcher }: { switcher: ReactNode }) {
               {listingId > 0 && runner && (
                 <div className="inspector-section">
                   <div className="head"><span className="sub-title">给预览的这款用</span></div>
-                  {effective === t.key ? <span className="fs-12 t3 inline"><Check size={14} />这款已经在用这套模板</span> : <>
+                  {effective === t.key && state?.settings.mode !== 'ai' ? <span className="fs-12 t3 inline"><Check size={14} />这款已经在用这套模板</span> : <>
                     <button className="btn btn-primary btn-block" disabled={t.disabled} onClick={() => useForListing(true)}><Sparkles />换成这套并重新出图</button>
                     <button className="btn btn-secondary btn-block" disabled={t.disabled} onClick={() => useForListing(false)}>只换模板，先不出图</button>
                   </>}

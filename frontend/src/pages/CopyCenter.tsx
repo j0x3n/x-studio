@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { FileText, Tags, Mic, Search, Package, Check, Sparkles, ShieldCheck, Pencil, Plus, Upload, Trash2, GitCompare, Loader2, X } from 'lucide-react'
+import { FileText, Tags, Mic, Search, Package, Check, Sparkles, ShieldCheck, Pencil, Plus, Upload, Trash2, GitCompare, Loader2, X, Wand2 } from 'lucide-react'
 import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
@@ -9,6 +9,7 @@ import { useListingRefs, type ListingRef } from '../lib/listings'
 import type { CopyVersion, Issue, Keyword } from '../lib/types'
 import { Topbar, Pill, Loading, Empty, Drawer, Field } from '../components/ui'
 import { fmtAgo, fmtDate } from '../lib/format'
+import { TitleSuggestDrawer } from '../components/TitleSuggest'
 
 type Mode = 'versions' | 'keywords' | 'voice'
 type Obj = Record<string, unknown>
@@ -121,6 +122,7 @@ function VersionsView({ ref_ }: { ref_: ListingRef }) {
   const [checking, setChecking] = useState(false)
   const [withAI, setWithAI] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [titling, setTitling] = useState(false)
   const [jobIds, setJobIds] = useState<number[]>([])
   const jobs = useJobs(jobIds)
   const handled = useRef(new Set<number>())
@@ -241,6 +243,11 @@ function VersionsView({ ref_ }: { ref_: ListingRef }) {
               {issues && <span className="fs-12 t3">{issues.length ? `${issues.filter(i => i.level === 'error').length} 处必须改，${issues.filter(i => i.level === 'warn').length} 处建议看一眼，已在原文标出` : '没查出问题'}</span>}
             </div>
           )}
+          <div className="inspector-section">
+            <div className="head"><span className="sub-title">标题建议</span></div>
+            <button className="btn btn-secondary btn-block" onClick={() => setTitling(true)}><Wand2 />按数据出 3 个标题</button>
+            <span className="fs-12 t4">用高价值词和竞品标题写，选中直接改上架标题；7 天内只能改一次。</span>
+          </div>
           {editable && <AIPanel disabled={!!running} hasVersion={!!detail}
             onRewrite={(scope, instructions) => detail && startJob(`/api/copies/${detail.id}/rewrite`, { scope, instructions })}
             onGenerate={instructions => startJob(`/api/listings/${ref_.id}/copies/generate`, { instructions })} />}
@@ -258,6 +265,7 @@ function VersionsView({ ref_ }: { ref_: ListingRef }) {
           </div>
         )}
       </aside>
+      {titling && <TitleSuggestDrawer listingId={ref_.id} editable={editable} onClose={() => setTitling(false)} onApplied={id => load(id)} />}
       {editing && detail && <EditDrawer v={detail} listingId={ref_.id} onClose={() => setEditing(false)} onSaved={id => { setEditing(false); load(id) }} />}
     </>
   )

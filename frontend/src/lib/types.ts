@@ -73,7 +73,7 @@ export type Outputs = { main34: string[]; main11: string[]; detail: string[]; wh
 export type ReviewStatus = 'none' | 'pending' | 'approved' | 'rejected'
 export type RenderState = {
   listing_id: number
-  settings: { detail_template: string; effective_detail_template: string; main_template: string; rendered_job_id: number | null; rendered_template: string; render_note: string; updated_at: string }
+  settings: { mode?: 'ai' | 'html'; detail_template: string; effective_detail_template: string; main_template: string; rendered_job_id: number | null; rendered_template: string; render_note: string; updated_at: string }
   review: { status: ReviewStatus; note: string; by: number | null; at: string }
   outputs: Outputs; preview_url: string
 }

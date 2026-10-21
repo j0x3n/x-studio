@@ -58,3 +58,4 @@
 /* 长提示（导出缺项、生成错误）：块级，可换行 */
 .cr-warn { padding: 8px 12px; border-radius: var(--r-md); background: var(--warning-bg); color: var(--warning-text); font-size: var(--fs-12); line-height: 1.6; overflow-wrap: anywhere; }
 .cr-warn ul { margin: 2px 0 0; padding-left: 18px; }
+.cr-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }

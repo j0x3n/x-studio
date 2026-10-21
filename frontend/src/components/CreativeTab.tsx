@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Sparkles, Download, Eye, Play, Plus, Trash2, RefreshCw, Star, History } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
-import { ApiError } from '../lib/api'
-import type { Product } from '../lib/types'
+import { ApiError, api } from '../lib/api'
+import type { Product, RenderState } from '../lib/types'
 import { Pill, Loading, Empty, Drawer, Field } from './ui'
 import { ItemCard, CompareView, ReviewDetail, TextRows, JudgeBar } from './CreativeShared'
 import '../styles/creative.css'
@@ -19,7 +19,34 @@ export function CreativeTab({ product }: { product: Product }) {
   return (
     <div className="stack">
       {listings.length > 1 && <div className="segmented">{listings.map(l => <button key={l.id} className={l.id === lid ? 'active' : ''} onClick={() => setLid(l.id)}>{shopName(l.shop_id)}</button>)}</div>}
+      <RenderMode key={'m' + lid} listingId={lid} />
       <ListingCreative key={lid} listingId={lid} product={product} />
+    </div>
+  )
+}
+
+// 一键出图最后一步（render）用 AI 出图还是旧 HTML 模板；后端 listing_render.mode，默认 ai
+function RenderMode({ listingId }: { listingId: number }) {
+  const { can } = useAuth()
+  const toast = useToast()
+  const [mode, setMode] = useState<'ai' | 'html' | null>(null)
+  useEffect(() => {
+    if (mockOn()) { setMode('ai'); return }
+    api<RenderState>(`/api/listings/${listingId}/render`).then(r => setMode(r.settings.mode || 'ai')).catch(() => setMode(null))
+  }, [listingId])
+  if (!mode) return null
+  const change = async (m: 'ai' | 'html') => {
+    if (m === mode) return
+    try { await api(`/api/listings/${listingId}/render`, { method: 'PUT', body: { mode: m } }); setMode(m); toast(m === 'ai' ? '一键出图改为 AI 出图' : '一键出图改用旧 HTML 模板', 'ok') } catch (e) { toast(errText(e), 'error') }
+  }
+  return (
+    <div className="cr-mode fs-12">
+      <span className="t3">一键出图最后一步</span>
+      <div className="segmented">
+        <button className={mode === 'ai' ? 'active' : ''} disabled={!can('render.run')} onClick={() => change('ai')}>AI 出图</button>
+        <button className={mode === 'html' ? 'active' : ''} disabled={!can('render.run')} onClick={() => change('html')}>HTML 模板（旧）</button>
+      </div>
+      <span className="t4">{mode === 'ai' ? '跑一键出图会自动新建一套，缺素材的位置跳过' : '跑一键出图按模板中心的 HTML 模板截图，不出 AI 图'}</span>
     </div>
   )
 }

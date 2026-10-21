@@ -790,3 +790,22 @@ button.thumb { display: block; width: 100%; cursor: zoom-in; }
 .lib-item.dragging { opacity: .5; }
 .upload-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
 .upload-list > div { display: flex; align-items: center; gap: 8px; font-size: var(--fs-12); }
+
+/* ===== 标题建议 ===== */
+.ts-locked { padding: 8px 10px; border-radius: var(--r-sm); background: var(--warning-bg); color: var(--warning-text); }
+.ts-ask { display: flex; gap: 8px; }
+.ts-ask .input { flex: 1; }
+.ts-current { display: flex; align-items: baseline; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); font-size: var(--fs-13); }
+.ts-list { display: flex; flex-direction: column; gap: 8px; }
+.ts-card { display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); text-align: left; font: inherit; color: var(--text); cursor: pointer; }
+.ts-card:hover:not(:disabled) { border-color: var(--border-strong); }
+.ts-card.active { border-color: var(--primary); background: var(--primary-50); }
+.ts-card:disabled { cursor: default; }
+.ts-head { display: flex; align-items: center; gap: 6px; }
+.ts-title { font-size: var(--fs-14); font-weight: 500; line-height: 1.5; }
+.ts-kw { display: flex; flex-wrap: wrap; gap: 4px; }
+.ts-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ts-ok { color: var(--success-text); }
+.ts-warn { color: var(--warning-text); }
+.ts-bad { color: var(--danger-text); }
+.ts-history { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--divider); }

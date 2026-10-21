@@ -374,7 +374,9 @@ func (a *Module) forced(ctx context.Context, item Item) []string {
 	return reasons
 }
 func (a *Module) decide(ctx context.Context, item *Item, set Set) {
-	item.Route, item.RouteReasons, item.Risk = routeItem(*item, a.settings(), a.forced(ctx, *item), item.SetID != nil && set.ImagesUsed < set.ImagesAllowance, rand.Float64())
+	// photo 模式是实拍裁切，重画还是同一张图，不自动重画，直接转人工
+	allowRedraw := item.SetID != nil && set.ImagesUsed < set.ImagesAllowance && item.ProductMode != "photo"
+	item.Route, item.RouteReasons, item.Risk = routeItem(*item, a.settings(), a.forced(ctx, *item), allowRedraw, rand.Float64())
 }
 func (a *Module) calibrate(ctx context.Context, tx *sql.Tx, item Item, verdict string, settings core.Object) error {
 	if item.ProductMode != "model" || item.WearType == "" {
