@@ -12,7 +12,6 @@ import (
 	"image/color"
 	"image/draw"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"xstudio/internal/core"
@@ -472,20 +471,11 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 	for _, text := range item.Texts {
 		textLines = append(textLines, fmt.Sprintf("【%s】“%s”", text.Key, text.Text))
 	}
-	infoKeys := make([]string, 0, len(product.Info))
-	for key := range product.Info {
-		infoKeys = append(infoKeys, key)
-	}
-	sort.Strings(infoKeys)
-	info := []string{}
-	for _, key := range infoKeys {
-		info = append(info, key+"："+stringValue(product.Info[key]))
-	}
 	modelDescription := ""
 	if item.ModelID != 0 {
 		_ = a.DB.QueryRow("SELECT description FROM shop_models WHERE id=?", item.ModelID).Scan(&modelDescription)
 	}
-	values := map[string]string{"款名": product.Name, "商品": strings.Join(info, "；"), "尺寸": core.JS(sizes), "颜色": stringValue(product.Info["color"]), "品类": product.Category.Name, "文字": strings.Join(textLines, " / "), "模特": modelDescription, "佩戴位置": placement(product), "i": strconv.Itoa(max(1, item.Seq)), "问题": item.Prompt}
+	values := map[string]string{"款名": product.Name, "商品": productFacts(product), "尺寸": core.JS(sizes), "颜色": stringValue(product.Info["color"]), "品类": product.Category.Name, "文字": strings.Join(textLines, " / "), "模特": modelDescription, "佩戴位置": placement(product), "i": strconv.Itoa(max(1, item.Seq)), "问题": item.Prompt}
 	values["英文名"] = stringValue(product.Content["nameEn"])
 	values["一句话"] = stringValue(product.Content["oneLiner"])
 	if currentSize != nil {
@@ -507,6 +497,10 @@ func (a *Module) generationPrompt(item *Item, product core.Product, params Param
 		common = strings.ReplaceAll(common, "No text, no logo, no watermark, no border, no collage unless this prompt explicitly asks for text.", "Text is allowed only as explicitly specified below.")
 	}
 	sections := []string{common, mode, t.Prompt}
+	scale, _ := beadScale(product)
+	if section := promptSection(mainDoc, "比例"); section != "" && scale != "" && (item.ProductMode == "model" || item.ProductMode == "redraw") {
+		sections = append(sections, strings.ReplaceAll(section, "{比例}", scale))
+	}
 	if t.Kind == "detail" {
 		sections = append(sections, promptSection(wrapper, "图上的字"))
 	} else if len(textLines) > 0 {

@@ -295,7 +295,8 @@ func (a *Module) reviewOnce(ctx context.Context, item Item, product core.Product
 	} else {
 		images = append(images, output)
 	}
-	input := core.Object{"slot": item.Slot, "product_mode": item.ProductMode, "wear_type": item.WearType, "size_compare": item.SizeCompare, "expected": core.Object{"sizes": expectedSizes(item, params), "texts": item.Texts, "placement": placement(product)}, "product": core.Object{"name": product.Name, "info": product.Info}, "category": product.Category.Brief()}
+	_, scale := beadScale(product)
+	input := core.Object{"slot": item.Slot, "product_mode": item.ProductMode, "wear_type": item.WearType, "size_compare": item.SizeCompare, "expected": core.Object{"sizes": expectedSizes(item, params), "scale": scale, "texts": item.Texts, "placement": placement(product)}, "product": core.Object{"name": product.Name, "info": productFacts(product)}, "category": product.Category.Brief()}
 	parts := []core.Object{{"type": "text", "text": core.JS(input)}}
 	for _, im := range images {
 		part, err := imagePart(im)
