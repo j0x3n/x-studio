@@ -84,7 +84,7 @@ function ShopCreativePanel() {
   useEffect(() => {
     if (!shopId) return
     setCfg(null)
-    creativeApi.shop(shopId).then(r => setCfg({ models: r.models || {}, template_set: r.template_set || {} })).catch(e => toast(errText(e), 'error'))
+    creativeApi.shop(shopId).then(setCfg).catch(e => toast(errText(e), 'error'))
     if (mockOn()) setModels([])
     else api<Page<ShopModel>>('/api/models' + qs({ shop_id: shopId, page_size: 100 })).then(r => setModels(r.items || [])).catch(() => setModels([]))
   }, [shopId, toast])

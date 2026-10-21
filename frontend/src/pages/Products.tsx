@@ -9,6 +9,7 @@ import { Topbar, Pill, Loading, Empty, Tabs, Drawer, Field } from '../components
 import { fmtAgo, productStatus, platformName, initials } from '../lib/format'
 import { useCategories, missingAttrs } from '../lib/categories'
 import { AttrFields } from '../components/AttrFields'
+import { LibrarySwitch } from '../components/LibrarySwitch'
 
 type Tab = 'all' | 'sampling' | 'pending' | 'listed' | 'archived'
 type Quick = '' | 'nophoto' | 'processing' | 'failed'
@@ -62,7 +63,7 @@ export function Products() {
   const { items: cats } = useCategories(true)
   const shops = me?.shops || []
   // 只有一个店时显示平台名就够了
-  const shopName = (id: number) => { const s = shops.find(x => x.id === id); return s ? (shops.length > 1 ? s.name : platformName[s.platform] || s.name) : `店铺 ${id}` }
+  const shopName = (id: number) => { const s = shops.find(x => x.id === id); return s ? s.name : `店铺 ${id}` }
 
   const load = useCallback(() => {
     api<Page<Product>>('/api/products' + qs({ q, shop_id: shop, category: cat, mine: mine ? 1 : undefined, page_size: 200 }))
@@ -128,6 +129,7 @@ export function Products() {
   return (
     <>
       <Topbar title="商品库" sub={<>{counts.all} 款在用<span className="sep" />{counts.pending ?? 0} 款待上架{home?.counts.review_pending ? <><span className="sep" />{home.counts.review_pending} 款等你审核</> : null}</>}>
+        <LibrarySwitch />
         {can('product.edit') && <button className="btn btn-primary" onClick={() => setCreating(true)}><Plus />新建商品</button>}
       </Topbar>
       <div className="scroll"><main className="content">

@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package, Pencil, Shirt } from 'lucide-react'
+import { Upload, Sparkles, Download, Plus, Trash2, ExternalLink, Package, Pencil, Shirt, Film, Play } from 'lucide-react'
 import { api, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
@@ -8,8 +8,10 @@ import type { Asset, Job, Listing, Product, Task } from '../lib/types'
 import { TaskMiniList, TaskDrawer, NewTaskDrawer } from '../components/TaskViews'
 import { ProductStock, RelatedArticles } from '../components/ProductExtras'
 import { Topbar, Pill, Loading, Empty, Tabs } from '../components/ui'
-import { fmtAgo, money, productStatus, pipelineStatus, listingStatus, sourceName, platformName } from '../lib/format'
-import { useCategories, missingAttrs, emptyValue, attrText } from '../lib/categories'
+import { fmtAgo, money, productStatus, pipelineStatus, listingStatus, sourceName, fmtDuration } from '../lib/format'
+import { shopLabel } from '../lib/shops'
+import { ProductSteps } from '../components/ProductSteps'
+import { useCategories, useCodeName, missingAttrs, emptyValue, attrText } from '../lib/categories'
 import { AttrFields } from '../components/AttrFields'
 import { useLightbox } from '../components/Lightbox'
 import { CreativeTab } from '../components/CreativeTab'
@@ -60,7 +62,7 @@ export function ProductDetail() {
 
   return (
     <>
-      <Topbar crumbs={[<a onClick={() => nav('/products')} className="link">商品</a>]} title={<span className="inline">{p.name}<Pill kind={ps?.pill || 'pill-neutral'}>{ps?.label}</Pill></span>} sub={<><span className="mono">#{p.id}</span>{p.category && <><span className="sep" />{p.category.name}</>}<span className="sep" />{photos.length} 张素材<span className="sep" />{p.listings.length} 个店铺版本<span className="sep" />更新于 {fmtAgo(p.updated_at)}</>}>
+      <Topbar crumbs={[<a onClick={() => nav('/products')} className="link">商品库</a>]} title={<span className="inline">{p.name}<Pill kind={ps?.pill || 'pill-neutral'}>{ps?.label}</Pill></span>} sub={<><span className="mono">#{p.id}</span>{p.category && <><span className="sep" />{p.category.name}</>}<span className="sep" />{photos.length} 个照片和视频<span className="sep" />{p.listings.length} 个店铺版本<span className="sep" />更新于 {fmtAgo(p.updated_at)}</>}>
         {can('product.edit') && (
           <select className="input" style={{ width: 120 }} value={p.status} onChange={e => setStatus(e.target.value)}>
             {Object.entries(productStatus).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -70,10 +72,11 @@ export function ProductDetail() {
           <button className="btn btn-secondary" onClick={remove}><Trash2 />删除</button>}
       </Topbar>
       <div className="scroll"><main className="content">
+        <ProductSteps product={p} photos={photos} onTab={setTab} />
         <Tabs value={tab} onChange={setTab} items={[
-          { key: 'assets', label: '素材', count: photos.length },
-          { key: 'listings', label: '店铺版本', count: p.listings.length },
+          { key: 'assets', label: '照片和视频', count: photos.length },
           ...(can('creative.run') && me?.role.scope !== 'shares' ? [{ key: 'creative' as const, label: 'AI 出图' }] : []),
+          { key: 'listings', label: '店铺版本', count: p.listings.length },
           { key: 'info', label: '基础信息' },
           ...(can('inventory.view') ? [{ key: 'stock' as const, label: '库存' }] : []),
           ...(canTasks ? [{ key: 'tasks' as const, label: '任务', count: tasks?.filter(t => t.status !== 'done' && t.status !== 'canceled').length }] : [])
@@ -85,12 +88,12 @@ export function ProductDetail() {
             {p.listings.map(l => <ListingCard key={l.id} listing={l} shopName={myShops.find(s => s.id === l.shop_id)?.name || `店铺 ${l.shop_id}`} onChange={load} />)}
             {can('product.edit') && missingShops.length > 0 && (
               <div className="toolbar">{missingShops.map(s => (
-                <button key={s.id} className="btn btn-secondary" onClick={() => addListing(s.id)}><Plus />加到{s.name}<span className="t4">{platformName[s.platform]}</span></button>
+                <button key={s.id} className="btn btn-secondary" onClick={() => addListing(s.id)}><Plus />加到{s.name}<span className="t4">{shopLabel(s)}</span></button>
               ))}</div>
             )}
           </div>
         )}
-        {tab === 'creative' && <CreativeTab product={p} />}
+        {tab === 'creative' && <CreativeTab product={p} videos={photos.filter(a => a.media === 'video')} />}
         {tab === 'info' && <InfoTab product={p} onChange={load} />}
         {tab === 'stock' && <ProductStock product={p} />}
         {tab === 'tasks' && <TasksTab product={p} tasks={tasks} onChange={loadTasks} />}
@@ -107,36 +110,50 @@ function AssetsTab({ product, assets, onChange }: { product: Product; assets: As
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState(false)
+  const codeName = useCodeName()
   const upload = async (files: FileList | File[]) => {
-    const list = Array.from(files).filter(f => /image\/(jpeg|png|webp)/.test(f.type))
-    if (!list.length) return toast('只认 jpg、png、webp 图片', 'error')
+    const list = Array.from(files).filter(f => /image\/(jpeg|png|webp)|video\/(mp4|quicktime|webm)/.test(f.type))
+    if (!list.length) return toast('只认 jpg、png、webp 图片和 mp4、mov、webm 视频', 'error')
+    if (list.some(f => f.type.startsWith('video/') && f.size > 500 * 1024 * 1024)) return toast('视频不能超过 500 MB', 'error')
     const form = new FormData()
     list.forEach(f => form.append('files', f))
     setBusy(true)
-    try { await api(`/api/products/${product.id}/assets`, { form }); toast(`已上传 ${list.length} 张`, 'ok'); onChange() }
+    try { await api(`/api/products/${product.id}/assets`, { form }); toast(`已上传 ${list.length} 个`, 'ok'); onChange() }
     catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }
+  const box = (a: Asset) => a.media === 'video'
+    ? { src: a.url, video: true, poster: a.poster_url, title: a.title || a.orig_name, meta: fmtDuration(a.duration_ms), download: '' }
+    : { src: a.url, title: a.title || a.orig_name, meta: `${a.width}×${a.height}`, download: '' }
   return (
     <section className="panel">
-      <div className="panel-head"><div className="titles"><div className="panel-title">素材</div><div className="panel-sub">上传原图后，在店铺版本里点「一键出图」会自动分拣编号、修图、写文案、出图</div></div></div>
+      <div className="panel-head"><div className="titles"><div className="panel-title">照片和视频</div><div className="panel-sub">传实拍原图和视频；照片会自动认出是哪一类（平铺、微距、上身……），出图时按类别取用</div></div></div>
       <div className="panel-pad stack">
         {can('asset.upload') && (
           <div className={'drop' + (over ? ' over' : '')} onClick={() => input.current?.click()}
             onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
             onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>
-            <Upload /><b>{busy ? '上传中…' : '点击或拖入原图'}</b>jpg / png / webp，单张不超过 25 MB，可以一次选多张
-            <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={e => e.target.files && upload(e.target.files)} />
+            <Upload /><b>{busy ? '上传中…' : '点击或拖入照片、视频'}</b>照片 jpg / png / webp 不超过 25 MB；视频 mp4 / mov / webm 不超过 500 MB；可以一次选多个
+            <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" multiple hidden onChange={e => e.target.files && upload(e.target.files)} />
           </div>
         )}
-        {assets.length === 0 ? <Empty title="还没有素材" /> : (
+        {assets.length === 0 ? <Empty title="还没有照片和视频" /> : (
           <div className="thumbs">{assets.map((a, ai) => {
             const src = sourceName[a.source_override || a.source] || sourceName.original
             return (
               <div key={a.id} className="thumb product-tryon-thumb">
-                <button type="button" className="zoomable" title={a.ai_note || a.orig_name} onClick={() => lightbox(assets.map(x => ({ src: x.url, title: x.title || x.orig_name, meta: `${x.width}×${x.height}`, download: '' })), ai)}><img src={a.url + '?w=240'} alt={a.orig_name} loading="lazy" /></button>
+                <button type="button" className="zoomable" title={a.ai_note || a.orig_name} onClick={() => lightbox(assets.map(box), ai)}>
+                  {a.media === 'video'
+                    ? (a.poster_url ? <img src={a.poster_url} alt={a.orig_name} loading="lazy" /> : <span className="lib-video-blank"><Film /></span>)
+                    : <img src={a.url + '?w=240'} alt={a.orig_name} loading="lazy" />}
+                  {a.media === 'video' && <span className="lib-video-badge mono"><Play />{fmtDuration(a.duration_ms) || '视频'}</span>}
+                </button>
                 {src.label !== '原图' && <span className="src"><Pill kind={src.pill} dot={false}>{src.label}</Pill></span>}
-                <div className="meta"><span className={'code' + (a.code ? '' : ' none')}>{a.code || '未编号'}</span><span className="grow" /><span className="t4 mono">{a.width}×{a.height}</span></div>
-                {a.kind === 'photo' && can('model.view') && can('asset.process') && can('asset.upload') && me?.role.scope !== 'shares' && <button className="btn btn-ghost btn-sm" onClick={() => nav('/tryon?assets=' + a.id)}><Shirt />试穿试戴</button>}
+                <div className="meta">
+                  {a.media === 'video' ? <span className="code">视频</span>
+                    : <span className={'code' + (a.code ? '' : ' none')} title={a.code ? `拍摄编号 ${a.code}` : '还没认出是哪一类照片，一键出图时会自动分拣'}>{a.code ? codeName(a.code, product.category_id) : '未分类'}</span>}
+                  <span className="grow" />{a.width > 0 && <span className="t4 mono">{a.width}×{a.height}</span>}
+                </div>
+                {a.kind === 'photo' && a.media !== 'video' && can('model.view') && can('asset.process') && can('asset.upload') && me?.role.scope !== 'shares' && <button className="btn btn-ghost btn-sm" onClick={() => nav('/tryon?assets=' + a.id)}><Shirt />试穿试戴</button>}
               </div>
             )
           })}</div>

@@ -31,8 +31,8 @@ function write(store: () => Storage, key: string, v: unknown) {
 
 // 地址 → 页面名，给助手当上下文
 const PAGES: [RegExp, string][] = [
-  [/^\/$/, '今天（首页）'], [/^\/products\/\d+/, '商品详情'], [/^\/products/, '商品库'], [/^\/assets/, '素材库'],
-  [/^\/process/, '图片处理'], [/^\/copy/, '文案中心'], [/^\/templates/, '模板中心'], [/^\/review/, '出图审核'],
+  [/^\/$/, '今天（首页）'], [/^\/products\/\d+/, '商品详情'], [/^\/products/, '商品库'], [/^\/assets/, '商品库（全部图片和视频）'], [/^\/scenes/, '场景库'], [/^\/models/, '模特库'],
+  [/^\/process/, '图片处理'], [/^\/copy/, '文案中心'], [/^\/templates/, '模板库'], [/^\/review/, '出图审核'],
   [/^\/tasks/, '任务'], [/^\/kb/, '知识库'], [/^\/inventory/, '库存'], [/^\/purchase-orders/, '采购单'],
   [/^\/orders/, '订单'], [/^\/suppliers/, '供应商'], [/^\/assembly/, '组装加工'], [/^\/finance/, '财务'],
   [/^\/replenishment/, '补货建议'], [/^\/purchase-recognize/, '单据识别'], [/^\/models/, '模特库'], [/^\/tryon/, '试穿试戴'],

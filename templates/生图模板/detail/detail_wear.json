@@ -5,7 +5,7 @@
   "slot": "d4",
   "categories": [],
   "purpose": "正面、侧面、搭配，模特图",
-  "prompt": "On-body screen, full-bleed photograph. The model wears the product ({商品}). {模特} Charcoal or black knit, dark blue-grey backdrop, cool side light, low-key, editorial magazine feel. Image {i} of the series: 1 = front view, 2 = side view at 45 degrees, 3 = styled with a simple dark outfit. Never show the full face.",
+  "prompt": "On-body screen, full-bleed photograph. The model wears the product ({商品}). {模特} Styling and setting: {穿搭} Editorial magazine feel. Image {i} of the series: 1 = front view, 2 = side view at 45 degrees, 3 = styled with a simple outfit that matches the setting. Never show the full face.",
   "style_refs": [],
   "texts": [],
   "photo_codes": [
@@ -31,6 +31,6 @@
     "body_part": "auto",
     "framing": "half_body"
   },
-  "version": 1,
+  "version": 2,
   "enabled": true
 }

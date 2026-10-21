@@ -1,11 +1,11 @@
 {
   "key": "main_hero_stone",
-  "name": "首图·中灰石材",
+  "name": "首图·静物",
   "kind": "main",
   "slot": "main1",
   "categories": [],
   "purpose": "首图 A/B，商品居中偏下，画面不加字；角上的小水印导出时由程序加",
-  "prompt": "Hero image. The exact product ({商品}) lies on a matte mid-grey stone surface with fine natural texture, seen from a slightly elevated three-quarter angle. Cool white light from the left side, crisp but soft directional shadow falling to the right, the far edge of the stone falling off into darkness. Plenty of calm empty space above the product. Shallow depth of field on the far background only; the product is fully sharp.",
+  "prompt": "Hero image. The exact product ({商品}) is placed in this scene: {场景} Seen from a slightly elevated three-quarter angle, with a soft directional shadow. Plenty of calm empty space above the product. Shallow depth of field on the far background only; the product is fully sharp.",
   "style_refs": [],
   "texts": [],
   "photo_codes": [
@@ -37,6 +37,6 @@
   ],
   "count": 1,
   "wear": null,
-  "version": 1,
+  "version": 3,
   "enabled": true
 }

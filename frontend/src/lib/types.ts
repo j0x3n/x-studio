@@ -1,6 +1,6 @@
 // 后端返回的数据结构（只写前端用到的字段）。字段名和后端 JSON 一致。
 export type Role = { id: number; key: string; name: string; builtin: boolean; scope: 'all' | 'shops' | 'shares'; perms: string[] }
-export type Shop = { id: number; name: string; platform: 'taobao' | 'shopee_tw' | 'x' | 'other'; language: string; archived?: boolean; settings?: Record<string, unknown> }
+export type Shop = { id: number; name: string; platform: string; site?: string; currency?: string; language: string; archived?: boolean; settings?: Record<string, unknown> }
 export type Me = { user: { id: number; username: string; display_name: string }; role: Role; perms: string[]; shops: Shop[] }
 
 export type Listing = {
@@ -24,6 +24,8 @@ export type Asset = {
   title?: string; note?: string; archived?: boolean; updated_at?: string
   product?: { id: number; name: string }; effective_source?: string; thumb_url?: string; version_count?: number
   op?: AssetOp; folder_id?: number | null
+  // 视频和旧版本（接口约定-素材场景店铺.md 第 1 节）
+  media?: 'image' | 'video'; duration_ms?: number; poster_url?: string; stale?: boolean
 }
 // 素材文件夹：团队共用的整理层级，一张素材最多在一个文件夹里；删文件夹不删图
 export type AssetFolder = { id: number; parent_id: number | null; name: string; count: number; created_by: number; created_at: string }

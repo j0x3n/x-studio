@@ -10,6 +10,7 @@ import { Admin } from './pages/Admin'
 import { SettingsPage } from './pages/Settings'
 import { Assets } from './pages/Assets'
 import { Workbench } from './pages/Workbench'
+import { Scenes } from './pages/Scenes'
 import { ModelLibrary } from './pages/ModelLibrary'
 import { TryOn } from './pages/TryOn'
 import { CopyCenter } from './pages/CopyCenter'
@@ -61,6 +62,7 @@ export function App() {
         <Route path="assets" element={<Assets />} />
         <Route path="process" element={<Workbench />} />
         <Route path="models" element={<ModelLibrary />} />
+        <Route path="scenes" element={<Scenes />} />
         <Route path="tryon" element={<TryOn />} />
         <Route path="copy" element={<CopyCenter />} />
         <Route path="templates" element={<TemplateCenter />} />

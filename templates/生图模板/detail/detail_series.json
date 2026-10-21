@@ -5,7 +5,7 @@
   "slot": "d6",
   "categories": [],
   "purpose": "搭配推荐；同系列商品的关联做好前先不启用",
-  "prompt": "Series screen. The exact product lies on a matte mid-grey stone surface with fine natural texture together with empty space for its matching pieces, cool side light, calm arrangement. A short line of text in a Song serif typeface at the top.",
+  "prompt": "Series screen. The exact product with empty space for its matching pieces, calm arrangement, in this scene: {场景} A short line of text in a Song serif typeface at the top.",
   "style_refs": [],
   "texts": [
     {
@@ -36,6 +36,6 @@
   ],
   "count": 1,
   "wear": null,
-  "version": 1,
+  "version": 3,
   "enabled": false
 }

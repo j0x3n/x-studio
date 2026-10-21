@@ -14,7 +14,7 @@ export function Admin() {
   const items = ([
     { key: 'users', label: '账号', perm: 'admin.users' },
     { key: 'roles', label: '角色和权限', perm: 'admin.users' },
-    { key: 'shops', label: '店铺', perm: 'admin.shops' },
+    { key: 'shops', label: '店铺和渠道', perm: 'admin.shops' },
     { key: 'usage', label: 'AI 用量', perm: 'admin.users' },
     { key: 'audit', label: '操作日志', perm: 'admin.audit' }
   ] as { key: Key; label: string; perm: string }[]).filter(i => can(i.perm))

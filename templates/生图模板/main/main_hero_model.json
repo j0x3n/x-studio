@@ -5,7 +5,7 @@
   "slot": "main1",
   "categories": [],
   "purpose": "首图的模特版，可在店铺出图设置里替换默认首图",
-  "prompt": "Hero image. Close-up of the model wearing the product ({商品}). {模特} Dark blue-grey backdrop, charcoal knit sweater, cool white side light from the left, low-key, the product is the brightest and sharpest point of the image. Crop tightly; never show the full face.",
+  "prompt": "Hero image. Close-up of the model wearing the product ({商品}). {模特} Styling and setting: {穿搭} The product is the brightest and sharpest point of the image. Crop tightly; never show the full face.",
   "style_refs": [],
   "texts": [],
   "photo_codes": [
@@ -36,6 +36,6 @@
     "body_part": "auto",
     "framing": "closeup"
   },
-  "version": 1,
+  "version": 2,
   "enabled": true
 }

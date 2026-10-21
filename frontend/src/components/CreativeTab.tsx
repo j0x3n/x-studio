@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Sparkles, Download, Eye, Play, Plus, Trash2, RefreshCw, Star, History } from 'lucide-react'
+import { Sparkles, Download, Eye, Play, Plus, Trash2, RefreshCw, Star, History, Smartphone } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import { ApiError, api } from '../lib/api'
-import type { Product, RenderState } from '../lib/types'
+import type { Asset, Product, RenderState } from '../lib/types'
+import { ListingPreview } from './ListingPreview'
 import { Pill, Loading, Empty, Drawer, Field } from './ui'
 import { ItemCard, CompareView, ReviewDetail, TextRows, JudgeBar } from './CreativeShared'
 import '../styles/creative.css'
 import { DETAIL_SLOTS, HERO_STYLE, MAIN_SLOTS, SET_STATUS, creativeApi, itemOk, mockOn, preflightMissing, slotName, type CreativeItem, type CreativeSet, type PreflightMissing, type SetParams } from '../lib/creative'
 
 // 商品详情「AI 出图」：每个店铺版本一套或多套 AI 主图和详情页，逐张复核后导出
-export function CreativeTab({ product }: { product: Product }) {
+export function CreativeTab({ product, videos = [] }: { product: Product; videos?: Asset[] }) {
   const { me } = useAuth()
   const listings = product.listings
   const [lid, setLid] = useState(listings[0]?.id || 0)
@@ -20,7 +21,7 @@ export function CreativeTab({ product }: { product: Product }) {
     <div className="stack">
       {listings.length > 1 && <div className="segmented">{listings.map(l => <button key={l.id} className={l.id === lid ? 'active' : ''} onClick={() => setLid(l.id)}>{shopName(l.shop_id)}</button>)}</div>}
       <RenderMode key={'m' + lid} listingId={lid} />
-      <ListingCreative key={lid} listingId={lid} product={product} />
+      <ListingCreative key={lid} listingId={lid} product={product} videos={videos} />
     </div>
   )
 }
@@ -46,13 +47,14 @@ function RenderMode({ listingId }: { listingId: number }) {
         <button className={mode === 'ai' ? 'active' : ''} disabled={!can('render.run')} onClick={() => change('ai')}>AI 出图</button>
         <button className={mode === 'html' ? 'active' : ''} disabled={!can('render.run')} onClick={() => change('html')}>HTML 模板（旧）</button>
       </div>
-      <span className="t4">{mode === 'ai' ? '跑一键出图会自动新建一套，缺素材的位置跳过' : '跑一键出图按模板中心的 HTML 模板截图，不出 AI 图'}</span>
+      <span className="t4">{mode === 'ai' ? '跑一键出图会自动新建一套，缺素材的位置跳过' : '跑一键出图按模板库的 HTML 模板截图，不出 AI 图'}</span>
     </div>
   )
 }
 
-function ListingCreative({ listingId, product }: { listingId: number; product: Product }) {
-  const { can } = useAuth()
+function ListingCreative({ listingId, product, videos }: { listingId: number; product: Product; videos: Asset[] }) {
+  const { can, me } = useAuth()
+  const [preview, setPreview] = useState(false)
   const toast = useToast()
   const [sets, setSets] = useState<CreativeSet[] | null>(null)
   const [setId, setSetId] = useState(0)
@@ -112,6 +114,7 @@ function ListingCreative({ listingId, product }: { listingId: number; product: P
   }
   return (
     <>
+      {preview && <ListingPreview set={set} product={product} shop={me?.shops.find(sh => sh.id === product.listings.find(l => l.id === listingId)?.shop_id)} videos={videos} onClose={() => setPreview(false)} />}
       <section className="panel">
         <div className="panel-head">
           <div className="titles">
@@ -122,6 +125,7 @@ function ListingCreative({ listingId, product }: { listingId: number; product: P
             <div className="panel-sub">可用 {ok} / {cur.length} 张 · 待人工 {pending} 张{failed ? ` · 没出来 ${failed} 张` : ''} · 已生成 {set.images_used} / {set.images_allowance} 次{set.params.hero_style ? ` · 首屏${HERO_STYLE[set.params.hero_style]}` : ''}</div>
           </div>
           {run && <button className="btn btn-ghost btn-sm" onClick={() => setCreating(true)}><Plus />再出一套</button>}
+          <button className="btn btn-secondary btn-sm" onClick={() => setPreview(true)} title="按店铺平台排出手机商品页，看整体效果"><Smartphone />预览商品页</button>
           {review && !set.glanced_at && <button className="btn btn-secondary btn-sm" onClick={() => act(() => creativeApi.glance(set.id), '已记录整套过目')}><Eye />整套过目</button>}
           {run && set.status === 'paused_limit' && <button className="btn btn-secondary btn-sm" onClick={() => { if (confirm(`这一套已经生成 ${set.images_used} 次，继续会再给一轮额度。确定继续？`)) act(() => creativeApi.cont(set.id), '已继续生成') }}><Play />确认继续</button>}
           {run && can('export.run') && <button className="btn btn-primary btn-sm" disabled={!!busy} onClick={doExport}><Download />{set.exported_at ? '重新导出' : '导出'}</button>}

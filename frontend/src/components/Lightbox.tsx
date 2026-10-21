@@ -3,7 +3,7 @@ import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut } from 'lucide-
 
 // 站内看大图：所有「点开看原图」都走这里，不再新开浏览器窗口。
 // ← → 切换，Esc 关闭，点图片在「适应窗口 / 原始大小」之间切换。
-export type LightboxItem = { src: string; title?: ReactNode; meta?: ReactNode; download?: string }
+export type LightboxItem = { src: string; title?: ReactNode; meta?: ReactNode; download?: string; video?: boolean; poster?: string }
 type Open = (items: LightboxItem[] | LightboxItem, index?: number) => void
 
 const Ctx = createContext<Open>(() => {})
@@ -48,7 +48,9 @@ function Lightbox({ items, index, onIndex, onClose }: { items: LightboxItem[]; i
       </div>
       <div className={'lightbox-stage' + (actual ? ' actual' : '')} onMouseDown={e => e.target === e.currentTarget && onClose()}>
         {!loaded && <span className="lightbox-loading">加载中…</span>}
-        <img key={cur.src} src={cur.src} alt="" onLoad={() => setLoaded(true)} onClick={() => setActual(v => !v)} style={loaded ? undefined : { opacity: 0 }} />
+        {cur.video
+          ? <video key={cur.src} src={cur.src} poster={cur.poster || undefined} controls autoPlay playsInline onLoadedData={() => setLoaded(true)} onError={() => setLoaded(true)} style={loaded ? undefined : { opacity: 0 }} />
+          : <img key={cur.src} src={cur.src} alt="" onLoad={() => setLoaded(true)} onClick={() => setActual(v => !v)} style={loaded ? undefined : { opacity: 0 }} />}
       </div>
       {many && <>
         <button className="lightbox-nav prev" onClick={() => go(-1)} aria-label="上一张"><ChevronLeft /></button>

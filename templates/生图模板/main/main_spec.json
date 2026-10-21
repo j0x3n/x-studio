@@ -5,7 +5,7 @@
   "slot": "main5",
   "categories": [],
   "purpose": "SKU 并排或包装，商品像素锁定",
-  "prompt": "All variants of the product ({商品}, colors: {颜色}) lie side by side on a matte mid-grey stone surface with fine natural texture, evenly spaced, seen from above at a slight angle. Cool white side light, soft shadows, calm and orderly composition, generous margin around the group.",
+  "prompt": "All variants of the product ({商品}, colors: {颜色}) lie side by side, evenly spaced, seen from above at a slight angle, in this scene: {场景} Soft shadows, calm and orderly composition, generous margin around the group.",
   "style_refs": [],
   "texts": [],
   "photo_codes": [
@@ -32,6 +32,6 @@
   ],
   "count": 1,
   "wear": null,
-  "version": 1,
+  "version": 3,
   "enabled": true
 }

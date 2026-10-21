@@ -62,7 +62,8 @@ export type CreativeTemplate = {
   wear: { slot: string; body_part: string; framing: string } | null
   version: number; enabled: boolean; source: 'file' | 'custom'; updated_at?: string
 }
-export type ShopCreative = { models: { female_main?: number | null; male?: number | null; hand?: number | null }; template_set: Record<string, string> }
+// main_ratios / detail_width / about_text：店铺自己的导出比例、详情图宽度、「关于我们」写法（接口约定-素材场景店铺.md 2.6）
+export type ShopCreative = { models: { female_main?: number | null; male?: number | null; hand?: number | null }; template_set: Record<string, string>; main_ratios?: string[]; detail_width?: number; about_text?: string }
 export type CalibrationRow = { category: string; total: number; agree: number; open: boolean; tightened: boolean; tightened_reason?: string; auto_pass_rate?: number; override_rate?: number; return_links?: number }
 export type Suggestion = { id: number; listing_id: number; set_id: number | null; item_id: number | null; slot: string; reason_code: string; count: number; status: 'open' | 'done' | 'ignored'; product_name?: string; created_at: string }
 export type Stats = { categories: CalibrationRow[]; suggestions: Suggestion[] }
@@ -78,7 +79,13 @@ export const SLOT: Record<string, string> = {
 export const MAIN_SLOTS = ['main1', 'main2', 'main3', 'main4', 'main5', 'sku']
 export const DETAIL_SLOTS = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9']
 export const slotName = (s: string) => SLOT[s] || s
-export const MODE: Record<ProductMode, string> = { pixel_lock: '像素锁定', redraw: '参考图重画', model: '模特', none: '不放商品', photo: '实拍原图' }
+export const MODE: Record<ProductMode, string> = { pixel_lock: '实拍贴回（商品不重画）', redraw: '照实拍重画', model: '模特佩戴', none: '不放商品', photo: '直接用实拍' }
+// 模板库左侧分组：主图 / 详情页 / 包装、售后与品牌
+export const TEMPLATE_GROUPS: { key: string; label: string; slots: string[] }[] = [
+  { key: 'main', label: '主图', slots: ['main1', 'main2', 'main3', 'main4', 'main5', 'sku', 'white'] },
+  { key: 'detail', label: '详情页', slots: ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'] },
+  { key: 'after', label: '包装、售后与品牌', slots: ['d7', 'd8', 'd9'] }
+]
 export const WEAR: Record<string, string> = { necklace: '项链', earring: '耳饰', bracelet: '手链', ring: '戒指' }
 export const CHECK_NAME: Record<string, string> = { product: '商品还原', size: '尺寸比例', body: '人体自然', placement: '佩戴位置', style: '视觉规范' }
 export const ROUTE: Record<Route, { label: string; pill: string }> = {
@@ -157,7 +164,7 @@ export const creativeApi = {
   templates: (p: { kind?: string; category?: string }) => mockOn() ? wait({ items: MOCK_TEMPLATES, total: MOCK_TEMPLATES.length }) : api<Page<Raw>>('/api/creative/templates' + qs(p)).then(page(normTemplate)),
   saveTemplate: (key: string, body: Partial<CreativeTemplate>) => mockOn() ? wait({}) : api(`/api/creative/templates/${key}`, { method: 'PATCH', body }),
   trial: (key: string, listingId: number) => mockOn() ? wait({ item: MOCK_REVIEW[0] }) : api<{ item?: Raw; job_id?: number }>(`/api/creative/templates/${key}/trial`, { body: { listing_id: listingId } }).then(r => ({ ...r, item: r.item && normItem(r.item) })),
-  shop: (id: number) => mockOn() ? wait<ShopCreative>({ models: { female_main: null, male: null, hand: null }, template_set: {} }) : api<Raw>(`/api/creative/shops/${id}/settings`).then(r => ({ models: r.models || {}, template_set: r.template_set || {} }) as ShopCreative),
+  shop: (id: number) => mockOn() ? wait<ShopCreative>({ models: { female_main: null, male: null, hand: null }, template_set: {} }) : api<Raw>(`/api/creative/shops/${id}/settings`).then(r => ({ ...r, models: r.models || {}, template_set: r.template_set || {}, main_ratios: r.main_ratios || [], detail_width: r.detail_width || 0, about_text: r.about_text || '' }) as ShopCreative),
   saveShop: (id: number, body: ShopCreative) => mockOn() ? wait({}) : api(`/api/creative/shops/${id}/settings`, { method: 'PUT', body }),
   stats: () => mockOn() ? wait(MOCK_STATS) : api<Stats>('/api/creative/stats'),
   suggestion: (id: number, status: 'done' | 'ignored') => mockOn() ? wait({}) : api(`/api/creative/suggestions/${id}`, { body: { status } }),

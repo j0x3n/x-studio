@@ -74,7 +74,7 @@ export function ModelLibrary() {
       </div>}
       {data && data.total > 24 && <div className="pager"><button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}><ChevronLeft />上一页</button><span className="mono">{page} / {Math.ceil(data.total / 24)}</span><button className="btn btn-secondary btn-sm" disabled={page * 24 >= data.total} onClick={() => setPage(p => p + 1)}>下一页<ChevronRight /></button></div>}
     </main></div>
-    {selected && <ModelDetail key={selected.id} model={selected} onClose={close} onChange={refreshSelected} onEdit={() => setEditing(selected)} />}
+    {selected && <ModelDetail key={selected.id} model={selected} onClose={close} onChange={refreshSelected} onEdit={() => setEditing(selected)} onDeleted={() => { close(); load() }} />}
     {editing && <ModelForm model={editing === 'new' ? undefined : editing} shopId={shop} onClose={() => setEditing(null)} onSaved={m => { setEditing(null); setSelected(m); setSp({ shop_id: String(m.shop_id), model: String(m.id) }, { replace: true }); load() }} />}
   </>
 }
@@ -96,7 +96,7 @@ function ModelForm({ model, shopId, onClose, onSaved }: { model?: ShopModel; sho
   </Drawer>
 }
 
-function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; onClose: () => void; onChange: () => void; onEdit: () => void }) {
+function ModelDetail({ model, onClose, onChange, onEdit, onDeleted }: { model: ShopModel; onClose: () => void; onChange: () => void; onEdit: () => void; onDeleted: () => void }) {
   const { can } = useAuth()
   const lightbox = useLightbox()
   const refItems = (model.references || []).map(r => ({ src: r.url, title: `${model.name} · ${bodyLabel(r.body_part)}`, download: '' }))
@@ -155,6 +155,13 @@ function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; o
     try { await api(`/api/models/${model.id}`, { method: 'PATCH', body }); onChange() }
     catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }
+  const removeModel = async () => {
+    if (!confirm(`永久删除模特「${model.name}」？
+参考图会一起删掉，不能恢复；用这位模特已经生成的商品图会保留。`)) return
+    setBusy(true)
+    try { await api(`/api/models/${model.id}`, { method: 'DELETE' }); toast('模特已删除', 'ok'); onDeleted() }
+    catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+  }
   const removeReference = async (id: number) => {
     if (!confirm('删除这张固定参考图？已有生成结果会保留，之后不能再用这张参考图生成。')) return
     setBusy(true)
@@ -165,11 +172,12 @@ function ModelDetail({ model, onClose, onChange, onEdit }: { model: ShopModel; o
   }
   return <Drawer title={<span className="inline"><UserRound size={16} />{model.name}</span>} width={620} onClose={onClose} foot={<>
     {editable && <button className="btn btn-ghost" disabled={busy || task.running} onClick={() => patch({ archived: !model.archived })}>{model.archived ? <ArchiveRestore /> : <Archive />}{model.archived ? '恢复使用' : '归档模特'}</button>}
+    {editable && model.archived && <button className="btn btn-danger" disabled={busy} onClick={removeModel}><Trash2 />永久删除</button>}
     <span className="grow" />{!model.archived && model.references?.length > 0 && can('asset.process') && can('asset.upload') && <Link className="btn btn-secondary" to={`/tryon?model=${model.id}&shop_id=${model.shop_id}`}><Sparkles />用这位模特试穿</Link>}
   </>}>
     <div className="row between"><span className="help">固定参考长期保留 · {model.references?.length || 0} 张</span>{editable && <button className="btn btn-ghost btn-sm" onClick={onEdit}><Pencil />编辑档案</button>}</div>
     <p className="model-detail-description">{model.description || '尚未填写外观与风格描述'}</p>
-    {model.archived && <div className="model-note">已归档，恢复使用后可以继续添加参考图和生成穿戴照。</div>}
+    {model.archived && <div className="model-note">已归档，恢复使用后可以继续添加参考图和生成穿戴照；不再需要可以在下方永久删除。</div>}
     <div className="model-ref-grid">{(model.references || []).map((r, ri) => <div className="model-ref" key={r.id}>
       <button type="button" className="model-ref-photo" title="看大图" onClick={() => lightbox(refItems, ri)}><ModelImage src={r.thumb_url || r.url} alt={`${model.name} ${bodyLabel(r.body_part)}`} /></button>
       <div className="row between"><span>{bodyLabel(r.body_part)}</span>{r.id === model.cover_reference_id ? <span className="inline help"><Star size={12} />封面</span> : editable && !model.archived && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => patch({ cover_reference_id: r.id })}>设封面</button>}</div>

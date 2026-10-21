@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Search, Images, Archive, ArchiveRestore, Layers, X, Wand2, Tags, Download, FolderInput, Trash2, ArrowLeft, ImageOff, Shirt,
-  Upload, FolderPlus, Folder, FolderOpen, Maximize2, PanelRight, Pencil, Sparkles, SlidersHorizontal, ScanSearch, Package, RefreshCw, CheckSquare, FolderX, Loader2
+  Upload, FolderPlus, Folder, FolderOpen, Maximize2, PanelRight, Pencil, Sparkles, SlidersHorizontal, ScanSearch, Package, RefreshCw, CheckSquare, FolderX, Loader2, Film, Play
 } from 'lucide-react'
 import { api, downloadPost, qs, type Page } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -14,7 +14,9 @@ import { AssetInspector } from '../components/AssetInspector'
 import { useLightbox } from '../components/Lightbox'
 import { useContextMenu, type MenuEntry } from '../components/ContextMenu'
 import { FolderTree, FolderTile, NameDialog, UploadDialog, DRAG_ASSETS, childrenOf, flatFolders, folderPath } from '../components/AssetFolders'
-import { sourceName, assetTitle, quickOps } from '../lib/format'
+import { sourceName, assetTitle, quickOps, fmtDuration } from '../lib/format'
+import { useCategories, useCodeName } from '../lib/categories'
+import { LibrarySwitch } from '../components/LibrarySwitch'
 
 const PAGE = 60
 type Hit = Asset & { distance?: number }
@@ -31,11 +33,24 @@ export function Assets() {
   const lightbox = useLightbox()
   const menu = useContextMenu()
   const [sp, setSp] = useSearchParams()
+  const codeName = useCodeName()
+  const { items: cats } = useCategories()
+  // 照片类型下拉：所有品类的编号按组合并，同一编号只列一次
+  const codeGroups = useMemo(() => {
+    const groups = new Map<string, { group: string; prefix: string; codes: { code: string; name: string }[] }>()
+    for (const c of (cats || []).flatMap(x => x.codes || [])) {
+      const g = groups.get(c.group) || { group: c.group.replace(/^[A-Z]\s*/, ''), prefix: c.code.slice(0, 1), codes: [] }
+      if (!g.codes.some(x => x.code === c.code)) g.codes.push({ code: c.code, name: c.name })
+      groups.set(c.group, g)
+    }
+    return [...groups.values()]
+  }, [cats])
   const f = {
     q: sp.get('q') || '', source: sp.get('source') || '', kind: sp.get('kind') || '', tag: sp.get('tag') || '',
     code: sp.get('code') || '', shop_id: sp.get('shop_id') || '', product_id: sp.get('product_id') || '',
     from: sp.get('from') || '', to: sp.get('to') || '', sort: sp.get('sort') || 'new', folder: sp.get('folder') || '',
-    root: sp.get('root') === '1', archived: sp.get('archived') === '1', page: Number(sp.get('page') || 1)
+    root: sp.get('root') === '1', archived: sp.get('archived') === '1', page: Number(sp.get('page') || 1),
+    media: sp.get('media') || '', stale: sp.get('stale') || ''
   }
   const set = (patch: Record<string, string | number | boolean>) => {
     const next = new URLSearchParams(sp)
@@ -112,7 +127,7 @@ export function Assets() {
 
   const sources = f.source ? f.source.split(',') : []
   const tags = f.tag ? f.tag.split(',') : []
-  const filtered = !!(f.q || f.source || f.kind || f.tag || f.code || f.shop_id || f.product_id || f.from || f.to)
+  const filtered = !!(f.q || f.source || f.kind || f.tag || f.code || f.shop_id || f.product_id || f.from || f.to || f.media)
   const productName = f.product_id ? items.find(a => String(a.product_id) === f.product_id)?.product?.name : ''
   const folderId = Number(f.folder) || null
   const curFolder = folderId ? folders.find(x => x.id === folderId) : undefined
@@ -300,16 +315,17 @@ export function Assets() {
   const shops = me?.shops || []
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE)) : 1
   const subfolders = folderId && !similar ? childrenOf(folders, folderId) : []
-  const home = <a className="link" onClick={() => { setSimilar(null); set({ folder: '' }) }}>素材库</a>
+  const home = <a className="link" onClick={() => { setSimilar(null); set({ folder: '' }) }}>全部图片和视频</a>
   const crumbs = similar ? [home, `与「${assetTitle(similar)}」相似`]
     : f.folder === '0' ? [home, '未归类']
       : curFolder ? [home, ...path.slice(0, -1).map(x => <a className="link" onClick={() => openFolder(String(x.id))}>{x.name}</a>), curFolder.name]
-        : ['素材库']
+        : ['商品库']
   const blankTarget = (t: EventTarget) => { const el = t as HTMLElement; return el.classList.contains('scroll') || el.classList.contains('lib-grid') || el.classList.contains('lib-subfolders') || !!el.closest('.empty') }
 
   return (
     <>
       <Topbar crumbs={crumbs}>
+        <LibrarySwitch />
         {similar && <button className="btn btn-ghost btn-sm" onClick={() => setSimilar(null)}><ArrowLeft />返回素材库</button>}
         {!similar && canFolders && <button className="btn btn-secondary btn-sm" onClick={() => setNameDlg({ mode: 'folder', parent: folderId })}><FolderPlus />{curFolder ? '新建子文件夹' : '新建文件夹'}</button>}
         {!similar && canUpload && <button className="btn btn-primary btn-sm" onClick={() => setUpload([])}><Upload />上传</button>}
@@ -317,8 +333,9 @@ export function Assets() {
       <div className="lib">
         <aside className="sidebar lib-filters">
           <div className="nav-group">
-            <a className={'nav-item' + (!f.root && !f.archived && !f.folder ? ' active' : '')} onClick={() => set({ root: false, archived: false, folder: '' })}><Images />全部图片</a>
-            <a className={'nav-item' + (f.root ? ' active' : '')} onClick={() => set({ root: true, archived: false })} title="只看第一版，不看处理出来的新版本"><Layers />只看未处理</a>
+            <a className={'nav-item' + (!f.root && !f.archived && !f.folder && !f.media ? ' active' : '')} onClick={() => set({ root: false, archived: false, folder: '', media: '' })}><Images />全部</a>
+            <a className={'nav-item' + (f.media === 'video' && !f.archived ? ' active' : '')} onClick={() => set({ media: 'video', root: false, archived: false })}><Film />只看视频</a>
+            <a className={'nav-item' + (f.root ? ' active' : '')} onClick={() => set({ root: true, archived: false })} title="只看上传的原图，不看修图、AI 出图这些处理出来的版本"><Layers />只看原图</a>
             <a className={'nav-item' + (f.archived ? ' active' : '')} onClick={() => set({ archived: true, root: false })}><Archive />已归档</a>
           </div>
           {me?.role.scope !== 'shares' && <div className="nav-group">
@@ -339,8 +356,11 @@ export function Assets() {
           <div className="nav-group">
             <div className="nav-label">类型</div>
             <div className="segmented block">
-              {[['', '全部'], ['photo', '素材'], ['output', '成品']].map(([k, t]) => <button key={k} className={f.kind === k ? 'active' : ''} onClick={() => set({ kind: k })}>{t}</button>)}
+              {[['', '全部'], ['photo', '实拍和处理'], ['output', 'AI 成品']].map(([k, t]) => <button key={k} className={f.kind === k ? 'active' : ''} onClick={() => set({ kind: k })}>{t}</button>)}
             </div>
+            <label className="filter-opt" title="被重画、改字替换掉的旧图，和人工弃用的图，默认不显示">
+              <input type="checkbox" className="check" checked={f.stale === 'all'} onChange={e => set({ stale: e.target.checked ? 'all' : '' })} />显示旧版本和弃用的图
+            </label>
           </div>
           {shops.length > 1 && (
             <div className="nav-group">
@@ -352,8 +372,14 @@ export function Assets() {
             </div>
           )}
           <div className="nav-group">
-            <div className="nav-label">拍摄编号</div>
-            <input className="input mono" placeholder="B 或 B2" value={f.code} onChange={e => set({ code: e.target.value.trim().toUpperCase() })} />
+            <div className="nav-label">照片类型</div>
+            <select className="input" value={f.code} onChange={e => set({ code: e.target.value })}>
+              <option value="">全部</option>
+              {codeGroups.map(g => <optgroup key={g.group} label={g.group}>
+                <option value={g.prefix}>{g.group}（全部）</option>
+                {g.codes.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </optgroup>)}
+            </select>
           </div>
           <div className="nav-group">
             <div className="nav-label">标签</div>
@@ -396,7 +422,7 @@ export function Assets() {
             {!data ? <Loading /> : items.length === 0 ? (
               <Empty title={similar ? '没有找到相似的图' : filtered ? '没有符合条件的图' : f.archived ? '没有归档的图' : curFolder ? '这个文件夹里没有图' : f.folder === '0' ? '没有未归类的图' : '素材库还是空的'}
                 desc={similar ? '这里只找得出几乎一样的图，比如重复上传的、同一张图的其他版本；换个角度重拍的不算。' : filtered ? '换个筛选条件试试。' : curFolder ? '把图拖到左边的文件夹上，或者右键图片「移到文件夹」；也可以直接把电脑里的图拖进来上传。' : '点右上角「上传」，或把电脑里的图直接拖进来。'}>
-                {!similar && !filtered && canUpload && <button className="btn btn-secondary btn-sm" onClick={() => setUpload([])}><Upload />上传图片</button>}
+                {!similar && !filtered && canUpload && <button className="btn btn-secondary btn-sm" onClick={() => setUpload([])}><Upload />上传图片或视频</button>}
               </Empty>
             ) : (
               <div className="lib-grid">
@@ -409,20 +435,24 @@ export function Assets() {
                       onDoubleClick={() => view(a.id)} onContextMenu={e => itemMenu(e, a)}
                       draggable={canFolders && !similar} onDragStart={e => dragStart(e, a)} onDragEnd={() => setDragging([])}>
                       <div className="lib-img">
-                        <img src={a.thumb_url || a.url + '?w=240'} alt="" loading="lazy" draggable={false} />
+                        {a.media === 'video'
+                          ? (a.poster_url ? <img src={a.poster_url} alt="" loading="lazy" draggable={false} /> : <span className="lib-video-blank"><Film /></span>)
+                          : <img src={a.thumb_url || a.url + '?w=240'} alt="" loading="lazy" draggable={false} />}
+                        {a.media === 'video' && <span className="lib-video-badge mono"><Play />{fmtDuration(a.duration_ms) || '视频'}</span>}
                         <input type="checkbox" className="check lib-check" checked={sel} aria-label="选择"
                           onClick={e => { e.stopPropagation(); toggle(a.id, e.shiftKey) }} onChange={() => {}} />
                         {src.label !== '原图' && <span className="lib-src"><Pill kind={src.pill} dot={false}>{src.label}</Pill></span>}
-                        {canUpload && <button className="lib-hover btn btn-sm" onClick={e => { e.stopPropagation(); process([a.id]) }}><Wand2 />处理</button>}
+                        {canUpload && a.media !== 'video' && <button className="lib-hover btn btn-sm" onClick={e => { e.stopPropagation(); process([a.id]) }}><Wand2 />处理</button>}
+                        {a.stale && <span className="lib-stale">旧版本</span>}
                         {(a.version_count || 1) > 1 && <span className="lib-ver mono" title="同一张原图的版本数">{a.version_count} 版</span>}
                         {a.distance !== undefined && <span className="lib-ver mono" title="差异值，0 表示几乎一样">差 {a.distance}</span>}
                       </div>
                       <div className="lib-meta">
                         <div className="row" style={{ gap: 6 }}>
-                          {a.code ? <span className="code mono">{a.code}</span> : null}
+                          {a.code ? <span className="code" title={`拍摄编号 ${a.code}`}>{codeName(a.code)}</span> : null}
                           <span className="ellipsis cell-title" style={{ fontSize: 'var(--fs-12)' }}>{assetTitle(a)}</span>
                         </div>
-                        <div className="ellipsis t3 fs-12">{a.product?.name || `商品 #${a.product_id}`}<span className="t4 mono"> · {a.width}×{a.height}</span></div>
+                        <div className="ellipsis t3 fs-12">{a.product?.name || `商品 #${a.product_id}`}{a.width > 0 && <span className="t4 mono"> · {a.width}×{a.height}</span>}</div>
                       </div>
                     </div>
                   )

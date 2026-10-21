@@ -12,7 +12,7 @@ import { CreativeTemplates } from '../components/CreativeTemplates'
 
 type Templates = { detail: DetailTemplate[]; main: { key: string; name: string; file: string }[] }
 
-// 模板中心：生图模板（AI 出图用，默认）和旧的 HTML 详情页模板（停用但保留）
+// 模板库：生图模板（AI 出图用，默认）和旧的 HTML 详情页模板（停用但保留）
 export function TemplateCenter() {
   const { can } = useAuth()
   const ai = can('creative.run')
@@ -77,7 +77,7 @@ function HtmlTemplates({ switcher }: { switcher: ReactNode }) {
   const effective = state?.settings.effective_detail_template
   return (
     <>
-      <Topbar crumbs={['模板中心', ...(t ? [t.name] : [])]}>{switcher}</Topbar>
+      <Topbar crumbs={['模板库', ...(t ? [t.name] : [])]}>{switcher}</Topbar>
       <div className="lib">
         <aside className="sidebar lib-filters">
           {shops.length > 0 && (

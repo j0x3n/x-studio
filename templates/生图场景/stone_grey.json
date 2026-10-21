@@ -1,0 +1,12 @@
+{
+  "key": "stone_grey",
+  "name": "冷灰石材",
+  "default": true,
+  "categories": [],
+  "still": "A matte mid-grey stone surface with fine natural texture; the far edge of the stone falls off into darkness.",
+  "wear": "Charcoal fine-knit sweater, plain dark blue-grey backdrop, no other jewelry.",
+  "light": "Cool white side light from the left, crisp but soft directional shadow, low-key, calm, low saturation.",
+  "props": "",
+  "note": "店里一直在用的默认风格：冷灰、侧光、暗调。没指定场景的款都用它。",
+  "refs": []
+}

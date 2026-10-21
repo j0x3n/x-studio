@@ -42,3 +42,22 @@ export function attrText(a: AttrField | undefined, v: unknown) {
   const s = String(v)
   return a?.unit && a.type !== 'number' && !s.endsWith(a.unit) ? `${s} ${a.unit}` : s
 }
+
+// 拍摄编号的中文名：A1 → 平铺正面；C4_8mm → 同一位置多尺寸 · 8mm；A1_AI → 平铺正面（AI 补）。
+// 先找指定品类，找不到再找其他品类；都没有就原样返回编号。
+export function codeName(cats: Category[] | null | undefined, code: string, categoryId?: number | string) {
+  if (!code) return ''
+  const [base, ...rest] = code.split('_')
+  const suffix = rest.join('_')
+  const list = [...(cats || [])].sort((a, b) => (String(a.id) === String(categoryId) ? -1 : 0) - (String(b.id) === String(categoryId) ? -1 : 0))
+  const hit = list.flatMap(c => c.codes || []).find(c => c.code === base)
+  if (!hit) return code
+  if (!suffix) return hit.name
+  if (suffix === 'AI') return `${hit.name}（AI 补）`
+  return `${hit.name} · ${suffix}`
+}
+
+export function useCodeName() {
+  const { items } = useCategories(true)
+  return useCallback((code: string, categoryId?: number | string) => codeName(items, code, categoryId), [items])
+}
