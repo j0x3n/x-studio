@@ -88,9 +88,11 @@ jobs:
     steps:
       - name: Check deploy settings
         id: check
+        env:
+          HAS_KEY: ${{ secrets.DEPLOY_SSH_KEY != '' }}
         run: |
-          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ]; then
-            echo "::notice::没有配置 DEPLOY_HOST / DEPLOY_USER，跳过部署。镜像已推送：${{ needs.image.outputs.ref }}"
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ "$HAS_KEY" != "true" ]; then
+            echo "::notice::没有配置 DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY，跳过部署。镜像已推送：${{ needs.image.outputs.ref }}"
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
