@@ -66,5 +66,5 @@ INSERT INTO products_new(id,name,created_by,created_at,updated_at,status,info) S
 		}
 		_, e = tx.Exec("ALTER TABLE products_new RENAME TO products")
 		return e
-	}}, {Version: 2, Up: a.migrateCategories}}
+	}}, {Version: 2, Up: a.migrateCategories}, {Version: 3, Up: migrateViewsAndPlans}}
 }

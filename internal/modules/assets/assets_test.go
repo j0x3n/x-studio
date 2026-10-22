@@ -220,7 +220,7 @@ func TestMigrationV2AndBackgroundHashPreservesOriginal(t *testing.T) {
 			f.c.Mu.Unlock()
 		}
 	}()
-	if _, err := f.c.DB.Exec("DROP TRIGGER assets_updated_at_insert;DROP TABLE asset_presets;ALTER TABLE assets DROP COLUMN title;ALTER TABLE assets DROP COLUMN note;ALTER TABLE assets DROP COLUMN archived;ALTER TABLE assets DROP COLUMN updated_at;ALTER TABLE assets DROP COLUMN phash;"); err != nil {
+	if _, err := f.c.DB.Exec("DROP TRIGGER assets_updated_at_insert;DROP TRIGGER assets_view_insert;DROP TRIGGER assets_view_code;DROP TRIGGER assets_view_parent;DROP TRIGGER assets_view_inherit;DROP INDEX assets_view;DROP TABLE asset_presets;ALTER TABLE assets DROP COLUMN title;ALTER TABLE assets DROP COLUMN note;ALTER TABLE assets DROP COLUMN archived;ALTER TABLE assets DROP COLUMN updated_at;ALTER TABLE assets DROP COLUMN phash;"); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := f.c.DB.Begin()

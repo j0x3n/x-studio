@@ -107,8 +107,8 @@ func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	if !p.AIGenerated && p.Code != "" {
-		if _, e = tx.Exec("UPDATE assets SET code='' WHERE product_id=? AND code=? AND ai_generated=1", p.ProductID, p.Code); e != nil {
+	if in["code"] != nil && p.Code != "" {
+		if _, e = tx.Exec("UPDATE assets SET code='',updated_at=? WHERE product_id=? AND code=? AND id<>?", now(), p.ProductID, p.Code, p.ID); e != nil {
 			fail(w, 500, "更新 AI 照片编号失败")
 			return
 		}
@@ -133,6 +133,7 @@ func (a *Module) patchPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.Audit(r, "assets.update", "asset", p.ID, Object{"fields": rawFields(in)})
+	p, _ = a.asset(p.ID)
 	writeJSON(w, 200, Object{"asset": p})
 }
 func (a *Module) removePhotoOutputs(id int64, code string) {

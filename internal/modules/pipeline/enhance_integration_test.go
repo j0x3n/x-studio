@@ -369,7 +369,7 @@ func TestFullEnhancePipelineWithFakeAIAndChrome(t *testing.T) {
 		t.Fatal(len(photos))
 	}
 	for _, ph := range photos {
-		if !ph.AIGenerated && (!ph.AIEnhanced || ph.RetouchLog["geometry_already_applied"] != true) {
+		if !ph.AIGenerated && (!ph.AIEnhanced || ph.RetouchLog["geometry_already_applied"] == true) {
 			t.Fatal(ph)
 		}
 	}

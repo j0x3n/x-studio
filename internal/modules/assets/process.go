@@ -180,6 +180,8 @@ type stagedProcess struct {
 	phash         string
 	file, source  string
 	op            Object
+	metrics       Object
+	enhanceCheck  Object
 }
 
 func (a *Module) executeProcess(ctx context.Context, j core.Job) error {
@@ -325,6 +327,9 @@ func (a *Module) publishProcess(j core.Job, in ProcessRequest, v stagedProcess) 
 	if err != nil || fresh.ProductID != j.TargetID || !a.CanProduct(u, fresh.ProductID) || (u.Role.Scope == "shares" && !a.CanUpload(u, fresh.ProductID)) {
 		return 0, fmt.Errorf("原素材已移动、删除或不再可见")
 	}
+	if v.enhanceCheck != nil && (fresh.Archived || !a.CanUpload(u, fresh.ProductID) || fresh.ViewCode != v.input.ViewCode || fresh.File != v.input.File) {
+		return 0, fmt.Errorf("原图已丢弃、挪动槽位或权限已变化")
+	}
 	code := ""
 	if in.SetCurrent && v.input.Code != "" {
 		if sharedPipelineBusy(a.DB, fresh.ProductID) {
@@ -351,6 +356,14 @@ func (a *Module) publishProcess(j core.Job, in ProcessRequest, v stagedProcess) 
 		return 0, fmt.Errorf("保存新素材记录失败：%w", err)
 	}
 	id, _ := res.LastInsertId()
+	if v.enhanceCheck != nil {
+		if _, err = tx.Exec("UPDATE assets SET metrics=?,enhance_check=? WHERE id=?", js(v.metrics), js(v.enhanceCheck), id); err != nil {
+			return 0, err
+		}
+		if err = auditViewTx(a.Context(), tx, j, "assets.views.enhance.create", id, Object{"parent_id": fresh.ID, "job_id": j.ID}); err != nil {
+			return 0, err
+		}
+	}
 	file := fmt.Sprintf("原图/proc_%d.%s", id, in.Ops.Format)
 	if _, err = tx.Exec("UPDATE assets SET file=? WHERE id=?", file, id); err != nil {
 		return 0, fmt.Errorf("保存新素材路径失败")

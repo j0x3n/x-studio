@@ -79,6 +79,10 @@ type Photo struct {
 	PosterFile     string    `json:"-"`
 	PosterURL      string    `json:"poster_url"`
 	Stale          bool      `json:"stale"`
+	ViewCode       string    `json:"view_code"`
+	Suggest        Object    `json:"suggest"`
+	EnhanceCheck   Object    `json:"enhance_check"`
+	BlurLevel      string    `json:"blur_level"`
 }
 
 func (p Photo) EffectiveSource() string {
@@ -86,6 +90,10 @@ func (p Photo) EffectiveSource() string {
 		return p.SourceOverride
 	}
 	return p.Source
+}
+
+func (p Photo) HasVerifiedEnhancement() bool {
+	return p.EnhancedFile != "" && p.EnhanceCheck["verdict"] == "pass"
 }
 
 type Job struct {
@@ -118,12 +126,15 @@ func (a *Core) User(id int64) (User, error) {
 	return ScanUser(a.DB.QueryRow(UserQuery+" WHERE u.id=?", id))
 }
 
-const PhotoColumns = "id,product_id,file,orig_name,width,height,metrics,code,crop,rotate,white_bg,ai_note,retouch_log,manual,enhanced_file,ai_enhanced,ai_generated,source,parent_id,kind,tags,op,created_by,created_at,source_override,media,duration_ms,poster_file,stale"
+const PhotoColumns = "id,product_id,file,orig_name,width,height,metrics,code,crop,rotate,white_bg,ai_note,retouch_log,manual,enhanced_file,ai_enhanced,ai_generated,source,parent_id,kind,tags,op,created_by,created_at,source_override,media,duration_ms,poster_file,stale,view_code,suggest,enhance_check"
 
 func ScanPhoto(s Scanner) (p Photo, e error) {
-	var metrics, crop, log, tags, op string
-	e = s.Scan(&p.ID, &p.ProductID, &p.File, &p.OrigName, &p.Width, &p.Height, &metrics, &p.Code, &crop, &p.Rotate, &p.WhiteBG, &p.AINote, &log, &p.Manual, &p.EnhancedFile, &p.AIEnhanced, &p.AIGenerated, &p.Source, &p.ParentID, &p.Kind, &tags, &op, &p.CreatedBy, &p.CreatedAt, &p.SourceOverride, &p.Media, &p.DurationMS, &p.PosterFile, &p.Stale)
+	var metrics, crop, log, tags, op, suggest, enhanceCheck string
+	e = s.Scan(&p.ID, &p.ProductID, &p.File, &p.OrigName, &p.Width, &p.Height, &metrics, &p.Code, &crop, &p.Rotate, &p.WhiteBG, &p.AINote, &log, &p.Manual, &p.EnhancedFile, &p.AIEnhanced, &p.AIGenerated, &p.Source, &p.ParentID, &p.Kind, &tags, &op, &p.CreatedBy, &p.CreatedAt, &p.SourceOverride, &p.Media, &p.DurationMS, &p.PosterFile, &p.Stale, &p.ViewCode, &suggest, &enhanceCheck)
 	p.Metrics = JSONObj(metrics)
+	p.BlurLevel, _ = p.Metrics["blur_level"].(string)
+	p.Suggest = JSONObj(suggest)
+	p.EnhanceCheck = JSONObj(enhanceCheck)
 	p.RetouchLog = JSONObj(log)
 	p.Op = JSONObj(op)
 	_ = json.Unmarshal([]byte(crop), &p.Crop)
@@ -142,7 +153,7 @@ func (a *Core) AllPhotos(id int64) ([]Photo, error) { return a.readPhotos(id, tr
 func (a *Core) readPhotos(id int64, all bool) ([]Photo, error) {
 	query := "SELECT " + PhotoColumns + " FROM assets WHERE product_id=?"
 	if !all {
-		query += " AND kind='photo' AND media='image' AND NOT(source='ai_enhanced' AND parent_id IS NOT NULL AND code='')"
+		query += " AND kind='photo' AND media='image' AND archived=0 AND NOT(source='ai_enhanced' AND parent_id IS NOT NULL AND code='')"
 	}
 	rows, e := a.DB.Query(query+" ORDER BY CASE WHEN media='video' THEN 1 ELSE 0 END, id", id)
 	if e != nil {

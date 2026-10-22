@@ -210,7 +210,7 @@ func (a *Module) modelConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item, e := a.workbenchItem(u.ID, in.ItemID)
-	if e != nil || item.Kind != "result" || item.Op["type"] != "model_candidate" || opID(item.Op, "model_id") != m.ID || opID(item.Op, "shop_id") != m.ShopID || !a.modelWorkbenchVisible(u, item) {
+	if e != nil || item.Kind != "result" || item.Op["type"] != "model_candidate" || opID(item.Op, "model_id") != m.ID || !a.modelWorkbenchVisible(u, item) {
 		fail(w, 404, "模特候选不存在")
 		return
 	}

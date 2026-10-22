@@ -220,7 +220,7 @@ func (a *Module) shopPut(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		var count int
-		err := a.DB.QueryRowContext(r.Context(), "SELECT count(*) FROM shop_models WHERE id=? AND shop_id=? AND archived=0", mid, id).Scan(&count)
+		err := a.DB.QueryRowContext(r.Context(), "SELECT count(*) FROM shop_models WHERE id=? AND (shop_id=? OR shop_id IS NULL) AND archived=0", mid, id).Scan(&count)
 		if err != nil {
 			fail(w, err)
 			return

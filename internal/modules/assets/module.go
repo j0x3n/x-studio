@@ -18,13 +18,14 @@ type Module struct {
 func New(c *core.Core) *Module { return &Module{Core: c} }
 func (*Module) Name() string   { return "assets" }
 func (a *Module) Jobs() map[string]core.JobHandler {
-	return map[string]core.JobHandler{"assets.model_generate": a.executeModelJob, "assets.tryon_analyze": a.executeModelJob, "assets.tryon": a.executeModelJob, "assets.workbench": a.executeWorkbench, "assets.tag": a.executeTag, "assets.process": a.executeProcess}
+	return map[string]core.JobHandler{"assets.views_classify": a.executeViewsClassify, "assets.views_enhance": a.executeViewsEnhance, "assets.model_generate": a.executeModelJob, "assets.tryon_analyze": a.executeModelJob, "assets.tryon": a.executeModelJob, "assets.workbench": a.executeWorkbench, "assets.tag": a.executeTag, "assets.process": a.executeProcess}
 }
 func (a *Module) Routes(r *core.Router) {
 	a.startHashBackfill()
 	a.startWorkbenchCleanup()
 	a.workbenchRoutes(r)
 	a.modelRoutes(r)
+	a.viewRoutes(r)
 	r.Handle("GET /api/asset-folders", core.ProductView, a.folders)
 	r.Handle("POST /api/asset-folders", core.AssetUpload, a.createFolder)
 	r.Handle("PATCH /api/asset-folders/{id}", core.AssetUpload, a.patchFolder)

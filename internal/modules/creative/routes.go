@@ -18,6 +18,12 @@ func (a *Module) Routes(r *core.Router) {
 		pattern, permission string
 		handler             http.HandlerFunc
 	}{
+		{"GET /api/creative/plans", core.ProductView, a.plansList},
+		{"POST /api/creative/plans", core.CreativeTemplate, a.planWrite},
+		{"GET /api/creative/plans/{id}", core.ProductView, a.planGet},
+		{"PATCH /api/creative/plans/{id}", core.CreativeTemplate, a.planWrite},
+		{"DELETE /api/creative/plans/{id}", core.CreativeTemplate, a.planDelete},
+		{"GET /api/products/{id}/plan", core.ProductView, a.productPlan},
 		{"GET /api/creative/templates", core.CreativeRun, a.templatesList},
 		{"GET /api/creative/templates/{key}", core.CreativeRun, a.templateGet},
 		{"PATCH /api/creative/templates/{key}", core.CreativeTemplate, a.templatePatch},
@@ -45,7 +51,7 @@ func (a *Module) Routes(r *core.Router) {
 	for _, route := range routes {
 		permission, handler := route.permission, route.handler
 		r.Handle(route.pattern, permission, func(w http.ResponseWriter, r *http.Request) {
-			if _, err := a.authorize(r.Context(), core.CurrentUser(r).ID, 0, permission); err != nil {
+			if _, err := a.authorize(r.Context(), core.CurrentUser(r).ID, 0, permission); err != nil && permission != core.ProductView {
 				fail(w, err)
 				return
 			}

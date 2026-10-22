@@ -58,7 +58,7 @@ ALTER TABLE creative_shop_settings ADD COLUMN main_ratios TEXT NOT NULL DEFAULT 
 ALTER TABLE creative_shop_settings ADD COLUMN detail_width INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE creative_shop_settings ADD COLUMN about_text TEXT NOT NULL DEFAULT '';`)
 		return err
-	}}}
+	}}, {Version: 5, Up: migratePlans}}
 }
 
 type queryer interface {
@@ -106,7 +106,7 @@ func objects(ctx context.Context, db queryer, query string, args ...any) ([]core
 					}
 				}
 			}
-			if value != nil && (key == "enabled" || key == "superseded" || key == "size_compare" || key == "open" || key == "tightened") {
+			if value != nil && (key == "enabled" || key == "superseded" || key == "size_compare" || key == "open" || key == "tightened" || key == "archived") {
 				value = value == int64(1)
 			}
 			obj[key] = value

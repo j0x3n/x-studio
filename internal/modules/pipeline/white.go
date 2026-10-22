@@ -16,6 +16,9 @@ import (
 )
 
 func whiteParamKey(ph Photo) string {
+	if !ph.HasVerifiedEnhancement() {
+		ph.EnhancedFile = ""
+	}
 	crop := "null"
 	if len(ph.Crop) == 4 {
 		parts := make([]string, 4)

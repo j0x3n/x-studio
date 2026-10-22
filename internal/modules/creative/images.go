@@ -54,7 +54,7 @@ func loadImage(rootPath, name string) (*image.NRGBA, error) {
 }
 func (a *Module) sourceImage(ph core.Photo) (*image.NRGBA, error) {
 	name := ph.File
-	if ph.EnhancedFile != "" {
+	if ph.HasVerifiedEnhancement() {
 		name = ph.EnhancedFile
 	}
 	root, err := os.OpenRoot(a.Dir(ph.ProductID))
@@ -70,7 +70,7 @@ func (a *Module) sourceImage(ph core.Photo) (*image.NRGBA, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ph.EnhancedFile != "" {
+	if ph.HasVerifiedEnhancement() {
 		return nrgba(im), nil
 	}
 	ex := imaging.ReadExif(data)

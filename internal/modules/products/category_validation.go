@@ -48,6 +48,30 @@ func (a *Module) validateCategory(c *core.Category) error {
 		codes[v.Code] = true
 	}
 	var slots map[string]json.RawMessage
+	viewKeys := map[string]bool{}
+	for _, view := range c.Views {
+		if !categoryKey.MatchString(view.Key) || viewKeys[view.Key] || strings.TrimSpace(view.Name) == "" || !codes[view.Code] {
+			return fmt.Errorf("底图槽位 key 重复、名称为空或编号不属于此品类")
+		}
+		viewKeys[view.Key] = true
+		if len(view.Groups) == 0 {
+			return fmt.Errorf("底图槽位 groups 不能为空")
+		}
+		for _, group := range append(append([]string{}, view.Groups...), view.Required...) {
+			if (group != "small" && group != "strand") || !slices.Contains(view.Groups, group) {
+				return fmt.Errorf("底图槽位分组或必传分组不正确")
+			}
+		}
+		for _, other := range c.Views {
+			if other.Key != view.Key && other.Code == view.Code {
+				for _, group := range view.Groups {
+					if slices.Contains(other.Groups, group) {
+						return fmt.Errorf("同一分组内底图槽位编号不能重复")
+					}
+				}
+			}
+		}
+	}
 	if json.Unmarshal(c.Slots, &slots) != nil || slots == nil {
 		return fmt.Errorf("slots 必须是对象")
 	}

@@ -14,7 +14,7 @@ import (
 )
 
 func emptyCategory() core.Category {
-	return core.Category{Attrs: []core.CategoryAttr{}, Codes: []core.CategoryCode{}, Slots: json.RawMessage(`{}`), Banned: []string{}}
+	return core.Category{Attrs: []core.CategoryAttr{}, Codes: []core.CategoryCode{}, Views: []core.CategoryView{}, Slots: json.RawMessage(`{}`), Banned: []string{}}
 }
 func applyCategory(c *core.Category, in map[string]json.RawMessage, creating bool) error {
 	for k, v := range in {
@@ -35,6 +35,8 @@ func applyCategory(c *core.Category, in map[string]json.RawMessage, creating boo
 			target = &c.Attrs
 		case "codes":
 			target = &c.Codes
+		case "views":
+			target = &c.Views
 		case "slots":
 			target = &c.Slots
 		case "rules":
@@ -58,12 +60,12 @@ func applyCategory(c *core.Category, in map[string]json.RawMessage, creating boo
 	return nil
 }
 func categoryValues(c *core.Category) []any {
-	return []any{c.Name, c.Sort, c.Disabled, core.JS(c.Attrs), core.JS(c.Codes), string(c.Slots), c.Rules, core.JS(c.Banned), c.DefaultTemplate, core.Now()}
+	return []any{c.Name, c.Sort, c.Disabled, core.JS(c.Attrs), core.JS(c.Codes), string(c.Slots), c.Rules, core.JS(c.Banned), c.DefaultTemplate, core.JS(c.Views), core.Now()}
 }
 func insertCategory(tx *sql.Tx, c *core.Category) (int64, error) {
 	vals := append([]any{c.Key}, categoryValues(c)...)
 	vals = append(vals, core.Now())
-	res, e := tx.Exec(`INSERT INTO categories(key,name,sort,disabled,attrs,codes,slots,rules,banned,default_template,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, vals...)
+	res, e := tx.Exec(`INSERT INTO categories(key,name,sort,disabled,attrs,codes,slots,rules,banned,default_template,views,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, vals...)
 	if e != nil {
 		return 0, e
 	}
@@ -104,6 +106,7 @@ func (a *Module) writeCategory(w http.ResponseWriter, r *http.Request, creating 
 				return
 			}
 			c.Attrs, c.Codes, c.Slots, c.Rules, c.Banned, c.DefaultTemplate = base.Attrs, base.Codes, base.Slots, base.Rules, base.Banned, base.DefaultTemplate
+			c.Views = base.Views
 		}
 	} else {
 		old, e := a.Category(core.ID(r, "id"))
@@ -144,7 +147,7 @@ func (a *Module) writeCategory(w http.ResponseWriter, r *http.Request, creating 
 		c.ID, e = insertCategory(tx, &c)
 	} else {
 		vals := append(categoryValues(&c), c.ID)
-		_, e = tx.Exec(`UPDATE categories SET name=?,sort=?,disabled=?,attrs=?,codes=?,slots=?,rules=?,banned=?,default_template=?,updated_at=? WHERE id=?`, vals...)
+		_, e = tx.Exec(`UPDATE categories SET name=?,sort=?,disabled=?,attrs=?,codes=?,slots=?,rules=?,banned=?,default_template=?,views=?,updated_at=? WHERE id=?`, vals...)
 	}
 	if e != nil {
 		core.Fail(w, 400, "品类 key 已存在或字段不正确")
@@ -190,12 +193,15 @@ func (a *Module) seedCategory(file string) error {
 	if e = applyCategory(&c, raw, true); e != nil {
 		return e
 	}
-	if e = a.validateCategory(&c); e != nil {
-		return e
-	}
 	old, e := a.CategoryByKey(c.Key)
 	if e != nil && e != sql.ErrNoRows {
 		return e
+	}
+	if e == nil && len(c.Codes) == 0 {
+		c.Codes = old.Codes
+	}
+	if err := a.validateCategory(&c); err != nil {
+		return err
 	}
 	tx, e2 := a.DB.Begin()
 	if e2 != nil {
@@ -211,6 +217,9 @@ func (a *Module) seedCategory(file string) error {
 		}
 		if len(old.Codes) == 0 {
 			old.Codes = c.Codes
+		}
+		if len(old.Views) == 0 {
+			old.Views = c.Views
 		}
 		if len(old.Banned) == 0 {
 			old.Banned = c.Banned
@@ -231,7 +240,7 @@ func (a *Module) seedCategory(file string) error {
 			return e
 		}
 		after := categoryValues(old)
-		fields := []string{"attrs", "codes", "slots", "rules", "banned", "default_template"}
+		fields := []string{"attrs", "codes", "slots", "rules", "banned", "default_template", "views"}
 		sets := []string{}
 		args := []any{}
 		for i, field := range fields {

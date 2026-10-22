@@ -60,5 +60,5 @@ ALTER TABLE assets ADD COLUMN poster_file TEXT NOT NULL DEFAULT '';
 ALTER TABLE assets ADD COLUMN stale INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX assets_media_stale ON assets(media,stale);`)
 		return err
-	}}}
+	}}, {Version: 8, Up: migrateViews}, {Version: 9, Up: migrateGlobalModels}}
 }

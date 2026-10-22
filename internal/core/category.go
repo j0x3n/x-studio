@@ -32,6 +32,7 @@ type Category struct {
 	Disabled        bool            `json:"disabled"`
 	Attrs           []CategoryAttr  `json:"attrs"`
 	Codes           []CategoryCode  `json:"codes"`
+	Views           []CategoryView  `json:"views"`
 	Slots           json.RawMessage `json:"slots"`
 	Rules           string          `json:"rules"`
 	Banned          []string        `json:"banned"`
@@ -41,16 +42,26 @@ type Category struct {
 	UpdatedAt       string          `json:"updated_at"`
 }
 
-const categoryQuery = `SELECT c.id,c.key,c.name,c.sort,c.disabled,c.attrs,c.codes,c.slots,c.rules,c.banned,c.default_template,c.created_at,c.updated_at,(SELECT count(*) FROM products p WHERE p.category_id=c.id) FROM categories c `
+type CategoryView struct {
+	Key      string   `json:"key"`
+	Name     string   `json:"name"`
+	Code     string   `json:"code"`
+	Groups   []string `json:"groups"`
+	Required []string `json:"required"`
+	Hint     string   `json:"hint"`
+}
+
+const categoryQuery = `SELECT c.id,c.key,c.name,c.sort,c.disabled,c.attrs,c.codes,c.slots,c.rules,c.banned,c.default_template,c.created_at,c.updated_at,(SELECT count(*) FROM products p WHERE p.category_id=c.id),c.views FROM categories c `
 
 func ScanCategory(s Scanner) (c Category, err error) {
-	var attrs, codes, slots, banned string
-	err = s.Scan(&c.ID, &c.Key, &c.Name, &c.Sort, &c.Disabled, &attrs, &codes, &slots, &c.Rules, &banned, &c.DefaultTemplate, &c.CreatedAt, &c.UpdatedAt, &c.ProductCount)
+	var attrs, codes, slots, banned, views string
+	err = s.Scan(&c.ID, &c.Key, &c.Name, &c.Sort, &c.Disabled, &attrs, &codes, &slots, &c.Rules, &banned, &c.DefaultTemplate, &c.CreatedAt, &c.UpdatedAt, &c.ProductCount, &views)
 	if err != nil {
 		return
 	}
 	c.Attrs = []CategoryAttr{}
 	c.Codes = []CategoryCode{}
+	c.Views = []CategoryView{}
 	c.Banned = []string{}
 	if err = json.Unmarshal([]byte(attrs), &c.Attrs); err != nil {
 		return
@@ -59,6 +70,9 @@ func ScanCategory(s Scanner) (c Category, err error) {
 		return
 	}
 	err = json.Unmarshal([]byte(banned), &c.Banned)
+	if err == nil {
+		err = json.Unmarshal([]byte(views), &c.Views)
+	}
 	c.Slots = json.RawMessage(slots)
 	return
 }

@@ -2,6 +2,17 @@
   "key": "pearl",
   "name": "珍珠",
   "sort": 10,
+  "views": [
+    {"key":"front","name":"正面平视","code":"A1","groups":["small"],"required":["small"],"hint":"商品正面朝镜头，整体完整、不被遮挡"},
+    {"key":"flat","name":"平铺全貌","code":"A1","groups":["strand"],"required":["strand"],"hint":"整串平铺，能看到全部珠子"},
+    {"key":"angle","name":"45° 侧面","code":"A2","groups":["small","strand"],"required":["small"],"hint":"斜 45° 拍，能看出厚度和立体结构"},
+    {"key":"close","name":"局部近景","code":"B2","groups":["small","strand"],"required":["strand"],"hint":"几颗珠子或主体特写，能数清珠子、看清光泽"},
+    {"key":"macro","name":"表面微距","code":"B1","groups":["small","strand"],"required":[],"hint":""},
+    {"key":"back","name":"背面和扣头","code":"B5","groups":["small","strand"],"required":[],"hint":"耳针、耳夹、扣头、绳结"},
+    {"key":"wear","name":"佩戴实拍","code":"D1","groups":["small","strand"],"required":[],"hint":""},
+    {"key":"size","name":"尺寸参照","code":"C1","groups":["small","strand"],"required":[],"hint":"钢尺、硬币或手心旁边"},
+    {"key":"pack","name":"包装","code":"F2","groups":["small","strand"],"required":[],"hint":""}
+  ],
   "default_template": "navy",
   "attrs": [
     {"key": "style", "label": "款式", "type": "select", "options": ["耳钉", "耳夹", "耳线", "项链", "颈链", "手链", "戒指", "胸针", "发饰"], "free": true, "required": true},

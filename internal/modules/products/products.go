@@ -23,6 +23,7 @@ func (a *Module) Routes(r *core.Router) {
 	r.Handle("PATCH /api/categories/{id}", core.AdminSettings, a.patchCategory)
 	r.Handle("GET /api/products", core.ProductView, a.list)
 	r.Handle("POST /api/products", core.ProductEdit, a.create)
+	r.Handle("POST /api/products/{id}/duplicate", core.ProductEdit, a.duplicate)
 	r.Handle("GET /api/products/{id}", core.ProductView, a.get)
 	r.Handle("PATCH /api/products/{id}", core.ProductEdit, a.patch)
 	r.Handle("DELETE /api/products/{id}", core.Scoped, a.delete)
@@ -40,6 +41,13 @@ func (a *Module) productJSON(id int64, u core.User) (core.Object, error) {
 		return nil, sql.ErrNoRows
 	}
 	o := rows[0]
+	o["based_on"] = nil
+	if source, ok := o["based_on_id"].(int64); ok && a.CanProduct(u, source) {
+		var name string
+		if a.DB.QueryRow("SELECT name FROM products WHERE id=?", source).Scan(&name) == nil {
+			o["based_on"] = core.Object{"id": source, "name": name}
+		}
+	}
 	c, e := a.ProductCategory(id)
 	if e != nil {
 		return nil, e
@@ -319,10 +327,20 @@ func (a *Module) patch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sets := []string{}
+	if e := a.validateProductPlan(r, in); e != nil {
+		core.Fail(w, 400, e.Error())
+		return
+	}
 	args := []any{}
 	for k, v := range in {
 		var value any
 		switch k {
+		case "plan_id":
+			var id *int64
+			_ = json.Unmarshal(v, &id)
+			value = id
+		case "plan_overrides":
+			value = string(v)
 		case "category_id":
 			value = c.ID
 		case "name", "status":

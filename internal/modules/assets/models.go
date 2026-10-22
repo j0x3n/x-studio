@@ -54,7 +54,9 @@ const modelColumns = "id,shop_id,name,description,archived,cover_reference_id,cr
 const referenceColumns = "id,model_id,body_part,source,file,orig_name,width,height,op,created_by,created_at"
 
 func scanModel(s core.Scanner) (m ShopModel, err error) {
-	err = s.Scan(&m.ID, &m.ShopID, &m.Name, &m.Description, &m.Archived, &m.CoverReferenceID, &m.CreatedBy, &m.CreatedAt, &m.UpdatedAt)
+	var shop sql.NullInt64
+	err = s.Scan(&m.ID, &shop, &m.Name, &m.Description, &m.Archived, &m.CoverReferenceID, &m.CreatedBy, &m.CreatedAt, &m.UpdatedAt)
+	m.ShopID = shop.Int64
 	m.References = []ModelReference{}
 	if m.CoverReferenceID != nil {
 		m.CoverURL = referenceURL(m.ID, *m.CoverReferenceID)
@@ -73,7 +75,13 @@ func scanReference(s core.Scanner) (v ModelReference, err error) {
 	return
 }
 func (a *Module) shopAllowed(u core.User, sid int64, active bool) bool {
-	if u.Disabled || u.Role.Scope == "shares" || !u.Has(core.ModelView) || !a.CanShop(u, sid) {
+	if u.Disabled || u.Role.Scope == "shares" || !u.Has(core.ModelView) {
+		return false
+	}
+	if sid == 0 {
+		return true
+	}
+	if sid < 0 || !a.CanShop(u, sid) {
 		return false
 	}
 	var archived bool
@@ -158,7 +166,7 @@ func (a *Module) modelsList(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "搜索文本过长")
 		return
 	}
-	rows, err := a.DB.Query("SELECT "+modelColumns+" FROM shop_models WHERE archived=? AND (?='' OR shop_id=?) AND (name LIKE ? OR description LIKE ?) ORDER BY id DESC", archived, sid, sid, "%"+q+"%", "%"+q+"%")
+	rows, err := a.DB.Query("SELECT "+modelColumns+" FROM shop_models WHERE archived=? AND (?='' OR shop_id=? OR shop_id IS NULL) AND (name LIKE ? OR description LIKE ?) ORDER BY id DESC", archived, sid, sid, "%"+q+"%", "%"+q+"%")
 	if err != nil {
 		fail(w, 500, "读取模特失败")
 		return
@@ -229,7 +237,7 @@ func (a *Module) modelCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := now()
-	res, e := a.DB.Exec("INSERT INTO shop_models(shop_id,name,description,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?)", in.ShopID, in.Name, in.Description, u.ID, t, t)
+	res, e := a.DB.Exec("INSERT INTO shop_models(shop_id,name,description,created_by,created_at,updated_at) VALUES(nullif(?,0),?,?,?,?,?)", in.ShopID, in.Name, in.Description, u.ID, t, t)
 	if e != nil {
 		fail(w, 500, "创建模特失败")
 		return
@@ -256,13 +264,14 @@ func (a *Module) modelPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
+		ShopID           *int64  `json:"shop_id"`
 		Name             *string `json:"name"`
 		Description      *string `json:"description"`
 		Archived         *bool   `json:"archived"`
 		CoverReferenceID *int64  `json:"cover_reference_id"`
 	}
 	if strictDecode(raw, &in) != nil {
-		fail(w, 400, "请求字段或类型不正确，店铺不可修改")
+		fail(w, 400, "请求字段或类型不正确")
 		return
 	}
 	a.Mu.Lock()
@@ -274,6 +283,22 @@ func (a *Module) modelPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.Name != nil {
 		m.Name = strings.TrimSpace(*in.Name)
+	}
+	if _, sent := raw["shop_id"]; sent {
+		sid := int64(0)
+		if in.ShopID != nil {
+			sid = *in.ShopID
+		}
+		if !a.shopAllowed(currentUser(r), sid, true) {
+			fail(w, 404, "店铺不存在或无权使用")
+			return
+		}
+		// 全局模特所有店铺都在用：改成全局或从全局收回只能由全店角色做，避免某个店铺把共用模特收走
+		if (sid == 0) != (m.ShopID == 0) && currentUser(r).Role.Scope != "all" {
+			fail(w, 403, "只有能管理全部店铺的角色才能把模特设为全局或收回")
+			return
+		}
+		m.ShopID = sid
 	}
 	if in.Description != nil {
 		m.Description = *in.Description
@@ -295,7 +320,7 @@ func (a *Module) modelPatch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	m.UpdatedAt = now()
-	_, e = a.DB.Exec("UPDATE shop_models SET name=?,description=?,archived=?,cover_reference_id=?,updated_at=? WHERE id=?", m.Name, m.Description, m.Archived, m.CoverReferenceID, m.UpdatedAt, m.ID)
+	_, e = a.DB.Exec("UPDATE shop_models SET shop_id=nullif(?,0),name=?,description=?,archived=?,cover_reference_id=?,updated_at=? WHERE id=?", m.ShopID, m.Name, m.Description, m.Archived, m.CoverReferenceID, m.UpdatedAt, m.ID)
 	if e != nil {
 		fail(w, 500, "修改模特失败")
 		return
@@ -368,6 +393,15 @@ func (a *Module) modelDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	if used {
 		fail(w, 409, "这个模特还在「设置 → AI 出图」的模特位里，先换掉再删除")
+		return
+	}
+	used, err = modelInPlan(tx, m.ID)
+	if err != nil {
+		fail(w, 500, "读取出图方案失败")
+		return
+	}
+	if used {
+		fail(w, 409, "这个模特还在出图方案或商品覆盖里，先换掉再删除")
 		return
 	}
 	var refs int
