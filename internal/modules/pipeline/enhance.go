@@ -159,7 +159,7 @@ func selectReferences(photos []Photo) []Photo {
 	return out
 }
 func (a *Module) beforeRetouch(ph Photo) (*image.NRGBA, error) {
-	if ph.EnhancedFile != "" {
+	if ph.HasVerifiedEnhancement() {
 		im, _, err := loadPhoto(filepath.Join(a.Dir(ph.ProductID), filepath.FromSlash(ph.EnhancedFile)))
 		return im, err
 	}

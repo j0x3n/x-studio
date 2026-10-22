@@ -49,6 +49,8 @@ func imageConfig(b []byte) (image.Config, string, error) {
 	return c, f, nil
 }
 func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
+	code := ""
+	codeSent := false
 	var folderID *int64
 	if values, ok := r.URL.Query()["folder_id"]; ok {
 		if !folderWriteAllowed(w, r) {
@@ -104,6 +106,16 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			fail(w, 413, "上传数据过大或格式不正确")
 			return
+		}
+		if part.FormName() == "code" && part.FileName() == "" {
+			value, err := io.ReadAll(io.LimitReader(part, 128))
+			_ = part.Close()
+			if err != nil || len(value) > 60 || codeSent {
+				fail(w, 400, "底图槽位编号不正确或重复")
+				return
+			}
+			code, codeSent = strings.TrimSpace(string(value)), true
+			continue
 		}
 		if part.FormName() != "files" || part.FileName() == "" {
 			_ = part.Close()
@@ -168,6 +180,8 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			ext = "jpg"
 		}
 		files = append(files, pending{p: Asset{Photo: Photo{ProductID: id, File: ext, OrigName: name, Width: c.Width, Height: c.Height, Metrics: Object{}, RetouchLog: Object{}, Source: "original", Media: "image"}, PHash: fmt.Sprintf("%016x", imaging.Hash(imaging.Geometry(decoded, imaging.ReadExif(b).Orientation, 0, nil)))}, tmp: tmp.Name()})
+		metrics, _ := imaging.Metrics(imaging.Geometry(decoded, imaging.ReadExif(b).Orientation, 0, nil), imaging.ReadExif(b))
+		files[len(files)-1].p.Metrics = metrics
 		if e1 != nil {
 			fail(w, 500, "保存上传照片失败")
 			return
@@ -179,6 +193,22 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 	}
 	a.Mu.Lock()
 	defer a.Mu.Unlock()
+	product, ok := a.authorizedProduct(w, r, id, true)
+	if !ok {
+		return
+	}
+	if code != "" {
+		if !viewCodeAllowed(product, code) {
+			fail(w, 400, "编号必须属于本商品底图槽位")
+			return
+		}
+		for _, file := range files {
+			if file.p.Media != "image" {
+				fail(w, 400, "视频不能设置底图槽位")
+				return
+			}
+		}
+	}
 	tx, e := a.DB.Begin()
 	if e != nil {
 		fail(w, 500, "保存照片失败")
@@ -214,6 +244,15 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p.ID, _ = res.LastInsertId()
+		if code != "" {
+			if err := setCurrentTx(tx, p, code); err != nil {
+				fail(w, 500, "设置底图槽位失败")
+				return
+			}
+			p.Code, p.ViewCode, p.Manual = code, code, true
+		}
+		p.Suggest, p.EnhanceCheck = Object{}, Object{}
+		p.BlurLevel, _ = p.Metrics["blur_level"].(string)
 		if p.Media != "video" {
 			base := strings.TrimSuffix(p.OrigName, filepath.Ext(p.OrigName))
 			p.File = fmt.Sprintf("原图/%06d_%s.%s", p.ID, base, p.File)
@@ -246,7 +285,18 @@ func (a *Module) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	committed = true
+	if code != "" {
+		a.removePhotoOutputs(id, code)
+	}
 	ids := []int64{}
+	for index := range photos {
+		fresh, err := a.asset(photos[index].ID)
+		if err != nil {
+			fail(w, 500, "读取上传结果失败")
+			return
+		}
+		photos[index] = fresh
+	}
 	for i := range photos {
 		ids = append(ids, photos[i].ID)
 		photos[i] = a.decorate(photos[i], currentUser(r), photos)

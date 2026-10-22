@@ -26,12 +26,12 @@ func (a *Module) modelWorkbenchVisible(u core.User, v WorkbenchItem) bool {
 	if !modelWorkbenchItem(v) {
 		return true
 	}
-	sid, mid := opID(v.Op, "shop_id"), opID(v.Op, "model_id")
-	if sid <= 0 || mid <= 0 || !a.shopAllowed(u, sid, false) {
+	mid := opID(v.Op, "model_id")
+	if mid <= 0 {
 		return false
 	}
 	m, e := a.getModel(u, mid, false)
-	if e != nil || m.ShopID != sid {
+	if e != nil || opID(v.Op, "shop_id") != m.ShopID {
 		return false
 	}
 	if v.Op["type"] == "model_candidate" {

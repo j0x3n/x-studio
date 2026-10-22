@@ -75,6 +75,9 @@ func (a *Module) retouch(ctx context.Context, p Product) error {
 			return e
 		}
 		count++
+		if !ph.HasVerifiedEnhancement() {
+			ph.EnhancedFile = ""
+		}
 		input := ph.File
 		if ph.EnhancedFile != "" {
 			input = ph.EnhancedFile

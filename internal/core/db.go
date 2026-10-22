@@ -31,7 +31,7 @@ func QueryObjects(db *sql.DB, query string, args ...any) ([]Object, error) {
 		for i, k := range cols {
 			v := vs[i]
 			switch k {
-			case "info", "cost", "supplier", "content", "main", "meta", "settings", "perms", "detail", "params", "result", "tags", "op", "metrics", "crop", "retouch_log":
+			case "info", "cost", "supplier", "content", "main", "meta", "settings", "perms", "detail", "params", "result", "tags", "op", "metrics", "crop", "retouch_log", "plan_overrides":
 				if s, ok := v.(string); ok {
 					var x any
 					if json.Unmarshal([]byte(s), &x) == nil {

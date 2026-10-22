@@ -45,7 +45,7 @@ func ValidateSetting(key string, v json.RawMessage) error {
 				return fmt.Errorf("模型单价必须是非负数字")
 			}
 		}
-	case "creative", "market":
+	case "creative", "market", "views":
 		return validateFields(key, o)
 	case "quota_default":
 		for k, v := range o {
@@ -72,6 +72,7 @@ type settingField struct {
 
 // settingFields 是 creative、market 两组设置能改的字段；缺省值见 SettingDefaults。
 var settingFields = map[string]map[string]settingField{
+	"views": {"classify_confidence": {kind: "ratio"}, "auto_fidelity": {kind: "int", min: 0, max: 100}},
 	"creative": {
 		"final_glance":            {kind: "bool"},
 		"max_images_per_listing":  {kind: "int", min: 1, max: 500},
@@ -96,6 +97,7 @@ var settingFields = map[string]map[string]settingField{
 
 // SettingDefaults 是启动时补进 settings 表的缺省值（已有的不覆盖）。
 var SettingDefaults = map[string]Object{
+	"views":    {"classify_confidence": 0.8, "auto_fidelity": 85},
 	"creative": {"final_glance": true, "max_images_per_listing": 40, "auto_pass_score": 90, "manual_score_min": 60, "max_auto_redraw": 2, "calibration_count": 20, "calibration_agreement": 0.95, "spot_check_rate": 0.1, "size_tolerance": 0.2, "size_compare_tolerance": 0.1, "return_reason_threshold": 2},
 	"market":   {"remind_enabled": true, "remind_time": "10:00", "title_change_days": 7, "min_paid_price": 99, "new_listing_days": 14},
 }

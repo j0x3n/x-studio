@@ -221,8 +221,12 @@ func TestUpscaleThresholdGeometryAndInvalidation(t *testing.T) {
 		}
 		cfg, err := jpeg.DecodeConfig(file)
 		_ = file.Close()
-		if err != nil || cfg.Width != map[bool]int{true: 1024, false: 1536}[ph.ID == cropped.ID] || cfg.Height != 1024 {
-			t.Fatal("retouch applied crop/rotate twice", cfg, err)
+		want := image.Pt(1200, 899)
+		if ph.ID == cropped.ID {
+			want = image.Pt(600, 600)
+		}
+		if err != nil || image.Pt(cfg.Width, cfg.Height) != want {
+			t.Fatal("unverified enhancement must use original geometry", cfg, err)
 		}
 	}
 	if warnings, err = f.a.enhance(testActor(context.Background()), p); err != nil || len(warnings) > 0 {
@@ -419,8 +423,10 @@ func TestEvidenceSlotsOnlyAcceptRealPhotos(t *testing.T) {
 		{ID: 1, Code: "B2", Source: "ai_edited"},
 		{ID: 2, Code: "E1_AI", AIGenerated: true, Source: "ai_generated"},
 		{ID: 3, Code: "E1"},
-		{ID: 4, Code: "B1", Source: "ai_enhanced", AIEnhanced: true},
+		{ID: 4, Code: "B1", Source: "ai_enhanced", AIEnhanced: true, EnhanceCheck: Object{"verdict": "pass"}},
 		{ID: 5, Code: "C1", Source: "original", SourceOverride: "ai_edited"},
+		{ID: 6, Code: "B1", Source: "ai_enhanced", EnhanceCheck: Object{"verdict": "fail"}},
+		{ID: 7, Code: "B2", Source: "ai_enhanced"},
 	}
 	ids := func(list []Photo) string {
 		out := []string{}

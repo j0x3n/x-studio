@@ -30,7 +30,13 @@ func FillBase(code string) (string, bool) {
 // AIMade 表示画面由 AI 生成或改过（高清化不算），这类图不能放进实拍证据位。
 func AIMade(p core.Photo) bool {
 	s := p.EffectiveSource()
-	return p.AIGenerated || s == "ai_generated" || s == "ai_edited"
+	if p.AIGenerated || s == "ai_generated" || s == "ai_edited" {
+		return true
+	}
+	if s == "ai_enhanced" || p.Source == "ai_enhanced" || (p.AIEnhanced && p.EnhancedFile == "") {
+		return p.EnhanceCheck["verdict"] != "pass"
+	}
+	return false
 }
 
 func ValidatePhoto(p core.Photo) error {

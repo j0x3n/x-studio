@@ -53,7 +53,7 @@ func TestGenerateWornNoTransactionFeatureAndSaveOutput(t *testing.T) {
 	})
 	pid := f.product(t, "worn", 1)
 	aid := f.upload(t, pid, imageBytes(t, 40, 60))
-	mid := modelCreate(t, f, 1)
+	mid := modelCreate(t, f, 0)
 	dir := filepath.Join(f.c.Cfg.DataDir, "models", fmt.Sprint(mid))
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)

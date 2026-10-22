@@ -52,7 +52,7 @@ func GenerateWorn(ctx context.Context, c *core.Core, req WornRequest) ([]byte, c
 		}
 		var count int
 		err = c.DB.QueryRowContext(ctx, "SELECT count(*) FROM listings WHERE product_id=? AND shop_id=?", req.ProductID, m.ShopID).Scan(&count)
-		if err != nil || count == 0 {
+		if err != nil || (m.ShopID != 0 && count == 0) {
 			return u, m, wornError(404, "商品不属于模特店铺")
 		}
 		return u, m, nil
@@ -78,7 +78,7 @@ func GenerateWorn(ctx context.Context, c *core.Core, req WornRequest) ([]byte, c
 			return nil, nil, wornError(400, "商品参考必须是实拍或抠图")
 		}
 		seen[id] = true
-		if ph.EnhancedFile != "" {
+		if ph.HasVerifiedEnhancement() {
 			ph.File = ph.EnhancedFile
 		}
 		im, e := a.sourceImage(workbenchSource{input: workbenchInput{AssetID: &id}, asset: ph}, req.UserID)
@@ -242,7 +242,7 @@ func validateWornOutputTx(ctx context.Context, tx *sql.Tx, u core.User, req Outp
 		return wornError(403, "没有模特或图片处理权限")
 	}
 	var count int
-	err := tx.QueryRowContext(ctx, `SELECT count(*) FROM shop_models m JOIN shops s ON s.id=m.shop_id WHERE m.id=? AND m.archived=0 AND s.archived=0 AND EXISTS(SELECT 1 FROM listings l WHERE l.shop_id=m.shop_id AND l.product_id=?) AND (? OR EXISTS(SELECT 1 FROM user_shops us WHERE us.shop_id=m.shop_id AND us.user_id=?))`, worn.ModelID, req.ProductID, u.Role.Key == "admin", u.ID).Scan(&count)
+	err := tx.QueryRowContext(ctx, `SELECT count(*) FROM shop_models m LEFT JOIN shops s ON s.id=m.shop_id WHERE m.id=? AND m.archived=0 AND (m.shop_id IS NULL OR (s.archived=0 AND EXISTS(SELECT 1 FROM listings l WHERE l.shop_id=m.shop_id AND l.product_id=?) AND (? OR EXISTS(SELECT 1 FROM user_shops us WHERE us.shop_id=m.shop_id AND us.user_id=?))))`, worn.ModelID, req.ProductID, u.Role.Key == "admin", u.ID).Scan(&count)
 	if err != nil {
 		return err
 	}
