@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Gem, Sun, ListTodo, Package, Wand2, PenLine, LayoutTemplate, ClipboardCheck, Users, Settings, LogOut, ChevronDown, BookOpen, Boxes, ShoppingCart, Truck, Contact, UserRound, Shirt, Hammer, Wallet, PackagePlus, ScanLine, ScanEye, LineChart, Lightbulb, Mountain, type LucideIcon } from 'lucide-react'
+import { Gem, Sun, ListTodo, Package, Wand2, PenLine, LayoutTemplate, Users, Settings, LogOut, ChevronDown, BookOpen, Boxes, ShoppingCart, Truck, Contact, UserRound, Armchair, Hammer, Wallet, PackagePlus, ScanLine, ScanEye, LineChart, Lightbulb, Mountain, type LucideIcon } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { AssistantProvider, useAssistant } from '../lib/assistant'
@@ -11,20 +11,24 @@ import { AssistantPanel } from './AssistantPanel'
 import { LightboxProvider } from './Lightbox'
 
 // 左侧 232px 侧边栏（clean 预设），窄屏自动收成 64px 图标栏。没有权限的入口不显示。
-// 「上新」按上新时的先后排：商品库 → 模特库 → 场景库 → 模板库 → 文案 → AI 出图，左边带步骤号。
+// 「素材」「制作」按上新时的先后排：商品库 → 模特库 → 道具库 → 场景库 → 模板库 → 文案库 → 出图队列，左边带步骤号。
+// 图片处理、试穿试戴从商品页和模特库进，侧栏不单列；进去时高亮对应的库。
 type Item = { to: string; label: string; icon: LucideIcon; perm?: string; anyPerm?: string[]; allPerm?: string[]; internal?: boolean; badge?: 'todo' | 'review' | 'tasks'; also?: string[]; step?: number }
 const GROUPS: { label?: string; items: Item[] }[] = [
   { items: [
     { to: '/', label: '今天', icon: Sun, badge: 'todo' },
     { to: '/tasks', label: '任务', icon: ListTodo, perm: 'task.view', badge: 'tasks' }
   ] },
-  { label: '上新', items: [
-    { to: '/products', label: '商品库', icon: Package, perm: 'product.view', also: ['/assets'], step: 1 },
-    { to: '/models', label: '模特库', icon: UserRound, perm: 'model.view', internal: true, step: 2 },
-    { to: '/scenes', label: '场景库', icon: Mountain, perm: 'product.view', internal: true, step: 3 },
-    { to: '/templates', label: '模板库', icon: LayoutTemplate, perm: 'product.view', step: 4 },
-    { to: '/copy', label: '文案', icon: PenLine, perm: 'copy.view', step: 5 },
-    { to: '/creative/review', label: 'AI 出图', icon: ScanEye, perm: 'creative.review', internal: true, step: 6 }
+  { label: '素材', items: [
+    { to: '/products', label: '商品库', icon: Package, perm: 'product.view', also: ['/assets', '/process'], step: 1 },
+    { to: '/models', label: '模特库', icon: UserRound, perm: 'model.view', internal: true, also: ['/tryon'], step: 2 },
+    { to: '/props', label: '道具库', icon: Armchair, perm: 'product.view', internal: true, step: 3 },
+    { to: '/scenes', label: '场景库', icon: Mountain, perm: 'product.view', internal: true, step: 4 }
+  ] },
+  { label: '制作', items: [
+    { to: '/templates', label: '模板库', icon: LayoutTemplate, perm: 'product.view', step: 5 },
+    { to: '/copy', label: '文案库', icon: PenLine, perm: 'copy.view', step: 6 },
+    { to: '/creative/review', label: '出图队列', icon: ScanEye, perm: 'creative.review', internal: true, step: 7 }
   ] },
   { label: '经营', items: [
     { to: '/market', label: '数据', icon: LineChart, perm: 'market.view', internal: true },
@@ -38,10 +42,7 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     { to: '/finance', label: '财务', icon: Wallet, perm: 'finance.view', internal: true }
   ] },
   { label: '工具', items: [
-    { to: '/process', label: '图片处理', icon: Wand2, perm: 'asset.upload' },
-    { to: '/tryon', label: 'AI 试穿试戴', icon: Shirt, allPerm: ['model.view', 'asset.process', 'asset.upload'], internal: true },
     { to: '/purchase-recognize', label: '单据识别', icon: ScanLine, perm: 'purchase.manage', internal: true },
-    { to: '/review', label: '出图审核（旧）', icon: ClipboardCheck, perm: 'render.review', badge: 'review' },
     { to: '/kb', label: '知识库', icon: BookOpen, perm: 'kb.view' }
   ] }
 ]
@@ -59,8 +60,8 @@ function ShellInner() {
   const loc = useLocation()
   // 分组可以同时展开多个，记在本机浏览器；进入某个页面时自动展开它所在的组
   const [expanded, setExpanded] = useState<Set<string>>(() => {
-    // 第一次用默认展开「上新」；之后按用户自己的展开收起记住
-    try { return new Set(JSON.parse(localStorage.getItem('nav-expanded') || '["上新"]')) } catch { return new Set(['上新']) }
+    // 第一次默认展开「素材」「制作」；之后按用户自己的展开收起记住
+    try { return new Set(JSON.parse(localStorage.getItem('nav-expanded') || '["素材","制作"]')) } catch { return new Set(['素材', '制作']) }
   })
   const toggleGroup = (label: string) => setExpanded(old => {
     const next = new Set(old)
@@ -122,7 +123,7 @@ function ShellInner() {
             const items = g.items.filter(it => (!it.internal || me?.role.scope !== 'shares') && (it.allPerm ? it.allPerm.every(can) : it.anyPerm ? it.anyPerm.some(can) : !it.perm || can(it.perm)))
             if (!items.length) return null
             const isOpen = !g.label || expanded.has(g.label)
-            const GroupIcon = g.label === '上新' ? Package : g.label === '工具' ? Wand2 : Boxes
+            const GroupIcon = g.label === '素材' ? Package : g.label === '制作' ? LayoutTemplate : g.label === '工具' ? Wand2 : Boxes
             return (
               <nav key={i} className="nav-group" aria-label={g.label || '常用'}>
                 {g.label && <button className={'nav-section-toggle' + (isOpen ? ' expanded' : '')} aria-expanded={isOpen} aria-controls={`nav-section-${i}`} title={g.label} onClick={() => toggleGroup(g.label!)}><GroupIcon className="rail-group-icon" /><span className="hide-rail">{g.label}</span><ChevronDown className="nav-section-chevron hide-rail" /></button>}

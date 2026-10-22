@@ -8,7 +8,8 @@ export type Framing = keyof typeof FRAMINGS
 export const ASPECTS = { '1:1': '方图 1:1', '2:3': '竖图 2:3', '3:2': '横图 3:2' } as const
 export type Aspect = keyof typeof ASPECTS
 export type ModelReference = { id: number; model_id: number; body_part: BodyPart; source: string; orig_name: string; width: number; height: number; url: string; thumb_url: string; op?: Record<string, unknown>; created_at: string }
-export type ShopModel = { id: number; shop_id: number; name: string; description: string; archived: boolean; cover_reference_id: number | null; cover_url: string; references: ModelReference[]; created_by: number; created_at: string; updated_at: string }
+// shop_id 为 null 的是全局模特，所有店铺都能用
+export type ShopModel = { id: number; shop_id: number | null; name: string; description: string; archived: boolean; cover_reference_id: number | null; cover_url: string; references: ModelReference[]; created_by: number; created_at: string; updated_at: string }
 export type TryOnOp = AssetOp & { type?: 'tryon' | 'model_candidate'; model_id?: number; shop_id?: number; model_name?: string; reference_id?: number; body_part?: BodyPart; framing?: Framing; product_type?: string; prompt?: string; aspect_ratio?: Aspect; confirmed_reference_id?: number; inputs?: ImageInput[] }
 export type ModelResult = Omit<WbItem, 'op'> & { op?: TryOnOp }
 export type Analysis = { product_type: string; body_part: BodyPart; framing: Framing; description: string; suggested_prompt: string }

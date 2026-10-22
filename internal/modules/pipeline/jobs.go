@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -177,6 +178,13 @@ func (a *Module) getJob(w http.ResponseWriter, r *http.Request) {
 		var pid int64
 		if a.DB.QueryRow("SELECT product_id FROM assets WHERE id=?", j.TargetID).Scan(&pid) == nil {
 			visible = a.CanProduct(u, pid)
+		}
+	case "scene", "prop":
+		// 定场图、道具生成：没有店铺的大家都能看，限定店铺的要有这个店的权限
+		table := map[string]string{"scene": "scenes", "prop": "props"}[j.TargetType]
+		var shop sql.NullInt64
+		if a.DB.QueryRow("SELECT shop_id FROM "+table+" WHERE id=?", j.TargetID).Scan(&shop) == nil {
+			visible = !shop.Valid || a.CanShop(u, shop.Int64)
 		}
 	}
 	if !visible {

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Archive, ArchiveRestore, ImagePlus, Mountain, Plus, Search, Shirt, Star, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Archive, ArchiveRestore, Check, ImagePlus, Lock, Mountain, Plus, Search, Shirt, Sparkles, Star, Trash2, X } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useToast, errText } from '../lib/toast'
 import { useCategories } from '../lib/categories'
 import { useListingRefs } from '../lib/listings'
-import { sceneApi, SCENE_SOURCE, type Binding, type Scene, type SceneInput, type ShopBinding } from '../lib/scenes'
+import { CAMERAS, sceneApi, SCENE_SOURCE, type Binding, type Camera, type Scene, type SceneInput, type ShopBinding } from '../lib/scenes'
+import { propApi, type Prop } from '../lib/props'
+import { useJobs, jobRunning } from '../lib/jobs'
+import { BriefInput, SceneLayout } from '../components/SceneLayout'
 import { Drawer, Empty, Field, Loading, Pill, Topbar } from '../components/ui'
 import { useLightbox } from '../components/Lightbox'
 
@@ -60,10 +63,10 @@ export function Scenes() {
       {!items ? <Loading /> : error ? <section className="panel"><Empty title="场景库加载失败" desc={error}><button className="btn btn-secondary" onClick={load}>重试</button></Empty></section>
         : !items.length ? <section className="panel"><Empty title={archived ? '没有归档的场景' : q || cat || shop ? '没有符合条件的场景' : '还没有场景'} desc={archived ? undefined : '一个场景写清楚静物放在什么台面上、模特穿什么、什么光线，再传几张参考图。'}>{editable && !archived && <button className="btn btn-secondary" onClick={() => open('new')}><Plus />新建场景</button>}</Empty></section>
           : <div className="scene-grid">{items.map(s => {
-            const cover = s.refs.find(r => r.use === 'still') || s.refs[0]
+            const cover = s.thumb_url || (s.refs.find(r => r.use === 'still') || s.refs[0])?.url
             return <button key={s.id} type="button" className="scene-card" onClick={() => open(s)}>
-              <div className="scene-cover">{cover ? <img src={cover.url} alt="" loading="lazy" /> : <span className="scene-cover-blank"><Mountain /></span>}
-                {s.refs.length > 0 && <span className="lib-ver mono">{s.refs.length} 张参考</span>}
+              <div className="scene-cover">{cover ? <img src={cover} alt="" loading="lazy" /> : <span className="scene-cover-blank"><Mountain /></span>}
+                {s.plate ? <span className="lib-ver">{s.plate_outdated ? '定场图要重做' : '已锁定定场图'}</span> : s.refs.length > 0 && <span className="lib-ver mono">{s.refs.length} 张参考</span>}
               </div>
               <div className="scene-info">
                 <div className="row" style={{ gap: 6 }}><b className="ellipsis">{s.name}</b>{s.is_default && <Pill kind="pill-info" dot={false}>默认</Pill>}{s.archived && <Pill kind="pill-neutral" dot={false}>已归档</Pill>}</div>
@@ -83,7 +86,10 @@ export function Scenes() {
   </>
 }
 
-const EMPTY: SceneInput = { name: '', categories: [], still: '', wear: '', light: '', props: '', note: '', shop_id: null }
+const EMPTY: SceneInput = { name: '', categories: [], still: '', wear: '', light: '', props: '', note: '', shop_id: null, camera: '', brief: '', layout: { size: '1024x1536', elements: [] } }
+const pick = (s: Scene): SceneInput => ({ name: s.name, categories: s.categories, still: s.still, wear: s.wear, light: s.light, props: s.props, note: s.note, shop_id: s.shop_id, camera: s.camera, brief: s.brief, layout: s.layout })
+// 提交和比较是否改过时去掉后端补的道具名和封面
+const bare = (v: SceneInput): SceneInput => ({ ...v, layout: v.layout && { ...v.layout, elements: v.layout.elements.map(e => ({ id: e.id, type: e.type, ...(e.type === 'prop' ? { prop_id: e.prop_id } : {}), label: e.label, box: e.box, note: e.note })) } })
 
 function SceneDrawer({ scene, defaultShop, onClose, onSaved, onDeleted }: { scene?: Scene; defaultShop: number | null; onClose: () => void; onSaved: (s: Scene) => void; onDeleted: () => void }) {
   const { me, can } = useAuth()
@@ -92,13 +98,16 @@ function SceneDrawer({ scene, defaultShop, onClose, onSaved, onDeleted }: { scen
   const { items: cats } = useCategories()
   const shops = (me?.shops || []).filter(s => !s.archived)
   const editable = can('creative.template')
-  const [v, setV] = useState<SceneInput>(scene ? { name: scene.name, categories: scene.categories, still: scene.still, wear: scene.wear, light: scene.light, props: scene.props, note: scene.note, shop_id: scene.shop_id } : { ...EMPTY, shop_id: defaultShop })
+  const [v, setV] = useState<SceneInput>(scene ? pick(scene) : { ...EMPTY, shop_id: defaultShop })
+  const [props, setProps] = useState<Prop[]>([])
+  useEffect(() => { propApi.list().then(setProps).catch(() => setProps([])) }, [])
+  const usableProps = props.filter(p => !v.shop_id || !p.shop_id || p.shop_id === v.shop_id)
   const [busy, setBusy] = useState(false)
   const set = (patch: Partial<SceneInput>) => setV(old => ({ ...old, ...patch }))
   const save = async () => {
     setBusy(true)
     try {
-      const body = { ...v, name: v.name.trim() }
+      const body = { ...bare(v), name: v.name.trim() }
       const s = scene ? await sceneApi.patch(scene.id, body) : await sceneApi.create(body)
       toast(scene ? '场景已保存' : '场景已建好，可以接着传参考图', 'ok'); onSaved(s)
     } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
@@ -115,11 +124,13 @@ function SceneDrawer({ scene, defaultShop, onClose, onSaved, onDeleted }: { scen
     setBusy(true)
     try { await sceneApi.remove(scene.id); toast('场景已删除', 'ok'); onDeleted() } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }
-  const dirty = !scene || JSON.stringify({ name: scene.name, categories: scene.categories, still: scene.still, wear: scene.wear, light: scene.light, props: scene.props, note: scene.note, shop_id: scene.shop_id }) !== JSON.stringify(v)
+  const dirty = !scene || JSON.stringify(bare(pick(scene))) !== JSON.stringify(bare(v))
+  const layout = v.layout || EMPTY.layout!
+  const names = layout.elements.map(e => e.label).filter(Boolean)
   const toggleCat = (key: string) => set({ categories: v.categories.includes(key) ? v.categories.filter(k => k !== key) : [...v.categories, key] })
   const ro = !editable
 
-  return <Drawer title={scene ? <span className="inline"><Mountain size={16} />{scene.name}{scene.builtin_key && <span className="t4 fs-12">内置</span>}</span> : '新建场景'} width={640} onClose={onClose} foot={<>
+  return <Drawer title={scene ? <span className="inline"><Mountain size={16} />{scene.name}{scene.builtin_key && <span className="t4 fs-12">内置</span>}</span> : '新建场景'} width={780} onClose={onClose} foot={<>
     {scene && editable && !scene.is_default && <button className="btn btn-ghost" disabled={busy} onClick={archive}>{scene.archived ? <ArchiveRestore /> : <Archive />}{scene.archived ? '恢复使用' : '归档'}</button>}
     {scene && editable && scene.archived && <button className="btn btn-danger" disabled={busy} onClick={remove}><Trash2 />永久删除</button>}
     <span className="grow" />
@@ -140,8 +151,16 @@ function SceneDrawer({ scene, defaultShop, onClose, onSaved, onDeleted }: { scen
       <Field label="上身：穿搭和背景" hint="模特图里穿什么、站在什么环境。不写模特长相，长相在模特库。"><textarea className="textarea" rows={3} maxLength={600} disabled={ro} value={v.wear} onChange={e => set({ wear: e.target.value })} placeholder="如：炭灰色细针织圆领毛衣，深蓝灰纯色背景，不露其他首饰" /></Field>
       <div className="form-row">
         <Field label="光线和色调"><textarea className="textarea" rows={2} maxLength={600} disabled={ro} value={v.light} onChange={e => set({ light: e.target.value })} placeholder="如：左上方柔和窗光，冷灰暗调，低饱和" /></Field>
-        <Field label="道具（可空）"><textarea className="textarea" rows={2} maxLength={600} disabled={ro} value={v.props} onChange={e => set({ props: e.target.value })} placeholder="如：一小枝干花放在画面边缘，不抢主体" /></Field>
+        <Field label="道具（文字，可空）" hint="道具库里有的道具，在下面布局里放道具框更准"><textarea className="textarea" rows={2} maxLength={600} disabled={ro} value={v.props} onChange={e => set({ props: e.target.value })} placeholder="如：一小枝干花放在画面边缘，不抢主体" /></Field>
       </div>
+      <div className="form-section-title">机位和布局<span className="t3 fs-12" style={{ fontWeight: 400 }}>　定场图按布局摆道具，商品框留空，出图时把商品放进去</span></div>
+      <div className="form-row">
+        <Field label="机位"><select className="input" disabled={ro} value={v.camera || ''} onChange={e => set({ camera: e.target.value as Camera })}>{Object.entries(CAMERAS).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Field>
+        <span />
+      </div>
+      <SceneLayout layout={layout} onChange={l => set({ layout: l })} props={usableProps} disabled={ro} />
+      <Field label="摆放说明" hint="输入 @ 引用布局里的框，说清楚谁压着谁、朝哪个方向"><BriefInput value={v.brief || ''} onChange={brief => set({ brief })} names={names} disabled={ro} /></Field>
+      {scene && <PlateSection scene={scene} dirty={dirty} editable={editable && !scene.archived} onChange={onSaved} />}
       <Field label="说明（给同事看的，不进提示词）"><input className="input" maxLength={300} disabled={ro} value={v.note} onChange={e => set({ note: e.target.value })} placeholder="如：秋冬系列用；珍珠项链配这个最好看" /></Field>
       {scene && <>
         <RefSection scene={scene} use="still" title="静物参考图" hint="AI 照着这几张的台面、光线、色调来画；最多 4 张" editable={editable && !scene.archived} onChange={reload} onView={i => lightbox(scene.refs.filter(r => r.use === 'still').map(r => ({ src: r.url, title: `${scene.name} · 静物参考` })), i)} />
@@ -241,5 +260,56 @@ function SceneUsage({ scene, onChange }: { scene: Scene; onChange: () => void })
       </div>
       <div className="help">改场景只影响之后新出的套装；已经出好的图不变，要换就在「AI 出图」里再出一套。</div>
     </>}
+  </div>
+}
+
+// 定场图：按保存好的布局生成空台面候选，锁定一张；布局改过后提示重做（不自动作废）
+const plateJobs = new Map<number, number>()
+function PlateSection({ scene, dirty, editable, onChange }: { scene: Scene; dirty: boolean; editable: boolean; onChange: (s: Scene) => void }) {
+  const toast = useToast()
+  const lightbox = useLightbox()
+  const [extra, setExtra] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [jobId, setJobId] = useState(plateJobs.get(scene.id) || 0)
+  const jobs = useJobs(jobId ? [jobId] : [])
+  const job = jobId ? jobs[jobId] : undefined
+  const live = !!jobId && (!job || jobRunning(job))
+  useEffect(() => {
+    if (!job || jobRunning(job)) return
+    plateJobs.delete(scene.id); setJobId(0)
+    if (job.status === 'failed') toast(job.message || '定场图生成失败', 'error')
+    else toast('定场图候选好了，选一张锁定', 'ok')
+    sceneApi.get(scene.id).then(onChange).catch(() => {})
+  }, [job]) // eslint-disable-line react-hooks/exhaustive-deps
+  const act = async (fn: () => Promise<unknown>, ok: string) => {
+    setBusy(true)
+    try { await fn(); toast(ok, 'ok'); onChange(await sceneApi.get(scene.id)) } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+  }
+  const generate = async () => {
+    setBusy(true)
+    try { const r = await sceneApi.plate(scene.id, extra.trim()); plateJobs.set(scene.id, r.job_id); setJobId(r.job_id); toast('开始生成定场图', 'ok') }
+    catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+  }
+  const hasProduct = scene.layout.elements.some(e => e.type === 'product')
+  const all = [...(scene.plate ? [scene.plate] : []), ...scene.plates]
+  const view = (i: number) => lightbox(all.map(p => ({ src: p.url, title: `${scene.name} · ${p.status === 'locked' ? '锁定的定场图' : '定场图候选'}`, meta: `${p.width}×${p.height}`, download: '' })), i)
+  return <div className="form-field">
+    <span className="label inline"><Lock size={14} />定场图<span className="help">锁定后，出图时用「定场图 + 商品框局部重绘」放商品，同一场景每款背景一致</span></span>
+    {scene.plate && scene.plate_outdated && <div className="status-note inline"><AlertTriangle size={14} />布局在锁定后改过，这张定场图和现在的布局对不上，建议重新生成</div>}
+    {all.length > 0 ? <div className="plate-list">{all.map((p, i) => <div key={p.id} className={'plate' + (p.status === 'locked' ? ' on' : '')}>
+      <button type="button" className="zoomable" onClick={() => view(i)}><img src={p.url} alt="" loading="lazy" /></button>
+      <div className="prop-ref-meta">
+        {p.status === 'locked' ? <span className="inline"><Lock size={12} />已锁定</span> : <span className="t3">候选</span>}
+        {p.sketch_url && <button type="button" className="btn btn-ghost btn-sm" onClick={() => lightbox([{ src: p.sketch_url!, title: '生成时的布局示意图', download: '' }], 0)}>布局</button>}
+        <span className="grow" />
+        {editable && p.status !== 'locked' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => act(() => sceneApi.lockPlate(scene.id, p.id), '定场图已锁定')}><Check />锁定</button>}
+        {editable && <button className="btn btn-ghost btn-icon btn-sm" title="丢弃" aria-label="丢弃" disabled={busy} onClick={() => (p.status !== 'locked' || confirm('丢掉锁定的定场图？之后出图回到不用定场图的方式。')) && act(() => sceneApi.discardPlate(scene.id, p.id), '已丢弃')}><X /></button>}
+      </div>
+    </div>)}</div> : <span className="t4 fs-12">还没有定场图</span>}
+    {editable && <div className="row" style={{ gap: 8 }}>
+      <input className="input" maxLength={400} value={extra} onChange={e => setExtra(e.target.value)} placeholder="补充要求（可空）：如 光从左后方来，台面留多一点空" />
+      <button className="btn btn-primary" style={{ flex: 'none' }} disabled={busy || live || dirty || !hasProduct} onClick={generate} title={dirty ? '先保存布局' : !hasProduct ? '布局里先放一个商品框' : ''}><Sparkles />{live ? `生成中 ${job?.progress || 0}%` : '生成定场图'}</button>
+    </div>}
+    {editable && (dirty || !hasProduct) && <span className="help">{dirty ? '布局有改动，先保存再生成。' : '布局里先放一个商品框并保存。'}</span>}
   </div>
 }

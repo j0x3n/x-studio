@@ -88,7 +88,7 @@ export function TryOn() {
     if (!allowed || queryLoaded.current) return
     queryLoaded.current = true
     const queryModel = Number(sp.get('model'))
-    if (queryModel && !sp.get('shop_id')) api<{ model: ShopModel }>(`/api/models/${queryModel}`).then(r => { setShop(r.model.shop_id); setModelId(r.model.id) }).catch(e => toast(errText(e), 'error'))
+    if (queryModel && !sp.get('shop_id')) api<{ model: ShopModel }>(`/api/models/${queryModel}`).then(r => { if (r.model.shop_id) setShop(r.model.shop_id); setModelId(r.model.id) }).catch(e => toast(errText(e), 'error'))
     const ids = [...new Set((sp.get('assets') || '').split(',').map(Number).filter(n => Number.isSafeInteger(n) && n > 0))]
     if (ids.length > 2) toast('一次最多使用 2 张同款商品图，请重新选择', 'error')
     else if (ids.length) {

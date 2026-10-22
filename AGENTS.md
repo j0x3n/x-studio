@@ -23,5 +23,5 @@
 - 写操作都调 `core.Audit`；请求要带 `X-Requested-With: fetch`。
 - 后端测试离线跑，命令见交接说明第 4 节。用户偏好少跑测试、少耗 AI 额度：只做必要的编译和离线检查，真实 AI 和浏览器效果留给用户手动验收。
 - AI 补图编号带 `_AI` 后缀，证据位和模特位不收 AI 生成或改过的图（`internal/media`）；生图只能用三种尺寸，生成后要核对返回尺寸。生图模板字段见 `templates/生图模板/README.md`，内置场景见 `templates/生图场景/README.md`。
-- 前端：侧栏 `Shell.tsx`（「上新」组按流程排）；照片编号在界面上一律用 `useCodeName()` 显示中文名；通用组件 `Lightbox.tsx`（站内看大图，不要用 `target=_blank` 打开图片）、`ContextMenu.tsx`（右键菜单）、`AssetFolders.tsx`、`ListingPreview.tsx`（商品页模拟预览）；各模块类型和接口在 `lib/<模块>.ts`（如 `creative.ts`、`market.ts`、`scenes.ts`、`shops.ts`、`tryon.ts`）。
+- 前端：侧栏 `Shell.tsx`（「素材」「制作」两组按上新流程排，图片处理、试穿试戴从商品页和模特库进）；商品底图槽位 `components/ProductViews.tsx`，出图方案 `PlanEditor.tsx`（表单）/ `CreativePlans.tsx`（模板库分页）/ `ProductPlan.tsx`（商品页），场景布局框 `SceneLayout.tsx`，道具库 `pages/Props.tsx`，这几块样式在 `styles/materials.css`；照片编号在界面上一律用 `useCodeName()` 显示中文名；通用组件 `Lightbox.tsx`（站内看大图，不要用 `target=_blank` 打开图片）、`ContextMenu.tsx`（右键菜单）、`AssetFolders.tsx`、`ListingPreview.tsx`（商品页模拟预览）；各模块类型和接口在 `lib/<模块>.ts`（如 `creative.ts`、`market.ts`、`scenes.ts`、`props.ts`、`views.ts`（底图和出图方案）、`shops.ts`、`tryon.ts`）。
 - `lib/market.ts`、`lib/creative.ts` 带假数据，`localStorage xs-mock=1` 打开。

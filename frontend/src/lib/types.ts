@@ -15,6 +15,8 @@ export type Product = {
   info: Record<string, unknown>; cost?: Record<string, unknown>; supplier?: Record<string, unknown>
   listings: Listing[]; cover_url: string; asset_count?: number
   category_id?: number; category?: { id: number; key: string; name: string }; created_by_name?: string
+  // 基于哪款新建、引用的出图方案和覆盖
+  based_on?: { id: number; name: string } | null; plan_id?: number | null; plan_overrides?: Record<string, unknown>
 }
 export type Asset = {
   id: number; product_id: number; file: string; orig_name: string; width: number; height: number

@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { LayoutTemplate, Star, Ban, RotateCcw, Sparkles, Check, ExternalLink, Layers } from 'lucide-react'
 import { api, qs } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -9,16 +9,20 @@ import { useCategories } from '../lib/categories'
 import type { DetailTemplate, RenderState } from '../lib/types'
 import { Topbar, Pill, Loading, Empty, Drawer } from '../components/ui'
 import { CreativeTemplates } from '../components/CreativeTemplates'
+import { CreativePlans } from '../components/CreativePlans'
 
 type Templates = { detail: DetailTemplate[]; main: { key: string; name: string; file: string }[] }
 
 // 模板库：生图模板（AI 出图用，默认）和旧的 HTML 详情页模板（停用但保留）
+// 第三个分页是出图方案（?mode=plans 直接打开）
 export function TemplateCenter() {
   const { can } = useAuth()
+  const [sp, setSp] = useSearchParams()
   const ai = can('creative.run')
-  const [mode, setMode] = useState<'ai' | 'html'>(ai ? 'ai' : 'html')
-  const switcher = ai ? <div className="segmented"><button className={mode === 'ai' ? 'active' : ''} onClick={() => setMode('ai')}>生图模板</button><button className={mode === 'html' ? 'active' : ''} onClick={() => setMode('html')}>HTML 模板（旧）</button></div> : null
-  return mode === 'ai' ? <CreativeTemplates switcher={switcher} /> : <HtmlTemplates switcher={switcher} />
+  const mode: 'ai' | 'html' | 'plans' = sp.get('mode') === 'plans' && ai ? 'plans' : sp.get('mode') === 'html' || !ai ? 'html' : 'ai'
+  const setMode = (m: string) => setSp(m === 'ai' ? {} : { mode: m }, { replace: true })
+  const switcher = ai ? <div className="segmented"><button className={mode === 'ai' ? 'active' : ''} onClick={() => setMode('ai')}>生图模板</button><button className={mode === 'plans' ? 'active' : ''} onClick={() => setMode('plans')}>出图方案</button><button className={mode === 'html' ? 'active' : ''} onClick={() => setMode('html')}>HTML 模板（旧）</button></div> : null
+  return mode === 'ai' ? <CreativeTemplates switcher={switcher} /> : mode === 'plans' ? <CreativePlans switcher={switcher} /> : <HtmlTemplates switcher={switcher} />
 }
 
 function HtmlTemplates({ switcher }: { switcher: ReactNode }) {
