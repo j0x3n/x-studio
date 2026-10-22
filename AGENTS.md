@@ -8,7 +8,7 @@
 |---|---|
 | `cmd/server/main.go` | 入口，模块列表在这里注册 |
 | `internal/core/` | 公共框架：配置、路由和权限（`perm.go`）、迁移、审计（`audit.go`）、后台任务、AI 调用、品类 |
-| `internal/modules/<模块>/` | 每个模块自己的路由、表、迁移、测试：`accounts` 账号和角色、`products` 商品和上架版本、`assets` 图片库、处理台、店铺模特库和试穿试戴（`models.go/model_files.go/model_jobs.go/model_workbench.go`）、`copywriting` 文案、`studio` 模板和出图审核、`pipeline` 一键出图、`assistant` AI 助手、`tasks` 任务和通知、`inventory` 库存（`stock.go` 是给采购和订单用的库存 Go 接口）、`kb` 知识库、`purchase` 采购（供应商、采购单、分批到货质检、不合格退货）、`orders` 手工销售订单（占用、发货、售后）、`creative` AI 出图、`scenes` 场景库（静物台面、穿搭、光线、参考图，绑定到 listing / 店铺，`scenes.Resolve` 给 creative 用）、`market` 数据与运营（诊断和建议待做）、`assembly` 组装加工、`finance` 财务和对账 |
+| `internal/modules/<模块>/` | 每个模块自己的路由、表、迁移、测试：`accounts` 账号和角色、`products` 商品和上架版本、`assets` 图片库、处理台、模特库（可全局共用）和试穿试戴（`models.go/model_files.go/model_jobs.go/model_workbench.go`）、商品底图槽位和高清化替换（`views*.go`）、`copywriting` 文案、`studio` 旧 HTML 模板和出图审核、`pipeline` 一键出图、`assistant` AI 助手、`tasks` 任务和通知、`inventory` 库存（`stock.go` 是给采购和订单用的库存 Go 接口）、`kb` 知识库、`purchase` 采购（供应商、采购单、分批到货质检、不合格退货）、`orders` 手工销售订单（占用、发货、售后）、`creative` AI 出图和出图方案（`plans*.go`）、`scenes` 场景库（静物台面、穿搭、光线、参考图、机位、布局框、定场图，绑定到 listing / 店铺，`scenes.Resolve` 给 creative 用）、`props` 道具库（道具设定卡、锁定参考图）、`market` 数据与运营（诊断和建议待做）、`assembly` 组装加工、`finance` 财务和对账 |
 | `frontend/src/pages/` | 页面；`components/` 通用组件（`Shell` 侧栏、`ui` 基础组件、`TaskViews` 任务抽屉、`NoticeBell` 铃铛）；`lib/` 接口、类型、各模块的中文和工具函数 |
 | `frontend/src/styles/` | 样式，按 admin-design-system 规范；模块样式写在 `app.css` 末尾的分段里 |
 | `prompts/`、`templates/` | 提示词、详情页模板（不是 Go 代码） |

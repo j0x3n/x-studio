@@ -32,6 +32,9 @@ const FEATURES: Record<string, string> = {
   creative_text: 'AI 出图·图上文字核对（看图）',
   title_suggest: '标题优化',
   ops_advice: '运营诊断解释',
+  prop_generate: '道具库·生成参考图',
+  prop_views: '道具库·补其他角度',
+  scene_plate: '场景库·生成定场图',
   image_alt: '生图备用模型',
 }
 // 留空时的说明：备用模型在主模型失败、或 AI 出图自动重画时换着用
