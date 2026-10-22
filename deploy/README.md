@@ -37,6 +37,12 @@ bash deploy/local-update.sh --skip-web # 只改了后端
 
 没配 `DEPLOY_HOST` 时只构建镜像不部署。
 
+在 PowerShell 里从本机 `.env` 设 AI 密钥：
+
+```powershell
+gh secret set AI_API_KEY -R j0x3n/x-studio -b ((Select-String -Path .env -Pattern '^AI_API_KEY=(.*)$').Matches[0].Groups[1].Value.Trim())
+```
+
 ### 服务器上的操作
 
 ```bash
