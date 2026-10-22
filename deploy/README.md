@@ -20,7 +20,7 @@ bash deploy/local-update.sh --skip-web # 只改了后端
 
 现在的服务器：154.17.19.138（和 x-console 同一台），部署用户 `deploy`，目录 `/home/deploy/x-studio`，程序监听 `127.0.0.1:17390`，域名 `studio.xcc.im` 由服务器上的 naive Caddy（`/root/naive/Caddyfile`）反代。这台只有 1 核 2 GB、硬盘很紧，所以：
 
-- 不启动 rembg（镜像 4 GB）；像素锁定抠图自动退回普通抠图。空间够了在服务器 `.env` 里加 `COMPOSE_PROFILES=rembg`。
+- 不用 rembg（都走 GPT），像素锁定抠图用普通方式。
 - 程序容器内存上限 900 MB（`.env` 里 `XS_MEM_LIMIT` 可改）。
 - 只保留当前和上一个版本的镜像。
 

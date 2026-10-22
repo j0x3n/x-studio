@@ -2,15 +2,14 @@
 # 程序只监听服务器本机 127.0.0.1:${XS_PORT}，HTTPS 由反向代理负责：
 #   服务器上已经有 Caddy / Nginx：把域名反代到 127.0.0.1:${XS_PORT}
 #   没有反向代理：.env 里加 COMPOSE_PROFILES=caddy，用下面自带的 Caddy
-# rembg（抠图服务，镜像 4 GB）默认不启动，只有可选的像素锁定抠图用它，没有时自动退回普通抠图；
-#   服务器空间够时 .env 里 COMPOSE_PROFILES=rembg（和 caddy 一起用写成 caddy,rembg）
 services:
   app:
     image: ${XS_IMAGE:-ghcr.io/j0x3n/x-studio:latest}
     restart: unless-stopped
     env_file: .env
     environment:
-      REMBG_URL: http://rembg:7000
+      # 不用 rembg 抠图服务（都走 GPT），像素锁定抠图用普通方式
+      REMBG_URL: ""
     volumes:
       - xs-data:/app/data
     ports:
@@ -22,17 +21,6 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
-  rembg:
-    image: danielgatis/rembg:latest
-    profiles: ["rembg"]
-    command: ["s", "--host", "0.0.0.0", "--port", "7000"]
-    restart: unless-stopped
-    volumes:
-      - rembg-models:/root/.u2net
-    mem_limit: 1g
-    logging:
-      driver: json-file
-      options: { max-size: "10m", max-file: "3" }
 
   caddy:
     image: caddy:2
@@ -56,5 +44,4 @@ services:
 volumes:
   # 数据库和全部图片都在这个卷里，部署前的数据库备份在卷里的 backups/
   xs-data:
-  rembg-models:
   caddy-data:

@@ -22,7 +22,8 @@ services:
       AUTO_UPSCALE: "${AUTO_UPSCALE:-1}"
       AUTO_FILL: "${AUTO_FILL:-1}"
       UPSCALE_MIN_SIDE: "${UPSCALE_MIN_SIDE:-900}"
-      REMBG_URL: http://rembg:7000
+      # 不用 rembg 抠图服务（都走 GPT），像素锁定抠图用普通方式
+      REMBG_URL: ""
       COOKIE_SECURE: "0"
       WORKERS: "${WORKERS:-2}"
     volumes:
@@ -31,17 +32,8 @@ services:
       - ./prompts:/app/prompts:ro
     shm_size: "512mb"
     restart: unless-stopped
-    depends_on:
-      - rembg
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-  rembg:
-    image: danielgatis/rembg:latest
-    command: ["s", "--host", "0.0.0.0", "--port", "7000"]
-    volumes:
-      - rembg-models:/root/.u2net
-    restart: unless-stopped
 volumes:
   app-data:
-  rembg-models:
