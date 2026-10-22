@@ -32,7 +32,7 @@ bash deploy/local-update.sh --skip-web # 只改了后端
 | `DEPLOY_USER` | `deploy` |
 | `DEPLOY_SSH_KEY` | 和 x-console 共用的部署私钥（服务器上 `/root/xconsole_deploy`） |
 | `DEPLOY_DOMAIN` | `studio.xcc.im`（只在第一次生成 `.env` 时用） |
-| `AI_API_KEY` | 可选，只在第一次生成 `.env` 时写进去；之后改服务器上的 `.env` |
+| `AI_API_KEY` | 有值时每次部署都同步进服务器的 `.env`；换 key 改这里再部署。设置时用 Git Bash 或下面的 PowerShell 写法，PowerShell 里没有 grep/cut 会设成空值 |
 | `DEPLOY_KNOWN_HOSTS` | 可选，`ssh-keyscan 154.17.19.138` 的输出 |
 
 没配 `DEPLOY_HOST` 时只构建镜像不部署。

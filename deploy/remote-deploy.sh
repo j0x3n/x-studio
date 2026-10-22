@@ -96,6 +96,15 @@ if [ ! -f .env ]; then
 	[ -n "${AI_API_KEY:-}" ] || echo "注意：AI_API_KEY 是空的，AI 功能用不了，在 .env 里补上后再部署一次。" >&2
 fi
 
+# GitHub Secret 里的 AI_API_KEY 有值时，每次部署都同步进 .env（换 key 只要改 Secret 再部署）
+if [ -n "${AI_API_KEY:-}" ] && [ "$(sed -n 's/^AI_API_KEY=//p' .env)" != "$AI_API_KEY" ]; then
+	umask 077
+	grep -v '^AI_API_KEY=' .env >.env.tmp || true
+	printf 'AI_API_KEY=%s\n' "$AI_API_KEY" >>.env.tmp
+	mv .env.tmp .env
+	echo "已更新 .env 里的 AI_API_KEY"
+fi
+
 OLD_IMAGE=$(sed -n 's/^XS_IMAGE=//p' .env)
 BACKUP=
 if [ -n "$(docker compose ps --status running -q app)" ]; then
