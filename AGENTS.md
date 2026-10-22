@@ -12,6 +12,7 @@
 | `frontend/src/pages/` | 页面；`components/` 通用组件（`Shell` 侧栏、`ui` 基础组件、`TaskViews` 任务抽屉、`NoticeBell` 铃铛）；`lib/` 接口、类型、各模块的中文和工具函数 |
 | `frontend/src/styles/` | 样式，按 admin-design-system 规范；模块样式写在 `app.css` 末尾的分段里 |
 | `prompts/`、`templates/` | 提示词、详情页模板（不是 Go 代码） |
+| `deploy/` | Docker 和服务器部署：`Dockerfile`、本机更新脚本 `local-update.sh`、服务器用的 compose / Caddy / `remote-deploy.sh`；GitHub Actions 在 `.github/workflows/deploy.yml` |
 | `web/dist/` | 前端编译结果，`go build` 时打进程序 |
 | `data/` | 本机数据（数据库、图片），不进 git |
 | `.cache/` | 本机缓存、日志、数据库备份、程序，不进 git |
@@ -21,6 +22,7 @@
 - 模块之间不直接改对方的表；需要别的模块的事件就扫 `audit_log` / `jobs`（参照 `tasks` 模块）。库存变更通过 `inventory.StockIn/StockOut`；财务不写采购和订单表；事务里鉴权用同一个事务，避免单 SQLite 连接死锁。
 - 新权限点加在 `internal/core/perm.go`，给内置角色补权限用 `accounts` 模块的新迁移。
 - 写操作都调 `core.Audit`；请求要带 `X-Requested-With: fetch`。
+- **改完代码要更新本机 Docker**：每完成一块能看到效果的改动（前端、后端、模板），提交前跑 `bash deploy/local-update.sh`（只改后端加 `--skip-web`），确认最后一行是「完成」，用户直接在 http://127.0.0.1:8080 看。只改提示词不用跑（目录挂进了容器）。部署方式见 [deploy/README.md](deploy/README.md)。
 - 后端测试离线跑，命令见交接说明第 4 节。用户偏好少跑测试、少耗 AI 额度：只做必要的编译和离线检查，真实 AI 和浏览器效果留给用户手动验收。
 - AI 补图编号带 `_AI` 后缀，证据位和模特位不收 AI 生成或改过的图（`internal/media`）；生图只能用三种尺寸，生成后要核对返回尺寸。生图模板字段见 `templates/生图模板/README.md`，内置场景见 `templates/生图场景/README.md`。
 - 前端：侧栏 `Shell.tsx`（「素材」「制作」两组按上新流程排，图片处理、试穿试戴从商品页和模特库进）；商品底图槽位 `components/ProductViews.tsx`，出图方案 `PlanEditor.tsx`（表单）/ `CreativePlans.tsx`（模板库分页）/ `ProductPlan.tsx`（商品页），场景布局框 `SceneLayout.tsx`，道具库 `pages/Props.tsx`，这几块样式在 `styles/materials.css`；照片编号在界面上一律用 `useCodeName()` 显示中文名；通用组件 `Lightbox.tsx`（站内看大图，不要用 `target=_blank` 打开图片）、`ContextMenu.tsx`（右键菜单）、`AssetFolders.tsx`、`ListingPreview.tsx`（商品页模拟预览）；各模块类型和接口在 `lib/<模块>.ts`（如 `creative.ts`、`market.ts`、`scenes.ts`、`props.ts`、`views.ts`（底图和出图方案）、`shops.ts`、`tryon.ts`）。

@@ -1,14 +1,14 @@
-name: chutu
+# 本机 Docker：bash deploy/local-update.sh 构建并启动，打开 http://127.0.0.1:8080
+# 变量从仓库根目录的 .env 读（和以前直接跑 exe 用的是同一份）。
+# 数据在卷 x-studio_app-data 里；第一次运行 local-update.sh 时会把 ./data 复制进去，之后 ./data 不再使用。
+# 服务器部署用 deploy/docker-compose.yml，见 deploy/README.md。
+name: x-studio
 services:
   app:
-    build: .
+    image: x-studio:local
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
     environment:
-      LISTEN: ":8080"
-      DATA_DIR: /app/data
-      TEMPLATE_DIR: /app/templates
-      PROMPT_DIR: /app/prompts
       ADMIN_USER: "${ADMIN_USER:-admin}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       SESSION_SECRET: "${SESSION_SECRET:?请在 .env 设置至少 32 字符的 SESSION_SECRET}"
@@ -23,17 +23,19 @@ services:
       AUTO_FILL: "${AUTO_FILL:-1}"
       UPSCALE_MIN_SIDE: "${UPSCALE_MIN_SIDE:-900}"
       REMBG_URL: http://rembg:7000
-      CHROME_PATH: /usr/bin/chromium
-      CHROME_NO_SANDBOX: "1"
-      COOKIE_SECURE: "${COOKIE_SECURE:-0}"
+      COOKIE_SECURE: "0"
       WORKERS: "${WORKERS:-2}"
     volumes:
       - app-data:/app/data
+      # 提示词直接用仓库里的，改了不用重建镜像
       - ./prompts:/app/prompts:ro
     shm_size: "512mb"
     restart: unless-stopped
     depends_on:
       - rembg
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
   rembg:
     image: danielgatis/rembg:latest
     command: ["s", "--host", "0.0.0.0", "--port", "7000"]

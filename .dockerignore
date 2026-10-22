@@ -6,3 +6,8 @@ data
 *.zip
 .env
 .git
+.claude
+frontend/node_modules
+frontend/*.tsbuildinfo
+web/dist
+测试照片
