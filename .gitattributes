@@ -1,3 +1,6 @@
 *.sh text eol=lf
 *.go text eol=lf
 Dockerfile text eol=lf
+*.sh text eol=lf
+deploy/Caddyfile text eol=lf
+deploy/Dockerfile text eol=lf
